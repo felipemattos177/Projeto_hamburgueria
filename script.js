@@ -507,22 +507,36 @@ window.addEventListener('click', function(event) {
 
 // === 8. NAVEGAÇÃO ENTRE ABAS DO MENU INFERIOR ===
 function navegarPara(aba) {
-    // 1. Esconde todas as telas
-    document.getElementById("tela-catalogo").classList.add("escondido");
-    document.getElementById("tela-checkout").classList.add("escondido");
-    document.getElementById("tela-perfil").classList.add("escondido");
-    
-    // 2. Tira o foco azul de todos os botões
-    document.querySelectorAll(".nav-item").forEach(btn => btn.classList.remove("ativo"));
+    // A MÁGICA QUE EU TINHA ESQUECIDO: Avisar o site que saímos do checkout!
+    document.body.classList.remove("modo-checkout");
 
-    // 3. Mostra a tela certa e acende o botão
+    // Esconde todas as telas
+    const telaCatalogo = document.getElementById("tela-catalogo");
+    const telaCheckout = document.getElementById("tela-checkout");
+    const telaPerfil = document.getElementById("tela-perfil");
+
+    if (telaCatalogo) telaCatalogo.classList.add("escondido");
+    if (telaCheckout) telaCheckout.classList.add("escondido");
+    if (telaPerfil) telaPerfil.classList.add("escondido");
+    
+    // Tira o foco azul dos botões
+    document.querySelectorAll(".nav-item").forEach(btn => btn.classList.remove("ativo"));
+    
+    // Como saiu do checkout, atualiza a sacola para ela voltar a aparecer se tiver lanche
+    atualizarContadorCart();
+
+    // Mostra a tela certa
     if (aba === 'inicio') {
-        document.getElementById("tela-catalogo").classList.remove("escondido");
-        document.getElementById("btn-nav-inicio").classList.add("ativo");
+        if (telaCatalogo) telaCatalogo.classList.remove("escondido");
+        const btnInicio = document.getElementById("btn-nav-inicio");
+        if (btnInicio) btnInicio.classList.add("ativo");
+        window.scrollTo(0, 0);
     } else if (aba === 'perfil') {
-        document.getElementById("tela-perfil").classList.remove("escondido");
-        document.getElementById("btn-nav-perfil").classList.add("ativo");
-        carregarPerfilNaTela(); // Puxa os dados da memória
+        if (telaPerfil) telaPerfil.classList.remove("escondido");
+        const btnPerfil = document.getElementById("btn-nav-perfil");
+        if (btnPerfil) btnPerfil.classList.add("ativo");
+        carregarPerfilNaTela();
+        window.scrollTo(0, 0);
     }
 }
 

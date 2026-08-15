@@ -214,11 +214,15 @@ async function enviarParaWhatsApp() {
     // Calcula o total
     const totalCalculado = carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0);
 
-    // Muda o texto do botão para mostrar que está carregando
-    const btnFinalizar = document.querySelector(".tela-checkout .btn-novo");
-    const textoOriginalBotao = btnFinalizar.innerText;
-    btnFinalizar.innerText = "Processando Pedido...";
-    btnFinalizar.disabled = true;
+    // Captura o botão de forma segura pela ação de clique dele
+    const btnFinalizar = document.querySelector("button[onclick='enviarParaWhatsApp()']");
+    let textoOriginalBotao = "Enviar Pedido";
+
+    if (btnFinalizar) {
+        textoOriginalBotao = btnFinalizar.innerText;
+        btnFinalizar.innerText = "Processando Pedido...";
+        btnFinalizar.disabled = true;
+    }
 
     try {
         // PASSO 1: Salvar o Pedido no Banco de Dados
@@ -228,7 +232,7 @@ async function enviarParaWhatsApp() {
                 'apikey': SUPABASE_KEY,
                 'Authorization': `Bearer ${SUPABASE_KEY}`,
                 'Content-Type': 'application/json',
-                'Prefer': 'return=representation' // Pede para a API devolver o ID que acabou de gerar
+                'Prefer': 'return=representation' 
             },
             body: JSON.stringify({
                 nome_cliente: nome,
@@ -241,7 +245,7 @@ async function enviarParaWhatsApp() {
         const pedidoSalvo = await resPedido.json();
         const idDoPedido = pedidoSalvo[0].id; 
 
-        // PASSO 2: Salvar os Itens (ISSO VAI ACIONAR SEU TRIGGER DE ESTOQUE)
+        // PASSO 2: Salvar os Itens (AQUI SEU TRIGGER DO SUPABASE É ACIONADO)
         for (const item of carrinho) {
             await fetch(`${SUPABASE_URL}/rest/v1/itens_pedido`, {
                 method: 'POST',
@@ -282,9 +286,11 @@ async function enviarParaWhatsApp() {
 
         textoPedido += `\n💰 *TOTAL DO PEDIDO: R$ ${totalCalculado.toFixed(2).replace('.', ',')}*`;
 
-        // Restaura o botão e limpa o carrinho
-        btnFinalizar.innerText = textoOriginalBotao;
-        btnFinalizar.disabled = false;
+        // Restaura o botão e limpa os dados da tela
+        if (btnFinalizar) {
+            btnFinalizar.innerText = textoOriginalBotao;
+            btnFinalizar.disabled = false;
+        }
         
         carrinho = [];
         atualizarContadorCart();
@@ -293,16 +299,19 @@ async function enviarParaWhatsApp() {
         document.getElementById("nome-cliente").value = "";
         document.getElementById("endereco-cliente").value = "";
 
-        // Envia para o WhatsApp
-        const telefone = "5543999999999"; // Coloque seu número aqui
+        // Abre o WhatsApp
+        const telefone = "5543999999999"; // <-- Lembre-se de colocar o seu número real aqui depois!
         const mensagemCodificada = encodeURIComponent(textoPedido);
         window.open(`https://wa.me/${telefone}?text=${mensagemCodificada}`, '_blank');
 
     } catch (erro) {
         console.error("Erro no checkout:", erro);
-        alert("Houve um erro de conexão ao processar o pedido. Tente novamente.");
-        btnFinalizar.innerText = textoOriginalBotao;
-        btnFinalizar.disabled = false;
+        alert("Houve um erro de conexão ao processar o pedido. Verifique seu console F12.");
+        
+        if (btnFinalizar) {
+            btnFinalizar.innerText = textoOriginalBotao;
+            btnFinalizar.disabled = false;
+        }
     }
 }
 

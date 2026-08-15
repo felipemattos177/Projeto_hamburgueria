@@ -11,23 +11,33 @@
         .header-admin h1 { margin: 0; font-size: 24px; color: #ff5e00; }
         .btn-novo { background-color: #2ed573; color: white; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; transition: 0.2s;}
         .btn-novo:hover { background-color: #26b963; }
+        
         table { width: 100%; background: white; border-collapse: collapse; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         th, td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; }
         th { background-color: #f1f2f6; color: #555; font-weight: 500; }
+        
         .status-badge { padding: 5px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; color: white; }
         .status-ativo { background-color: #2ed573; }
         .status-inativo { background-color: #ff4757; }
+        
         .btn-acao { padding: 8px 12px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
         .btn-toggle { background-color: #dfe4ea; color: #2f3542; }
+        .btn-receita { background-color: #ffa502; color: white; margin-left: 5px; }
+        .btn-receita:hover { background-color: #ff7f50; }
+        .btn-excluir { background-color: #ff4757; color: white; }
         
         .estoque-baixo { color: #ff4757; font-weight: bold; }
         
+        /* Modais */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 1000; }
-        .modal-conteudo { background: white; padding: 30px; border-radius: 10px; width: 400px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .modal-conteudo { background: white; padding: 30px; border-radius: 10px; width: 400px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); max-height: 90vh; overflow-y: auto; }
+        .modal-conteudo.largo { width: 600px; }
         .modal-conteudo h2 { margin-top: 0; margin-bottom: 20px; color: #121212; }
         .modal-conteudo input, .modal-conteudo select { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
-        .modal-botoes { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
+        .modal-botoes { display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; }
         .btn-cancelar { background-color: #dfe4ea; color: #333; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        
+        .box-add-ingrediente { background: #f1f2f6; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #dfe4ea; }
     </style>
 </head>
 <body>
@@ -46,7 +56,7 @@
                 <th>Categoria</th>
                 <th>Preço</th>
                 <th>Status</th>
-                <th>Ação</th>
+                <th>Ações</th>
             </tr>
         </thead>
         <tbody id="tabela-produtos">
@@ -54,10 +64,10 @@
         </tbody>
     </table>
 
-    <!-- SESSÃO 2: ESTOQUE (NOVO) -->
+    <!-- SESSÃO 2: ESTOQUE -->
     <div class="header-admin">
         <h1>📦 Controle de Estoque (Ingredientes)</h1>
-        <button class="btn-novo" onclick="alert('Em breve: Formulário de nova matéria-prima!')">+ Nova Matéria-Prima</button>
+        <button class="btn-novo" onclick="alert('Em breve: Cadastro de nova matéria-prima!')">+ Nova Matéria-Prima</button>
     </div>
 
     <table>
@@ -75,7 +85,7 @@
         </tbody>
     </table>
 
-    <!-- Modal de Novo Produto -->
+    <!-- MODAL 1: CADASTRAR PRODUTO -->
     <div id="modal-novo-produto" class="modal-overlay">
         <div class="modal-conteudo">
             <h2>Cadastrar Lanche</h2>
@@ -91,6 +101,40 @@
             <div class="modal-botoes">
                 <button class="btn-cancelar" onclick="fecharModalAdmin()">Cancelar</button>
                 <button class="btn-novo" onclick="salvarNovoProduto()">Salvar Produto</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: FICHA TÉCNICA (RECEITA) -->
+    <div id="modal-receita" class="modal-overlay">
+        <div class="modal-conteudo largo">
+            <h2 id="titulo-modal-receita">Ficha Técnica</h2>
+            
+            <div class="box-add-ingrediente">
+                <h4 style="margin-top: 0; margin-bottom: 10px; color: #555;">➕ Adicionar à Receita</h4>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <select id="select-ingrediente" style="margin-bottom: 0; flex: 2;"></select>
+                    <input type="number" id="input-qtd-ingrediente" placeholder="Qtd" step="0.01" style="margin-bottom: 0; flex: 1;">
+                    <span id="label-unidade" style="font-weight: bold; color: #ff5e00; width: 60px;"></span>
+                </div>
+                <button class="btn-novo" style="margin-top: 10px; width: 100%;" onclick="salvarIngredienteNaReceita()">Vincular Ingrediente</button>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Ingrediente</th>
+                        <th>Quantidade Usada</th>
+                        <th>Ação</th>
+                    </tr>
+                </thead>
+                <tbody id="tabela-receita">
+                    <!-- Lista de ingredientes do lanche aparece aqui -->
+                </tbody>
+            </table>
+
+            <div class="modal-botoes">
+                <button class="btn-cancelar" onclick="fecharModalReceita()">Fechar Aba</button>
             </div>
         </div>
     </div>

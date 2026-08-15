@@ -395,3 +395,29 @@ input:focus, select:focus {
     align-items: center;
     gap: 10px;
 }
+/* Efeito de Lanche Esgotado */
+.produto-card.esgotado {
+    opacity: 0.6;
+    filter: grayscale(100%);
+    cursor: not-allowed;
+    transform: none; /* Tira o efeito de pular ao passar o mouse */
+    box-shadow: none;
+}
+
+/* Selo Vermelho de Aviso */
+.selo-esgotado {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(255, 71, 87, 0.9);
+    color: white;
+    padding: 8px 15px;
+    border-radius: 5px;
+    font-weight: bold;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    text-align: center;
+    width: 80%;
+}

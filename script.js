@@ -9,7 +9,8 @@ let produtoSendoVisto = null;
 // === 2. EXTRAÇÃO DE DADOS (API DO SUPABASE) ===
 async function carregarCardapioDoBanco() {
     try {
-        const resposta = await fetch(`${SUPABASE_URL}/rest/v1/produtos?select=*&ativo=eq.true`, {
+        // 1. Apontamos a extração para a nossa VIEW inteligente
+        const resposta = await fetch(`${SUPABASE_URL}/rest/v1/cardapio_inteligente?select=*&ativo=eq.true`, {
             method: 'GET',
             headers: {
                 'apikey': SUPABASE_KEY,
@@ -23,7 +24,7 @@ async function carregarCardapioDoBanco() {
 
         const dados = await resposta.json();
 
-        // Transforma o retorno do banco no formato que a tela espera
+        // 2. Mapeamos os dados trazendo a nova coluna de estoque
         cardapio = dados.map(item => ({
             id: item.id,
             categoria: item.categoria,
@@ -31,7 +32,8 @@ async function carregarCardapioDoBanco() {
             descricao: item.descricao,
             preco: parseFloat(item.preco),
             imagem: item.imagem,
-            adicionais: [] // Depois podemos criar a tabela de adicionais no banco
+            tem_estoque: item.tem_estoque, // <-- O SEGREDO ESTÁ AQUI
+            adicionais: [] 
         }));
 
         // Chama a função para desenhar na tela
@@ -51,9 +53,20 @@ function renderizarCardapio(categoriaFiltro = "Todos") {
 
     cardapio.forEach(produto => {
         if (categoriaFiltro === "Todos" || produto.categoria === categoriaFiltro) {
+            
+            // REGRA DE ESTOQUE: Verifica se o lanche tem ingredientes suficientes
+            const isEsgotado = produto.tem_estoque === false; 
+            
+            // Monta as classes e o evento dependendo da situação
+            const classeCard = isEsgotado ? "produto-card esgotado" : "produto-card";
+            const eventoClique = isEsgotado ? "" : `onclick="abrirModalProduto(${produto.id})"`;
+            const badgeEsgotado = isEsgotado ? `<div class="selo-esgotado">Ingredientes Esgotados</div>` : "";
+
             lista.innerHTML += `
-                <div class="produto-card" onclick="abrirModalProduto(${produto.id})">
-                    <div class="produto-imagem" style="background-image: url('${produto.imagem}');"></div>
+                <div class="${classeCard}" ${eventoClique}>
+                    <div class="produto-imagem" style="background-image: url('${produto.imagem}'); position: relative;">
+                        ${badgeEsgotado}
+                    </div>
                     <div class="produto-info">
                         <h3>${produto.nome}</h3>
                         <p>${produto.descricao}</p>
@@ -71,65 +84,110 @@ function filtrarCategoria(categoria, elementoBotao) {
     renderizarCardapio(categoria);
 }
 
-// === 4. LÓGICA DO MODAL (ADICIONAIS) ===
-function abrirModalProduto(id) {
+// === 4. LÓGICA DO MODAL (ADICIONAIS DO BANCO) ===
+async function abrirModalProduto(id) {
     produtoSendoVisto = cardapio.find(p => p.id === id);
     const modal = document.getElementById("modal-produto");
     const detalhes = document.getElementById("detalhes-produto-modal");
 
-    let htmlAdicionais = "";
-    if (produtoSendoVisto.adicionais.length > 0) {
-        htmlAdicionais += `<div class="adicionais-lista"><h4>Turbine seu lanche:</h4>`;
-        produtoSendoVisto.adicionais.forEach(add => {
-            htmlAdicionais += `
-                <label class="adicional-item">
-                    <span>${add.nome} (+ R$ ${add.preco.toFixed(2).replace('.', ',')})</span>
-                    <input type="checkbox" class="check-adicional" data-nome="${add.nome}" data-preco="${add.preco}">
-                </label>
-            `;
-        });
-        htmlAdicionais += `</div>`;
-    }
-
-    detalhes.innerHTML = `
-        <img src="${produtoSendoVisto.imagem}" class="img-destaque-modal">
-        <h2>${produtoSendoVisto.nome}</h2>
-        <p style="color: var(--texto-cinza); font-size: 14px; margin-bottom: 10px;">${produtoSendoVisto.descricao}</p>
-        <h3 style="color: var(--laranja-fogo);">R$ ${produtoSendoVisto.preco.toFixed(2).replace('.', ',')}</h3>
-        ${htmlAdicionais}
-        <button class="btn-add-carrinho" onclick="confirmarAdicao()">Adicionar ao Pedido</button>
-    `;
-
+    detalhes.innerHTML = `<p style="text-align: center; padding: 20px; color: #fff;">Carregando opções...</p>`;
     modal.classList.remove("escondido");
+
+    try {
+        const resExtras = await fetch(`${SUPABASE_URL}/rest/v1/ingredientes?select=id,nome,preco_adicional&preco_adicional=gt.0&estoque=gt.0`, {
+            method: 'GET',
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+        });
+        const adicionaisDoBanco = await resExtras.json();
+
+        let htmlAdicionais = "";
+        
+        if (adicionaisDoBanco.length > 0 && produtoSendoVisto.categoria !== "Bebidas") {
+            htmlAdicionais += `<div class="adicionais-lista" style="margin-top:15px; border-top: 1px solid #333; padding-top: 15px;">
+                <h4 style="margin-bottom: 10px; color: #fff;">Turbine seu lanche:</h4>`;
+            
+            adicionaisDoBanco.forEach(add => {
+                htmlAdicionais += `
+                    <div class="adicional-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 12px; background: #222; border-radius: 8px; border: 1px solid #333;">
+                        <span style="color: #fff; font-weight: 500;">${add.nome} <br><small style="color: #aaa;">+ R$ ${add.preco_adicional.toFixed(2).replace('.', ',')}</small></span>
+                        
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <button type="button" onclick="alterarQtdAdicional('${add.id}', -1)" style="width: 32px; height: 32px; border-radius: 6px; background: #444; color: white; border: none; font-weight: bold; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; transition: 0.2s;">-</button>
+                            
+                            <span class="qtd-adicional-span" id="qtd-add-${add.id}" data-id="${add.id}" data-nome="${add.nome}" data-preco="${add.preco_adicional}" style="font-weight: bold; color: #fff; width: 15px; text-align: center; font-size: 16px;">0</span>
+                            
+                            <button type="button" onclick="alterarQtdAdicional('${add.id}', 1)" style="width: 32px; height: 32px; border-radius: 6px; background: #ff5e00; color: white; border: none; font-weight: bold; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; transition: 0.2s;">+</button>
+                        </div>
+                    </div>
+                `;
+            });
+            htmlAdicionais += `</div>`;
+        }
+
+        detalhes.innerHTML = `
+            <div class="produto-imagem" style="background-image: url('${produtoSendoVisto.imagem}'); height: 200px; background-size: cover; background-position: center; border-radius: 10px; margin-bottom: 15px;"></div>
+            <h2 style="color: #fff;">${produtoSendoVisto.nome}</h2>
+            <p style="color: #aaa; font-size: 14px; margin-bottom: 10px;">${produtoSendoVisto.descricao}</p>
+            <h3 style="color: #ff5e00; font-size: 22px;">R$ ${produtoSendoVisto.preco.toFixed(2).replace('.', ',')}</h3>
+            ${htmlAdicionais}
+            <button class="btn-add-carrinho" onclick="confirmarAdicao()" style="width: 100%; padding: 15px; background: #2ed573; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 16px; margin-top: 15px; cursor: pointer;">
+                Adicionar ao Pedido
+            </button>
+        `;
+
+    } catch (erro) {
+        console.error("Erro ao buscar adicionais:", erro);
+        detalhes.innerHTML = `<p style="color: red;">Erro ao carregar. Tente novamente.</p>`;
+    }
 }
 
-function fecharModal() {
-    document.getElementById("modal-produto").classList.add("escondido");
-    produtoSendoVisto = null;
+// === FUNÇÃO NOVA: FAZ OS BOTÕES + E - FUNCIONAREM ===
+function alterarQtdAdicional(id, delta) {
+    const span = document.getElementById(`qtd-add-${id}`);
+    let qtd = parseInt(span.innerText) + delta;
+    if (qtd < 0) qtd = 0;
+    if (qtd > 10) qtd = 10; // Trava de segurança (máximo 10 extras iguais)
+    span.innerText = qtd;
 }
 
+// === FUNÇÃO: JOGA O LANCHE E OS EXTRAS NO CARRINHO ===
 function confirmarAdicao() {
-    let adicionaisEscolhidos = [];
-    let valorAdicionais = 0;
+    const adicionaisEscolhidos = [];
+    let totalAdicionais = 0;
 
-    const checkboxes = document.querySelectorAll(".check-adicional:checked");
-    checkboxes.forEach(chk => {
-        const nome = chk.getAttribute("data-nome");
-        const preco = parseFloat(chk.getAttribute("data-preco"));
-        adicionaisEscolhidos.push({ nome, preco });
-        valorAdicionais += preco;
+    // Busca todos os números do novo contador de adicionais
+    const spansQtd = document.querySelectorAll(".qtd-adicional-span");
+    
+    spansQtd.forEach(span => {
+        const qtd = parseInt(span.innerText);
+        if (qtd > 0) { // Só entra no carrinho se o cliente colocou 1 ou mais
+            const idAdd = span.getAttribute("data-id");
+            const nomeAdd = span.getAttribute("data-nome");
+            const precoAdd = parseFloat(span.getAttribute("data-preco"));
+
+            adicionaisEscolhidos.push({
+                id: idAdd, 
+                nome: nomeAdd,
+                preco: precoAdd,
+                quantidade: qtd
+            });
+            totalAdicionais += (precoAdd * qtd);
+        }
     });
 
-    const itemCarrinho = {
+    const itemParaCarrinho = {
         produtoBase: produtoSendoVisto,
         adicionais: adicionaisEscolhidos,
-        precoTotalItem: produtoSendoVisto.preco + valorAdicionais
+        precoTotalItem: produtoSendoVisto.preco + totalAdicionais
     };
 
-    carrinho.push(itemCarrinho);
+    carrinho.push(itemParaCarrinho);
+    
     atualizarContadorCart();
-    fecharModal();
+    document.getElementById("modal-produto").classList.add("escondido");
+    
 }
+
 
 // === 5. LÓGICA DO CARRINHO E CHECKOUT ===
 function atualizarContadorCart() {
@@ -164,7 +222,8 @@ function renderizarCheckout() {
         if (item.adicionais.length > 0) {
             listaAddsHtml = "<ul>";
             item.adicionais.forEach(add => {
-                listaAddsHtml += `<li>+ ${add.nome} (R$ ${add.preco.toFixed(2).replace('.', ',')})</li>`;
+                const subtotalAdd = add.preco * add.quantidade;
+                listaAddsHtml += `<li>+ ${add.quantidade}x ${add.nome} (R$ ${subtotalAdd.toFixed(2).replace('.', ',')})</li>`;
             });
             listaAddsHtml += "</ul>";
         }
@@ -183,6 +242,7 @@ function renderizarCheckout() {
 
     document.getElementById("valor-total").innerText = `R$ ${somaTotal.toFixed(2).replace('.', ',')}`;
 }
+
 
 function removerDoCarrinho(index) {
     carrinho.splice(index, 1);
@@ -245,14 +305,19 @@ async function enviarParaWhatsApp() {
         const pedidoSalvo = await resPedido.json();
         const idDoPedido = pedidoSalvo[0].id; 
 
-        // PASSO 2: Salvar os Itens (AQUI SEU TRIGGER DO SUPABASE É ACIONADO)
+        // =======================================================
+        // PASSO 2: SALVAR OS ITENS E OS ADICIONAIS
+        // =======================================================
         for (const item of carrinho) {
-            await fetch(`${SUPABASE_URL}/rest/v1/itens_pedido`, {
+            
+            // 2.1: Salva o Lanche
+            const resItem = await fetch(`${SUPABASE_URL}/rest/v1/itens_pedido`, {
                 method: 'POST',
                 headers: {
                     'apikey': SUPABASE_KEY,
                     'Authorization': `Bearer ${SUPABASE_KEY}`,
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Prefer': 'return=representation' 
                 },
                 body: JSON.stringify({
                     pedido_id: idDoPedido,
@@ -261,7 +326,30 @@ async function enviarParaWhatsApp() {
                     preco_unitario: item.precoTotalItem
                 })
             });
+
+            if (!resItem.ok) throw new Error("Erro ao salvar lanche.");
+            const itemSalvo = await resItem.json();
+            const idDoItemSalvo = itemSalvo[0].id; 
+
+            // 2.2: Salva Adicionais com a Quantidade Correta!
+            for (const extra of item.adicionais) {
+                await fetch(`${SUPABASE_URL}/rest/v1/itens_pedido_adicionais`, {
+                    method: 'POST',
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        item_pedido_id: idDoItemSalvo,
+                        ingrediente_id: parseInt(extra.id),
+                        quantidade: extra.quantidade,  // <-- Agora envia ex: 2, 3...
+                        preco_unitario: extra.preco
+                    })
+                });
+            }
         }
+        // =======================================================
 
         // PASSO 3: Montar a mensagem do WhatsApp
         let textoPedido = `🔥 *NOVO PEDIDO #${idDoPedido} - FIRE BURGER* 🔥\n\n`;
@@ -278,9 +366,13 @@ async function enviarParaWhatsApp() {
         textoPedido += "🛒 *ITENS DO PEDIDO:*\n";
         carrinho.forEach(item => {
             textoPedido += `\n*1x ${item.produtoBase.nome}* (R$ ${item.produtoBase.preco.toFixed(2).replace('.', ',')})\n`;
+            
+            // Coloca a quantidade e o subtotal do adicional na mensagem
             item.adicionais.forEach(add => {
-                textoPedido += `   + ${add.nome} (R$ ${add.preco.toFixed(2).replace('.', ',')})\n`;
+                const subtotalExtra = add.preco * add.quantidade;
+                textoPedido += `   + ${add.quantidade}x ${add.nome} (R$ ${subtotalExtra.toFixed(2).replace('.', ',')})\n`;
             });
+            
             textoPedido += `   *Subtotal do item: R$ ${item.precoTotalItem.toFixed(2).replace('.', ',')}*\n`;
         });
 
@@ -300,7 +392,7 @@ async function enviarParaWhatsApp() {
         document.getElementById("endereco-cliente").value = "";
 
         // Abre o WhatsApp
-        const telefone = "5543999999999"; // <-- Lembre-se de colocar o seu número real aqui depois!
+        const telefone = "5543996150221"; 
         const mensagemCodificada = encodeURIComponent(textoPedido);
         window.open(`https://wa.me/${telefone}?text=${mensagemCodificada}`, '_blank');
 
@@ -313,7 +405,25 @@ async function enviarParaWhatsApp() {
             btnFinalizar.disabled = false;
         }
     }
+}// === 7. FUNÇÕES DE FECHAR A JANELA (GARANTIA) ===
+
+// Cobre o nome 1
+function fecharModalProduto() {
+    document.getElementById("modal-produto").classList.add("escondido");
 }
+
+// Cobre o nome 2 (caso esteja assim no seu HTML)
+function fecharModal() {
+    document.getElementById("modal-produto").classList.add("escondido");
+}
+
+// BÔNUS VIP: Fecha a janela se o cliente clicar no fundo escuro fora do lanche
+window.addEventListener('click', function(event) {
+    const modal = document.getElementById("modal-produto");
+    if (event.target === modal) {
+        modal.classList.add("escondido");
+    }
+});
 
 // === INICIA O SISTEMA AO ABRIR O SITE ===
 carregarCardapioDoBanco();

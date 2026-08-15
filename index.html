@@ -119,6 +119,17 @@
     </div>
 
     <!-- ========================================== -->
+    <!-- TELA 4: MEUS PEDIDOS                       -->
+    <!-- ========================================== -->
+    <div id="tela-pedidos" class="container escondido" style="margin-top: 80px; margin-bottom: 100px;">
+        <h2 style="color: var(--laranja-fogo); margin-bottom: 20px;"><i class="fa-regular fa-clipboard"></i> Meus Pedidos</h2>
+        
+        <div id="lista-historico-pedidos">
+            <!-- Os pedidos vão aparecer aqui magicamente -->
+        </div>
+    </div>
+
+    <!-- ========================================== -->
     <!-- MODAL DE PRODUTO (ADICIONAIS)              -->
     <!-- ========================================== -->
     <div id="modal-produto" class="modal-overlay escondido">
@@ -138,7 +149,7 @@
         <div class="sacola-total" id="total-sacola">R$ 0,00</div>
     </div>
 
-    <!-- === MENU INFERIOR (BOTTOM NAV) === -->
+   <!-- === MENU INFERIOR (BOTTOM NAV) === -->
     <nav class="bottom-nav">
         <a href="#" class="nav-item ativo" onclick="navegarPara('inicio')" id="btn-nav-inicio">
             <i class="fa-solid fa-house"></i>
@@ -148,7 +159,7 @@
             <i class="fa-solid fa-percent"></i>
             <span>Promoções</span>
         </a>
-        <a href="#" class="nav-item">
+        <a href="#" class="nav-item" onclick="navegarPara('pedidos')" id="btn-nav-pedidos">
             <i class="fa-regular fa-clipboard"></i>
             <span>Pedidos</span>
         </a>

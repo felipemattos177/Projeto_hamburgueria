@@ -553,4 +553,37 @@ body.modo-checkout .bottom-nav {
     justify-content: center;
     align-items: center;
     gap: 10px;
+}/* === MENU INFERIOR (BOTTOM NAV) === */
+.bottom-nav {
+    position: fixed; 
+    bottom: 0; 
+    left: 0; 
+    width: 100%; 
+    background-color: var(--fundo-secundario, #1e1e1e); /* Fundo escuro elegante */
+    display: flex !important; /* MÁGICA: Força a ficar lado a lado */
+    flex-direction: row !important;
+    justify-content: space-around; 
+    padding: 15px 0; 
+    z-index: 1000; 
+    border-top: 1px solid #333;
+}
+
+.nav-item { 
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    text-decoration: none; 
+    color: var(--texto-cinza, #a4b0be); 
+    font-size: 12px; 
+    gap: 5px;
+}
+
+.nav-item.ativo { 
+    color: var(--laranja-fogo, #ff5e00); 
+    font-weight: bold; 
+}
+
+/* Isso garante que a barra da sacola fique logo acima do menu inferior */
+#barra-sacola {
+    bottom: 85px; 
 }

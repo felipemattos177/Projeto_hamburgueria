@@ -393,9 +393,16 @@ async function enviarParaWhatsApp() {
         return;
     }
 
-    const enderecoFormatado = `${rua}, ${numero} - ${bairro} ${complemento ? '(' + complemento + ')' : ''}`;
+const enderecoFormatado = `${rua}, ${numero} - ${bairro} ${complemento ? '(' + complemento + ')' : ''}`;
     const totalCalculado = carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0);
     
+    // --- NOVO: Puxa o ID único e o telefone da memória do celular ---
+    const idUnicoCliente = obterIdCliente();
+    let telefonePerfil = "";
+    const salvo = localStorage.getItem("vilelaburgers_perfil");
+    if (salvo) telefonePerfil = JSON.parse(salvo).telefone || "";
+    // ----------------------------------------------------------------
+
     const btnFinalizar = document.querySelector("button[onclick='enviarParaWhatsApp()']");
     let textoOriginalBotao = "Enviar Pedido";
 
@@ -412,9 +419,15 @@ async function enviarParaWhatsApp() {
                 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`,
                 'Content-Type': 'application/json', 'Prefer': 'return=representation' 
             },
-            body: JSON.stringify({ nome_cliente: nome, forma_pagamento: pagamento, total: totalCalculado })
+            // --- NOVO: Enviando o cliente_id e telefone_cliente para o banco ---
+            body: JSON.stringify({ 
+                nome_cliente: nome, 
+                forma_pagamento: pagamento, 
+                total: totalCalculado,
+                cliente_id: idUnicoCliente,
+                telefone_cliente: telefonePerfil
+            })
         });
-
         if (!resPedido.ok) throw new Error("Erro ao gerar pedido no banco.");
         const pedidoSalvo = await resPedido.json();
         const idDoPedido = pedidoSalvo[0].id; 
@@ -507,35 +520,33 @@ window.addEventListener('click', function(event) {
 
 // === 8. NAVEGAÇÃO ENTRE ABAS DO MENU INFERIOR ===
 function navegarPara(aba) {
-    // A MÁGICA QUE EU TINHA ESQUECIDO: Avisar o site que saímos do checkout!
     document.body.classList.remove("modo-checkout");
 
-    // Esconde todas as telas
-    const telaCatalogo = document.getElementById("tela-catalogo");
-    const telaCheckout = document.getElementById("tela-checkout");
-    const telaPerfil = document.getElementById("tela-perfil");
-
-    if (telaCatalogo) telaCatalogo.classList.add("escondido");
-    if (telaCheckout) telaCheckout.classList.add("escondido");
-    if (telaPerfil) telaPerfil.classList.add("escondido");
+    // 1. Esconde todas as telas
+    const telas = ["tela-catalogo", "tela-checkout", "tela-perfil", "tela-pedidos"];
+    telas.forEach(id => {
+        const elemento = document.getElementById(id);
+        if (elemento) elemento.classList.add("escondido");
+    });
     
-    // Tira o foco azul dos botões
+    // 2. Tira o foco azul dos botões
     document.querySelectorAll(".nav-item").forEach(btn => btn.classList.remove("ativo"));
-    
-    // Como saiu do checkout, atualiza a sacola para ela voltar a aparecer se tiver lanche
     atualizarContadorCart();
 
-    // Mostra a tela certa
+    // 3. Mostra a tela certa e executa a função dela
     if (aba === 'inicio') {
-        if (telaCatalogo) telaCatalogo.classList.remove("escondido");
-        const btnInicio = document.getElementById("btn-nav-inicio");
-        if (btnInicio) btnInicio.classList.add("ativo");
+        document.getElementById("tela-catalogo").classList.remove("escondido");
+        document.getElementById("btn-nav-inicio").classList.add("ativo");
         window.scrollTo(0, 0);
     } else if (aba === 'perfil') {
-        if (telaPerfil) telaPerfil.classList.remove("escondido");
-        const btnPerfil = document.getElementById("btn-nav-perfil");
-        if (btnPerfil) btnPerfil.classList.add("ativo");
+        document.getElementById("tela-perfil").classList.remove("escondido");
+        document.getElementById("btn-nav-perfil").classList.add("ativo");
         carregarPerfilNaTela();
+        window.scrollTo(0, 0);
+    } else if (aba === 'pedidos') {
+        document.getElementById("tela-pedidos").classList.remove("escondido");
+        document.getElementById("btn-nav-pedidos").classList.add("ativo");
+        carregarHistoricoPedidos(); // MÁGICA: Busca os pedidos quando abre a aba!
         window.scrollTo(0, 0);
     }
 }
@@ -627,12 +638,81 @@ async function renderizarRodape() {
         const hora = String(dataCommit.getHours()).padStart(2, '0');
         const minuto = String(dataCommit.getMinutes()).padStart(2, '0');
 
-        document.getElementById("versao-app").innerText = `Build: ${hashAtualizacao} (${dia}/${mes} às ${hora}:${minuto})`;
+        document.getElementById("versao-app").innerText = `Versão: ${hashAtualizacao} (${dia}/${mes} às ${hora}:${minuto})`;
 
     } catch (erro) {
         // Se der erro (ex: cliente sem internet na hora, ou o GitHub demorar), ele põe a data de hoje como garantia
         const mesAtual = String(dataAtual.getMonth() + 1).padStart(2, '0');
         document.getElementById("versao-app").innerText = `Versão do Sistema v1.${ano}.${mesAtual}`;
+    }
+}// === 11. IDENTIFICAÇÃO ÚNICA (SILENT ID) ===
+function obterIdCliente() {
+    let id = localStorage.getItem("vilelaburgers_cliente_id");
+    if (!id) {
+        // Se é a primeira vez dele no site, gera um ID único e salva
+        id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+        localStorage.setItem("vilelaburgers_cliente_id", id);
+    }
+    return id;
+}// === 12. HISTÓRICO DE PEDIDOS DO CLIENTE ===
+async function carregarHistoricoPedidos() {
+    const divHistorico = document.getElementById("lista-historico-pedidos");
+    const clienteId = obterIdCliente(); // Pega o ID único do celular
+
+    divHistorico.innerHTML = `<p style="color: var(--texto-cinza); text-align: center;"><i class="fa-solid fa-spinner fa-spin"></i> Buscando seus pedidos...</p>`;
+
+    try {
+        // Vai no Supabase e pede: "Me traga todos os pedidos onde o cliente_id seja igual ao meu, ordenado do mais novo pro mais velho"
+        const resposta = await fetch(`${SUPABASE_URL}/rest/v1/pedidos?cliente_id=eq.${clienteId}&select=*&order=id.desc`, {
+            method: 'GET',
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+        });
+
+        if (!resposta.ok) throw new Error("Erro ao buscar histórico.");
+        const pedidos = await resposta.json();
+
+        if (pedidos.length === 0) {
+            // Se ele nunca comprou, fazemos um convite legal
+            divHistorico.innerHTML = `
+                <div style="text-align: center; padding: 40px 20px; background: var(--fundo-secundario); border-radius: 12px;">
+                    <i class="fa-solid fa-burger" style="font-size: 40px; color: #444; margin-bottom: 15px;"></i>
+                    <p style="color: var(--texto-cinza);">Você ainda não fez nenhum pedido.</p>
+                    <button onclick="navegarPara('inicio')" style="margin-top: 15px; padding: 10px 20px; background: var(--laranja-fogo); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">Ver Cardápio</button>
+                </div>`;
+            return;
+        }
+
+        // Se ele tem pedidos, monta a lista bonitinha
+        let htmlPedidos = "";
+        pedidos.forEach(ped => {
+            // Formata a data que vem do banco (created_at)
+            let dataFormatada = "Data não registrada";
+            if(ped.created_at) {
+                const dataObj = new Date(ped.created_at);
+                dataFormatada = dataObj.toLocaleDateString('pt-BR') + ' às ' + dataObj.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+            }
+
+            htmlPedidos += `
+                <div class="checkout-secao" style="margin-bottom: 15px; padding: 15px; border-left: 4px solid var(--laranja-fogo);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <strong style="color: #fff; font-size: 16px;">Pedido #${ped.id}</strong>
+                        <span style="background: #333; padding: 4px 8px; border-radius: 4px; font-size: 12px; color: #ccc;">${dataFormatada}</span>
+                    </div>
+                    <div style="color: var(--texto-cinza); font-size: 14px; margin-bottom: 5px;">
+                        <i class="fa-regular fa-credit-card"></i> Pagamento: ${ped.forma_pagamento}
+                    </div>
+                    <div style="color: #2ed573; font-weight: bold; font-size: 16px; margin-top: 10px;">
+                        Total: R$ ${parseFloat(ped.total).toFixed(2).replace('.', ',')}
+                    </div>
+                </div>
+            `;
+        });
+
+        divHistorico.innerHTML = htmlPedidos;
+
+    } catch (erro) {
+        console.error("Erro no histórico:", erro);
+        divHistorico.innerHTML = `<p style="color: #ff4757; text-align: center;">Erro ao carregar o histórico. Tente novamente mais tarde.</p>`;
     }
 }
 renderizarRodape();

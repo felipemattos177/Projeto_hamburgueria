@@ -218,7 +218,25 @@ function confirmarAdicao() {
 
 // === 5. LÓGICA DO CARRINHO E CHECKOUT ===
 function atualizarContadorCart() {
-    document.getElementById("contador-carrinho").innerText = carrinho.length;
+    const qtdItens = carrinho.length;
+    const barraSacola = document.getElementById("barra-sacola");
+    
+    if (qtdItens > 0) {
+        // Mostra a barra flutuante
+        barraSacola.classList.remove("escondido");
+        
+        // Atualiza a bolinha branca com a quantidade
+        document.getElementById("contador-sacola").innerText = qtdItens;
+        
+        // Calcula a soma total em Reais do carrinho em tempo real
+        const somaTotal = carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0);
+        
+        // Atualiza o valor na barra
+        document.getElementById("total-sacola").innerText = `R$ ${somaTotal.toFixed(2).replace('.', ',')}`;
+    } else {
+        // Se esvaziou o carrinho, esconde a barra
+        barraSacola.classList.add("escondido");
+    }
 }
 
 function abrirCheckout() {
@@ -274,13 +292,13 @@ function removerDoCarrinho(index) {
     carrinho.splice(index, 1);
     atualizarContadorCart();
     renderizarCardapio();
+    
     if (carrinho.length === 0) {
         fecharCheckout();
     } else {
         renderizarCheckout();
     }
 }
-
 // === 6. FINALIZAÇÃO, BANCO DE DADOS E WHATSAPP ===
 function verificarTroco() {
     const formaPagamento = document.getElementById("forma-pagamento").value;
@@ -402,3 +420,31 @@ window.addEventListener('click', function(event) {
 
 // === INICIA O SISTEMA AO ABRIR O SITE ===
 carregarCardapioDoBanco();
+
+// === 8. RODAPÉ DO DESENVOLVEDOR (BRANDING MATHS LABS) ===
+function renderizarRodape() {
+    const dataAtual = new Date();
+    const ano = dataAtual.getFullYear(); // Pega o ano automaticamente (2026, 2027...)
+    
+    // Cria uma "Versão Automática" baseada no ano e mês para parecer sempre atualizado
+    // Exemplo do formato: v1.2026.08
+    const mes = String(dataAtual.getMonth() + 1).padStart(2, '0');
+    const versaoApp = `v1.${ano}.${mes}`; 
+
+    const footer = document.createElement("footer");
+    // Estilo dark moderno, combinando com o app
+    footer.style.cssText = "text-align: center; padding: 30px 15px; background: #111; color: #777; font-size: 13px; margin-top: 50px; border-top: 1px solid #222; width: 100%;";
+    
+    footer.innerHTML = `
+        <div style="margin-bottom: 8px;">&copy; ${ano} Fire Burger. Todos os direitos reservados.</div>
+        <div style="margin-bottom: 8px;">
+            Desenvolvido por <a href="https://mathshub.com.br" target="_blank" style="color: #ff5e00; text-decoration: none; font-weight: bold;">Maths Labs</a> 🚀
+        </div>
+        <div style="font-size: 11px; color: #444; margin-top: 10px;">Versão do Sistema ${versaoApp}</div>
+    `;
+
+    document.body.appendChild(footer);
+}
+
+// Executa a função para o rodapé aparecer sozinho
+renderizarRodape();

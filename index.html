@@ -116,5 +116,34 @@
     </div>
 
     <script src="script.js"></script>
+    <!-- === BARRA FLUTUANTE DA SACOLA === -->
+    <div id="barra-sacola" class="escondido" onclick="abrirCheckout()">
+        <div class="sacola-icone">
+            <i class="fa-solid fa-bag-shopping"></i>
+            <span id="contador-sacola">0</span>
+        </div>
+        <div class="sacola-texto">Ver sacola</div>
+        <div class="sacola-total" id="total-sacola">R$ 0,00</div>
+    </div>
+
+    <!-- === MENU INFERIOR (BOTTOM NAV) === -->
+    <nav class="bottom-nav">
+        <a href="#" class="nav-item ativo" onclick="fecharCheckout()">
+            <i class="fa-solid fa-house"></i>
+            <span>Início</span>
+        </a>
+        <a href="#" class="nav-item">
+            <i class="fa-solid fa-percent"></i>
+            <span>Promoções</span>
+        </a>
+        <a href="#" class="nav-item">
+            <i class="fa-regular fa-clipboard"></i>
+            <span>Pedidos</span>
+        </a>
+        <a href="#" class="nav-item">
+            <i class="fa-regular fa-user"></i>
+            <span>Perfil</span>
+        </a>
+    </nav>
 </body>
 </html>

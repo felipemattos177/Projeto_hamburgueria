@@ -311,9 +311,14 @@ function renderizarCheckout() {
         divItens.innerHTML += `
             <div class="item-checkout-card">
                 <div class="item-checkout-info">
-                    <strong>1x ${item.produtoBase.nome}</strong>
+                    <!-- === AQUI ESTÁ A MUDANÇA: Preço base ao lado do nome === -->
+                    <strong>1x ${item.produtoBase.nome} <span style="color: #aaa; font-size: 13px;">(R$ ${item.produtoBase.preco.toFixed(2).replace('.', ',')})</span></strong>
+                    
                     ${listaAddsHtml}
-                    <div style="color: var(--laranja-fogo); margin-top: 5px;">R$ ${item.precoTotalItem.toFixed(2).replace('.', ',')}</div>
+                    
+                    <div style="color: var(--laranja-fogo); margin-top: 5px; font-weight: bold; font-size: 15px;">
+                        Subtotal: R$ ${item.precoTotalItem.toFixed(2).replace('.', ',')}
+                    </div>
                 </div>
                 <button class="btn-remover" onclick="removerDoCarrinho(${index})"><i class="fa-solid fa-trash"></i></button>
             </div>

@@ -516,4 +516,7 @@ body {
 .sacola-total {
     font-weight: bold;
     font-size: 15px;
+}/* Adiciona um espaço extra no fundo do modal para o botão verde não ficar escondido atrás do menu branco */
+.modal-conteudo {
+    padding-bottom: 100px !important;
 }

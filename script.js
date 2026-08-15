@@ -78,6 +78,7 @@ function filtrarCategoria(categoria, elementoBotao) {
 
 // === 4. LÓGICA DO MODAL E CÁLCULO CIRÚRGICO DE ESTOQUE ===
 async function abrirModalProduto(id) {
+    document.body.classList.add("modal-aberto");
     produtoSendoVisto = cardapio.find(p => p.id == id);
     const modal = document.getElementById("modal-produto");
     const detalhes = document.getElementById("detalhes-produto-modal");
@@ -146,12 +147,24 @@ async function abrirModalProduto(id) {
             htmlAdicionais += `</div>`;
         }
 
+        // --- CAIXA DE QUANTIDADE DO LANCHE INSERIDA AQUI ---
         detalhes.innerHTML = `
             <div class="produto-imagem" style="background-image: url('${produtoSendoVisto.imagem}'); height: 200px; background-size: cover; background-position: center; border-radius: 10px; margin-bottom: 15px;"></div>
             <h2 style="color: #fff;">${produtoSendoVisto.nome}</h2>
             <p style="color: #aaa; font-size: 14px; margin-bottom: 10px;">${produtoSendoVisto.descricao}</p>
             <h3 style="color: #ff5e00; font-size: 22px;">R$ ${produtoSendoVisto.preco.toFixed(2).replace('.', ',')}</h3>
+            
             ${htmlAdicionais}
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; padding: 15px; background: #222; border-radius: 8px;">
+                <span style="color: #fff; font-weight: bold; font-size: 16px;">Quantidade:</span>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <button type="button" onclick="alterarQtdBase(-1)" style="width: 40px; height: 40px; border-radius: 8px; background: #444; color: white; border: none; font-weight: bold; cursor: pointer; font-size: 20px;">-</button>
+                    <span id="qtd-produto-base" style="font-weight: bold; color: #fff; font-size: 18px;">1</span>
+                    <button type="button" onclick="alterarQtdBase(1)" style="width: 40px; height: 40px; border-radius: 8px; background: #ff5e00; color: white; border: none; font-weight: bold; cursor: pointer; font-size: 20px;">+</button>
+                </div>
+            </div>
+
             <button class="btn-add-carrinho" onclick="confirmarAdicao()" style="width: 100%; padding: 15px; background: #2ed573; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 16px; margin-top: 15px; cursor: pointer;">
                 Adicionar ao Pedido
             </button>
@@ -163,7 +176,15 @@ async function abrirModalProduto(id) {
     }
 }
 
-// === FUNÇÃO NOVA: FAZ OS BOTÕES + E - FUNCIONAREM E BLOQUEIA ESTOQUE ===
+// === FUNÇÕES NOVAS: CONTROLE DE QUANTIDADE DO LANCHE ===
+function alterarQtdBase(delta) {
+    const span = document.getElementById("qtd-produto-base");
+    let qtd = parseInt(span.innerText) + delta;
+    if (qtd < 1) qtd = 1; // Não deixa pedir menos de 1 lanche
+    span.innerText = qtd;
+}
+
+// === FUNÇÕES DE ADICIONAIS E CONFIRMAÇÃO ===
 function alterarQtdAdicional(id, delta) {
     const span = document.getElementById(`qtd-add-${id}`);
     const estoqueReal = parseInt(span.getAttribute("data-estoquereal")); 
@@ -180,37 +201,51 @@ function alterarQtdAdicional(id, delta) {
 }
 
 function confirmarAdicao() {
+    const spanQtdBase = document.getElementById("qtd-produto-base");
+    const qtdBaseEscolhida = spanQtdBase ? parseInt(spanQtdBase.innerText) : 1;
+
+    // BLINDAGEM 1: Tem lanche suficiente pro pedido inteiro?
     const qtdJaNoCarrinho = carrinho.filter(item => item.produtoBase.id == produtoSendoVisto.id).length;
-    
-    if (qtdJaNoCarrinho >= produtoSendoVisto.estoque_maximo) {
-        alert(`Estoque limite atingido! O nosso estoque atual permite preparar no máximo ${produtoSendoVisto.estoque_maximo} unidade(s).`);
-        fecharModalProduto(); 
+    if (qtdJaNoCarrinho + qtdBaseEscolhida > produtoSendoVisto.estoque_maximo) {
+        alert(`Estoque atingido! O nosso estoque permite adicionar no máximo mais ${produtoSendoVisto.estoque_maximo - qtdJaNoCarrinho} unidade(s).`);
         return; 
     }
 
     const adicionaisEscolhidos = [];
     let totalAdicionais = 0;
 
+    // BLINDAGEM 2: Multiplica os adicionais pelo número de lanches
     const spansQtd = document.querySelectorAll(".qtd-adicional-span");
-    spansQtd.forEach(span => {
-        const qtd = parseInt(span.innerText);
-        if (qtd > 0) { 
+    for (const span of spansQtd) {
+        const qtdPorLanche = parseInt(span.innerText);
+        if (qtdPorLanche > 0) { 
+            const estoqueReal = parseInt(span.getAttribute("data-estoquereal"));
+            const totalRequerido = qtdPorLanche * qtdBaseEscolhida; // Ex: Pede 2 lanches com 2 bacons = Precisa de 4 bacons
+
+            if (totalRequerido > estoqueReal) {
+                alert(`Estoque insuficiente de ${span.getAttribute("data-nome")}! Você pediu ${qtdPorLanche} porção(ões) para cada um dos ${qtdBaseEscolhida} lanches, necessitando de ${totalRequerido}, mas temos apenas ${estoqueReal}.`);
+                return; // Trava a função!
+            }
+
             const idAdd = span.getAttribute("data-id");
             const nomeAdd = span.getAttribute("data-nome");
             const precoAdd = parseFloat(span.getAttribute("data-preco"));
 
-            adicionaisEscolhidos.push({ id: idAdd, nome: nomeAdd, preco: precoAdd, quantidade: qtd });
-            totalAdicionais += (precoAdd * qtd);
+            adicionaisEscolhidos.push({ id: idAdd, nome: nomeAdd, preco: precoAdd, quantidade: qtdPorLanche });
+            totalAdicionais += (precoAdd * qtdPorLanche);
         }
-    });
+    }
 
-    const itemParaCarrinho = {
-        produtoBase: produtoSendoVisto,
-        adicionais: adicionaisEscolhidos,
-        precoTotalItem: produtoSendoVisto.preco + totalAdicionais
-    };
+    // ADIÇÃO MULTIPLA: Coloca no carrinho como linhas separadas (Melhor UX)
+    for (let i = 0; i < qtdBaseEscolhida; i++) {
+        const itemParaCarrinho = {
+            produtoBase: produtoSendoVisto,
+            adicionais: JSON.parse(JSON.stringify(adicionaisEscolhidos)), // Clona o array com segurança
+            precoTotalItem: produtoSendoVisto.preco + totalAdicionais
+        };
+        carrinho.push(itemParaCarrinho);
+    }
 
-    carrinho.push(itemParaCarrinho);
     atualizarContadorCart();
     renderizarCardapio(); 
     fecharModalProduto();

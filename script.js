@@ -78,7 +78,7 @@ function filtrarCategoria(categoria, elementoBotao) {
 
 // === 4. LÓGICA DO MODAL E CÁLCULO CIRÚRGICO DE ESTOQUE ===
 async function abrirModalProduto(id) {
-    document.body.classList.add("modal-aberto"); // Esconde o menu inferior
+    document.body.classList.add("modal-aberto"); 
     produtoSendoVisto = cardapio.find(p => p.id == id);
     const modal = document.getElementById("modal-produto");
     const detalhes = document.getElementById("detalhes-produto-modal");
@@ -87,14 +87,12 @@ async function abrirModalProduto(id) {
     modal.classList.remove("escondido");
 
     try {
-        // 1. Busca adicionais
         const resExtras = await fetch(`${SUPABASE_URL}/rest/v1/ingredientes?select=id,nome,preco_adicional,estoque&preco_adicional=gt.0&estoque=gt.0`, {
             method: 'GET',
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
         });
         const adicionaisDoBanco = await resExtras.json();
 
-        // 2. Busca Fichas Técnicas em Tempo Real
         const resRec = await fetch(`${SUPABASE_URL}/rest/v1/receita_produto?select=*`, {
             method: 'GET',
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
@@ -110,7 +108,6 @@ async function abrirModalProduto(id) {
                 <h4 style="margin-bottom: 10px; color: #fff;">Turbine seu lanche:</h4>`;
             
             adicionaisDoBanco.forEach(add => {
-                
                 let qtdPresaNoCarrinho = 0;
                 carrinho.forEach(itemCart => {
                     const recCart = receitasAtualizadas.filter(r => r.produto_id == itemCart.produtoBase.id);
@@ -266,10 +263,7 @@ function abrirCheckout() {
         return;
     }
     
-    // MÁGICA: Avisa o CSS que entramos no checkout para ele esconder os menus
     document.body.classList.add("modo-checkout");
-    
-    // Limpa os botões azuis e esconde telas com segurança
     document.querySelectorAll(".nav-item").forEach(btn => btn.classList.remove("ativo"));
     
     const telaCatalogo = document.getElementById("tela-catalogo");
@@ -278,7 +272,6 @@ function abrirCheckout() {
     const telaPerfil = document.getElementById("tela-perfil");
     if (telaPerfil) telaPerfil.classList.add("escondido");
     
-    // Mostra o checkout
     const telaCheckout = document.getElementById("tela-checkout");
     if (telaCheckout) telaCheckout.classList.remove("escondido");
 
@@ -286,44 +279,7 @@ function abrirCheckout() {
     renderizarCheckout();
     carregarPerfilNaTela(); 
     preencherCheckoutComPerfil();
-}
-
-function navegarPara(aba) {
-    // MÁGICA: Remove o modo checkout para o menu branco voltar a aparecer
-    document.body.classList.remove("modo-checkout");
-    
-    // Esconde todas as telas
-    const telaCatalogo = document.getElementById("tela-catalogo");
-    const telaCheckout = document.getElementById("tela-checkout");
-    const telaPerfil = document.getElementById("tela-perfil");
-
-    if (telaCatalogo) telaCatalogo.classList.add("escondido");
-    if (telaCheckout) telaCheckout.classList.add("escondido");
-    if (telaPerfil) telaPerfil.classList.add("escondido");
-    
-    // Tira o foco azul
-    document.querySelectorAll(".nav-item").forEach(btn => btn.classList.remove("ativo"));
-    
-    // Volta a mostrar a barra flutuante da sacola se tiver itens
-    atualizarContadorCart();
-
-    // Mostra a tela certa
-    if (aba === 'inicio') {
-        if (telaCatalogo) telaCatalogo.classList.remove("escondido");
-        const btnInicio = document.getElementById("btn-nav-inicio");
-        if (btnInicio) btnInicio.classList.add("ativo");
-        window.scrollTo(0, 0);
-    } else if (aba === 'perfil') {
-        if (telaPerfil) telaPerfil.classList.remove("escondido");
-        const btnPerfil = document.getElementById("btn-nav-perfil");
-        if (btnPerfil) btnPerfil.classList.add("ativo");
-        carregarPerfilNaTela();
-        window.scrollTo(0, 0);
-    }
-}
-
-function fecharCheckout() {
-    navegarPara('inicio');
+    verificarTroco(); // Garante que a caixa do PIX abra se já estiver selecionado
 }
 
 function renderizarCheckout() {
@@ -359,6 +315,7 @@ function renderizarCheckout() {
     });
 
     document.getElementById("valor-total").innerText = `R$ ${somaTotal.toFixed(2).replace('.', ',')}`;
+    verificarTroco(); // Atualiza o valor do PIX caso o cliente apague um item
 }
 
 function removerDoCarrinho(index) {
@@ -373,11 +330,67 @@ function removerDoCarrinho(index) {
     }
 }
 
-// === 6. FINALIZAÇÃO E WHATSAPP ===
+// === 6. FINALIZAÇÃO, PIX NA TELA E WHATSAPP ===
 function verificarTroco() {
-    const formaPagamento = document.getElementById("forma-pagamento").value;
+    const selectPagamento = document.getElementById("forma-pagamento");
+    if (!selectPagamento) return;
+
+    const formaPagamento = selectPagamento.value;
     const campoTroco = document.getElementById("troco-dinheiro");
-    campoTroco.style.display = (formaPagamento === "Dinheiro") ? "block" : "none";
+    
+    if (campoTroco) {
+        campoTroco.style.display = (formaPagamento === "Dinheiro") ? "block" : "none";
+    }
+
+    // --- MÁGICA: CAIXA DO PIX DINÂMICA NA TELA ---
+    let areaPix = document.getElementById("area-pix-dinamica");
+    
+    if (formaPagamento.toUpperCase() === "PIX") {
+        const totalCalculado = carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0);
+        
+        // Se a caixa ainda não existe no HTML, o JS cria ela agora
+        if (!areaPix) {
+            areaPix = document.createElement("div");
+            areaPix.id = "area-pix-dinamica";
+            areaPix.style.cssText = "background: #1e1e1e; padding: 15px; border-radius: 8px; margin-top: 15px; border-left: 4px solid #2ed573; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3);";
+            
+            // Coloca a caixa logo abaixo da forma de pagamento
+            const elementoReferencia = campoTroco || selectPagamento;
+            elementoReferencia.parentNode.insertBefore(areaPix, elementoReferencia.nextSibling);
+        }
+
+        areaPix.style.display = "block";
+        areaPix.innerHTML = `
+            <p style="color: #fff; margin-bottom: 10px; font-size: 15px;"><strong>Total do PIX:</strong> <span style="color: #2ed573; font-size: 18px;">R$ ${totalCalculado.toFixed(2).replace('.', ',')}</span></p>
+            <button type="button" id="btn-copiar-pix" onclick="copiarPixParaAreaDeTransferencia()" style="background: #2ed573; color: #000; border: none; padding: 12px 15px; border-radius: 5px; font-weight: bold; cursor: pointer; width: 100%; margin-bottom: 10px; font-size: 16px; transition: 0.3s;"><i class="fa-regular fa-copy"></i> Copiar Código PIX</button>
+            <p style="color: #aaa; font-size: 13px; margin: 0; line-height: 1.4;">1. Copie o código acima e pague no seu app do banco.<br>2. Volte aqui e clique em <strong>Enviar Pedido</strong> abaixo.</p>
+        `;
+    } else {
+        if (areaPix) areaPix.style.display = "none";
+    }
+}
+
+// O botão na tela vai chamar essa função para copiar
+function copiarPixParaAreaDeTransferencia() {
+    const totalCalculado = carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0);
+    const minhaChavePix = "mattosf177@gmail.com"; 
+    const codigoPix = gerarPixCopiaECola(minhaChavePix, totalCalculado);
+
+    navigator.clipboard.writeText(codigoPix).then(() => {
+        const btn = document.getElementById("btn-copiar-pix");
+        btn.innerHTML = `<i class="fa-solid fa-check"></i> Copiado! Abra seu app do banco`;
+        btn.style.background = "#ffa502"; // Muda a cor pra laranja pra dar feedback visual
+        btn.style.color = "#fff";
+        
+        // Volta ao normal depois de 5 segundos
+        setTimeout(() => {
+            btn.innerHTML = `<i class="fa-regular fa-copy"></i> Copiar Código PIX`;
+            btn.style.background = "#2ed573";
+            btn.style.color = "#000";
+        }, 5000);
+    }).catch(err => {
+        alert("Erro ao copiar. Seu celular pode ter bloqueado a ação de cópia.");
+    });
 }
 
 async function enviarParaWhatsApp() {
@@ -393,15 +406,13 @@ async function enviarParaWhatsApp() {
         return;
     }
 
-const enderecoFormatado = `${rua}, ${numero} - ${bairro} ${complemento ? '(' + complemento + ')' : ''}`;
+    const enderecoFormatado = `${rua}, ${numero} - ${bairro} ${complemento ? '(' + complemento + ')' : ''}`;
     const totalCalculado = carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0);
     
-    // --- NOVO: Puxa o ID único e o telefone da memória do celular ---
     const idUnicoCliente = obterIdCliente();
     let telefonePerfil = "";
     const salvo = localStorage.getItem("vilelaburgers_perfil");
     if (salvo) telefonePerfil = JSON.parse(salvo).telefone || "";
-    // ----------------------------------------------------------------
 
     const btnFinalizar = document.querySelector("button[onclick='enviarParaWhatsApp()']");
     let textoOriginalBotao = "Enviar Pedido";
@@ -419,7 +430,6 @@ const enderecoFormatado = `${rua}, ${numero} - ${bairro} ${complemento ? '(' + c
                 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`,
                 'Content-Type': 'application/json', 'Prefer': 'return=representation' 
             },
-            // --- NOVO: Enviando o cliente_id e telefone_cliente para o banco ---
             body: JSON.stringify({ 
                 nome_cliente: nome, 
                 forma_pagamento: pagamento, 
@@ -483,14 +493,20 @@ const enderecoFormatado = `${rua}, ${numero} - ${bairro} ${complemento ? '(' + c
 
         textoPedido += `\n💰 *TOTAL DO PEDIDO: R$ ${totalCalculado.toFixed(2).replace('.', ',')}*`;
 
-       if (btnFinalizar) { btnFinalizar.innerText = textoOriginalBotao; btnFinalizar.disabled = false; }
+        // Agora a mensagem do WhatsApp fica limpa, pois o cliente já copiou a chave no site!
+        if (pagamento.toUpperCase() === "PIX") {
+            textoPedido += `\n\n*=== PAGAMENTO VIA PIX ===*\n`;
+            textoPedido += `📌 _A chave foi copiada pelo app. Segue o comprovante de pagamento abaixo:_`;
+        }
+
+        if (btnFinalizar) { btnFinalizar.innerText = textoOriginalBotao; btnFinalizar.disabled = false; }
         
         carrinho = [];
         atualizarContadorCart();
-        renderizarCardapio(); // <-- ADICIONE ESTA LINHA: Ela "limpa" os esgotados da tela quando o pedido termina
+        renderizarCardapio(); 
         fecharCheckout();
+        
         window.open(`https://wa.me/5543996150221?text=${encodeURIComponent(textoPedido)}`, '_blank');
-        // ...
 
     } catch (erro) {
         console.error("Erro no checkout:", erro);
@@ -499,59 +515,60 @@ const enderecoFormatado = `${rua}, ${numero} - ${bairro} ${complemento ? '(' + c
     }
 }
 
-// === 7. FUNÇÕES DE FECHAR A JANELA (Com correção do menu) ===
+// === 7. FECHAR JANELA / MENU NAVEGAÇÃO ===
 function fecharModalProduto() { 
     document.getElementById("modal-produto").classList.add("escondido"); 
-    document.body.classList.remove("modal-aberto"); // Devolve o menu
+    document.body.classList.remove("modal-aberto"); 
 }
 
 function fecharModal() { 
     document.getElementById("modal-produto").classList.add("escondido"); 
-    document.body.classList.remove("modal-aberto"); // Devolve o menu
+    document.body.classList.remove("modal-aberto"); 
 }
 
 window.addEventListener('click', function(event) {
     const modal = document.getElementById("modal-produto");
     if (event.target === modal) {
         modal.classList.add("escondido");
-        document.body.classList.remove("modal-aberto"); // Devolve o menu
+        document.body.classList.remove("modal-aberto");
     }
 });
 
-// === 8. NAVEGAÇÃO ENTRE ABAS DO MENU INFERIOR ===
+function fecharCheckout() {
+    navegarPara('inicio');
+}
+
+// === 8. NAVEGAÇÃO ENTRE ABAS ===
 function navegarPara(aba) {
     document.body.classList.remove("modo-checkout");
 
-    // 1. Esconde todas as telas
     const telas = ["tela-catalogo", "tela-checkout", "tela-perfil", "tela-pedidos"];
     telas.forEach(id => {
         const elemento = document.getElementById(id);
         if (elemento) elemento.classList.add("escondido");
     });
     
-    // 2. Tira o foco azul dos botões
     document.querySelectorAll(".nav-item").forEach(btn => btn.classList.remove("ativo"));
     atualizarContadorCart();
 
-    // 3. Mostra a tela certa e executa a função dela
     if (aba === 'inicio') {
         document.getElementById("tela-catalogo").classList.remove("escondido");
-        document.getElementById("btn-nav-inicio").classList.add("ativo");
+        const b = document.getElementById("btn-nav-inicio"); if(b) b.classList.add("ativo");
         window.scrollTo(0, 0);
     } else if (aba === 'perfil') {
         document.getElementById("tela-perfil").classList.remove("escondido");
-        document.getElementById("btn-nav-perfil").classList.add("ativo");
+        const b = document.getElementById("btn-nav-perfil"); if(b) b.classList.add("ativo");
         carregarPerfilNaTela();
         window.scrollTo(0, 0);
     } else if (aba === 'pedidos') {
         document.getElementById("tela-pedidos").classList.remove("escondido");
-        document.getElementById("btn-nav-pedidos").classList.add("ativo");
-        carregarHistoricoPedidos(); // MÁGICA: Busca os pedidos quando abre a aba!
+        const b = document.getElementById("btn-nav-pedidos"); if(b) b.classList.add("ativo");
+        carregarHistoricoPedidos(); 
         window.scrollTo(0, 0);
     }
 }
 
-// === 9. MEMÓRIA DO CELULAR (LOCALSTORAGE) ===
+// === 9. MEMÓRIA DO CELULAR ===
 function salvarPerfil() {
     const perfil = {
         nome: document.getElementById("perfil-nome").value,
@@ -562,9 +579,7 @@ function salvarPerfil() {
         complemento: document.getElementById("perfil-complemento").value
     };
     
-    // Cofre mágico do navegador
     localStorage.setItem("vilelaburgers_perfil", JSON.stringify(perfil));
-    
     alert("Pronto! Seus dados foram salvos e agilizarão seus próximos pedidos.");
     navegarPara('inicio'); 
 }
@@ -594,9 +609,6 @@ function preencherCheckoutComPerfil() {
     }
 }
 
-// === INICIA O SISTEMA AO ABRIR O SITE ===
-carregarCardapioDoBanco();
-
 // === 10. RODAPÉ DO DESENVOLVEDOR ===
 async function renderizarRodape() {
     const dataAtual = new Date();
@@ -605,7 +617,6 @@ async function renderizarRodape() {
     const footer = document.createElement("footer");
     footer.style.cssText = "text-align: center; padding: 30px 15px; background: #111; color: #777; font-size: 13px; margin-top: 50px; border-top: 1px solid #222; width: 100%; padding-bottom: 120px;"; 
     
-    // Note que coloquei um ID na div da versão para o JS achar ela facilmente
     footer.innerHTML = `
         <div style="margin-bottom: 8px;">&copy; ${ano} Vilela Burgers. Todos os direitos reservados.</div>
         <div style="margin-bottom: 8px;">
@@ -616,22 +627,16 @@ async function renderizarRodape() {
     document.body.appendChild(footer);
 
     try {
-        // MÁGICA: O site vai perguntar pro GitHub qual é a última atualização
-        // ATENÇÃO: Substitua pelos seus dados reais do GitHub
         const usuarioGit = "felipemattos177";
         const repositorioGit = "Projeto_hamburgueria";
-        const branch = "main"; // Pode ser que o seu seja "master"
+        const branch = "main"; 
         
         const resposta = await fetch(`https://api.github.com/repos/${usuarioGit}/${repositorioGit}/commits/${branch}`);
-        
         if (!resposta.ok) throw new Error("Não foi possível buscar a versão");
         
         const dados = await resposta.json();
-        
-        // Pega os 7 primeiros caracteres da atualização (Exemplo: 4a2b9f1)
         const hashAtualizacao = dados.sha.substring(0, 7);
         
-        // Formata a data em que você subiu o código
         const dataCommit = new Date(dados.commit.author.date);
         const dia = String(dataCommit.getDate()).padStart(2, '0');
         const mes = String(dataCommit.getMonth() + 1).padStart(2, '0');
@@ -641,28 +646,29 @@ async function renderizarRodape() {
         document.getElementById("versao-app").innerText = `Versão: ${hashAtualizacao} (${dia}/${mes} às ${hora}:${minuto})`;
 
     } catch (erro) {
-        // Se der erro (ex: cliente sem internet na hora, ou o GitHub demorar), ele põe a data de hoje como garantia
         const mesAtual = String(dataAtual.getMonth() + 1).padStart(2, '0');
         document.getElementById("versao-app").innerText = `Versão do Sistema v1.${ano}.${mesAtual}`;
     }
-}// === 11. IDENTIFICAÇÃO ÚNICA (SILENT ID) ===
+}
+
+// === 11. IDENTIFICAÇÃO ÚNICA (SILENT ID) ===
 function obterIdCliente() {
     let id = localStorage.getItem("vilelaburgers_cliente_id");
     if (!id) {
-        // Se é a primeira vez dele no site, gera um ID único e salva
         id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
         localStorage.setItem("vilelaburgers_cliente_id", id);
     }
     return id;
-}// === 12. HISTÓRICO DE PEDIDOS DO CLIENTE ===
+}
+
+// === 12. HISTÓRICO DE PEDIDOS DO CLIENTE ===
 async function carregarHistoricoPedidos() {
     const divHistorico = document.getElementById("lista-historico-pedidos");
-    const clienteId = obterIdCliente(); // Pega o ID único do celular
+    const clienteId = obterIdCliente(); 
 
     divHistorico.innerHTML = `<p style="color: var(--texto-cinza); text-align: center;"><i class="fa-solid fa-spinner fa-spin"></i> Buscando seus pedidos...</p>`;
 
     try {
-        // Vai no Supabase e pede: "Me traga todos os pedidos onde o cliente_id seja igual ao meu, ordenado do mais novo pro mais velho"
         const resposta = await fetch(`${SUPABASE_URL}/rest/v1/pedidos?cliente_id=eq.${clienteId}&select=*&order=id.desc`, {
             method: 'GET',
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
@@ -672,7 +678,6 @@ async function carregarHistoricoPedidos() {
         const pedidos = await resposta.json();
 
         if (pedidos.length === 0) {
-            // Se ele nunca comprou, fazemos um convite legal
             divHistorico.innerHTML = `
                 <div style="text-align: center; padding: 40px 20px; background: var(--fundo-secundario); border-radius: 12px;">
                     <i class="fa-solid fa-burger" style="font-size: 40px; color: #444; margin-bottom: 15px;"></i>
@@ -682,10 +687,8 @@ async function carregarHistoricoPedidos() {
             return;
         }
 
-        // Se ele tem pedidos, monta a lista bonitinha
         let htmlPedidos = "";
         pedidos.forEach(ped => {
-            // Formata a data que vem do banco (created_at)
             let dataFormatada = "Data não registrada";
             if(ped.created_at) {
                 const dataObj = new Date(ped.created_at);
@@ -715,4 +718,56 @@ async function carregarHistoricoPedidos() {
         divHistorico.innerHTML = `<p style="color: #ff4757; text-align: center;">Erro ao carregar o histórico. Tente novamente mais tarde.</p>`;
     }
 }
+
+// === 13. GERADOR DE PIX COPIA E COLA ===
+function gerarPixCopiaECola(chavePix, valorPix) {
+    const nomeRecebedor = "Felipe de Mattos"; 
+    const cidadeRecebedor = "Arapoti";      
+    const txidVenda = "***";             
+
+    const formatarTamanho = (id, valor) => {
+        const tamanho = String(valor.length).padStart(2, '0');
+        return `${id}${tamanho}${valor}`;
+    };
+
+    const payloadFormatIndicator = "000201";
+    
+    // CORREÇÃO AQUI: O sistema do Banco Central estava recusando porque essa linha estava formatada duas vezes no código antigo!
+    const gui = "br.gov.bcb.pix"; 
+    const chaveLimpa = chavePix.trim();
+    
+    const merchantAccountInfo = formatarTamanho("00", gui) + formatarTamanho("01", chaveLimpa);
+    const merchantAccount = formatarTamanho("26", merchantAccountInfo);
+    
+    const merchantCategoryCode = "52040000";
+    const transactionCurrency = "5303986";
+    const transactionAmount = formatarTamanho("54", valorPix.toFixed(2));
+    const countryCode = "5802BR";
+    
+    const nomeFormatado = nomeRecebedor.normalize("NFD").replace(/[\u0300-\u036f]/g, "").substring(0, 25);
+    const cidadeFormatada = cidadeRecebedor.normalize("NFD").replace(/[\u0300-\u036f]/g, "").substring(0, 15);
+    
+    const merchantName = formatarTamanho("59", nomeFormatado);
+    const merchantCity = formatarTamanho("60", cidadeFormatada);
+    const txid = formatarTamanho("62", formatarTamanho("05", txidVenda));
+
+    let payload = payloadFormatIndicator + merchantAccount + merchantCategoryCode + transactionCurrency + transactionAmount + countryCode + merchantName + merchantCity + txid + "6304";
+
+    // Calcula o Código de Segurança (CRC16) obrigatório pelo Banco Central
+    let polynomial = 0x1021;
+    let result = 0xFFFF;
+    for (let i = 0; i < payload.length; i++) {
+        result ^= payload.charCodeAt(i) << 8;
+        for (let j = 0; j < 8; j++) {
+            if ((result & 0x8000) !== 0) result = (result << 1) ^ polynomial;
+            else result <<= 1;
+            result &= 0xFFFF;
+        }
+    }
+    const crc = result.toString(16).toUpperCase().padStart(4, '0');
+    
+    return payload + crc; 
+}
+// === INICIALIZAÇÃO DO SISTEMA ===
+carregarCardapioDoBanco();
 renderizarRodape();

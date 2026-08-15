@@ -137,10 +137,18 @@
         </table>
     </div>
 
-    <!-- ========================================== -->
+<!-- ========================================== -->
     <!-- ABA 2: KANBAN DE PEDIDOS (TEMPO REAL)      -->
     <!-- ========================================== -->
     <div id="view-pedidos" class="view-section">
+        
+        <!-- NOVO: CONTROLE DE TEMPO DINÂMICO -->
+        <div style="background: #1e1e1e; padding: 15px 20px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 15px; border-left: 4px solid var(--laranja-fogo);">
+            <strong style="color: #fff; font-size: 16px;"><i class="fa-solid fa-clock"></i> Tempo Estimado Atual:</strong>
+            <input type="number" id="input-tempo-preparo" value="40" style="width: 70px; padding: 8px; border-radius: 5px; border: 1px solid #444; background: #111; color: var(--laranja-fogo); font-weight: bold; text-align: center; font-size: 16px;" onchange="carregarPedidosAdmin()">
+            <span style="color: #aaa; font-size: 14px;">minutos (Mude aqui conforme o movimento da chapa)</span>
+        </div>
+
         <div class="painel-board">
             
             <!-- Coluna 1: Pendentes (Novos) -->
@@ -165,7 +173,6 @@
 
         </div>
     </div>
-
     <!-- ========================================== -->
     <!-- MODAIS DO ESTOQUE (MANTIDOS INTACTOS)      -->
     <!-- ========================================== -->

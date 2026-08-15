@@ -238,15 +238,21 @@ async function removerDaReceita(idDaReceita) {
 // ==========================================
 async function carregarPedidosAdmin() {
     try {
-        // Busca pedidos que não estão marcados como 'Entregue'
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/pedidos?status=neq.Entregue&select=*&order=id.asc`, {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/pedidos?select=*&order=id.asc`, {
             method: 'GET',
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
         });
+
+        if (!res.ok) {
+            const erroSupabase = await res.json();
+            document.getElementById("col-pendentes").innerHTML = `<p style="color:#ff4757; text-align:center; margin-top:20px;"><b>Erro do Banco:</b> ${erroSupabase.message}</p>`;
+            return;
+        }
+
         const pedidos = await res.json();
         renderizarKanban(pedidos);
     } catch (erro) {
-        console.error("Erro ao puxar pedidos:", erro);
+        document.getElementById("col-pendentes").innerHTML = `<p style="color:#ff4757; text-align:center; margin-top:20px;"><b>Erro no Script:</b> ${erro.message}</p>`;
     }
 }
 
@@ -255,43 +261,67 @@ function renderizarKanban(pedidos) {
     const colPreparo = document.getElementById("col-preparo");
     const colEntrega = document.getElementById("col-entrega");
 
-    if (!colPendentes || !colPreparo || !colEntrega) return; // Trava de segurança
+    if (!colPendentes || !colPreparo || !colEntrega) return;
 
-    colPendentes.innerHTML = ""; colPreparo.innerHTML = ""; colEntrega.innerHTML = "";
-
-    if (pedidos.length === 0) {
-        colPendentes.innerHTML = "<p style='text-align: center; color: #666; margin-top: 20px;'>Nenhum pedido na fila.</p>";
+    if (!pedidos || pedidos.length === 0) {
+        colPendentes.innerHTML = "<p style='text-align: center; color: #fff; font-weight: bold; margin-top: 20px;'>Nenhum pedido na fila.</p>";
+        colPreparo.innerHTML = "";
+        colEntrega.innerHTML = "";
+        return;
     }
 
+    let htmlPendentes = "";
+    let htmlPreparo = "";
+    let htmlEntrega = "";
+
     pedidos.forEach(ped => {
-        const statusStr = ped.status || "Pendente";
-        const dataObj = new Date(ped.created_at);
-        const hora = dataObj.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+        if (ped.status === "Entregue") return;
+
+        let statusBanco = ped.status ? String(ped.status).trim().toLowerCase() : "pendente";
+        let statusFormatado = "Pendente"; 
+        
+        if (statusBanco === 'em preparo') statusFormatado = "Em Preparo";
+        else if (statusBanco === 'saiu para entrega') statusFormatado = "Saiu para Entrega";
+
+        let dataFormatada = "--:--";
+        if (ped.created_at) {
+            const d = new Date(ped.created_at);
+            dataFormatada = d.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+        }
+
+        const totalNum = parseFloat(ped.total) || 0;
 
         const cardHtml = `
-            <div class="card-pedido ${statusStr.toLowerCase().replace(' ', '-')}">
+            <div class="card-pedido ${statusFormatado.toLowerCase().replace(' ', '-')}">
                 <div class="card-header">
                     <span class="pedido-id">#${ped.id}</span>
-                    <span class="pedido-tempo"><i class="fa-regular fa-clock"></i> ${hora}</span>
+                    <span class="pedido-tempo"><i class="fa-regular fa-clock"></i> ${dataFormatada}</span>
                 </div>
                 <div class="info-cliente">
-                    <strong>${ped.nome_cliente}</strong><br>
-                    Pagamento: ${ped.forma_pagamento}<br>
-                    <span style="color: #2ed573; font-weight: bold;">R$ ${parseFloat(ped.total).toFixed(2).replace('.', ',')}</span>
+                    <strong>${ped.nome_cliente || 'Cliente não informado'}</strong><br>
+                    Pgto: ${ped.forma_pagamento || '-'}<br>
+                    <span style="color: #2ed573; font-weight: bold;">R$ ${totalNum.toFixed(2).replace('.', ',')}</span>
                 </div>
-                ${botoesAcaoKanban(ped.id, statusStr)}
+                ${botoesAcaoKanban(ped.id, statusFormatado)}
             </div>
         `;
 
-        if (statusStr === "Pendente") colPendentes.innerHTML += cardHtml;
-        else if (statusStr === "Em Preparo") colPreparo.innerHTML += cardHtml;
-        else if (statusStr === "Saiu para Entrega") colEntrega.innerHTML += cardHtml;
+        if (statusFormatado === "Pendente") htmlPendentes += cardHtml;
+        else if (statusFormatado === "Em Preparo") htmlPreparo += cardHtml;
+        else if (statusFormatado === "Saiu para Entrega") htmlEntrega += cardHtml;
     });
+
+    colPendentes.innerHTML = htmlPendentes || "<p style='text-align:center; color:#555; margin-top:20px;'>Vazio</p>";
+    colPreparo.innerHTML = htmlPreparo || "<p style='text-align:center; color:#555; margin-top:20px;'>Vazio</p>";
+    colEntrega.innerHTML = htmlEntrega || "<p style='text-align:center; color:#555; margin-top:20px;'>Vazio</p>";
 }
 
 function botoesAcaoKanban(id, status) {
+    const inputTempo = document.getElementById("input-tempo-preparo");
+    const tempoFila = inputTempo ? inputTempo.value : "40";
+
     if (status === "Pendente") {
-        return `<button class="btn-acao-kanban btn-aceitar" onclick="atualizarStatusPedido(${id}, 'Em Preparo')"><i class="fa-solid fa-fire"></i> Aceitar (30-45m)</button>`;
+        return `<button class="btn-acao-kanban btn-aceitar" onclick="atualizarStatusPedido(${id}, 'Em Preparo')"><i class="fa-solid fa-fire"></i> Aceitar (~${tempoFila}m)</button>`;
     } else if (status === "Em Preparo") {
         return `<button class="btn-acao-kanban btn-despachar" onclick="atualizarStatusPedido(${id}, 'Saiu para Entrega')"><i class="fa-solid fa-motorcycle"></i> Despachar Moto</button>`;
     } else if (status === "Saiu para Entrega") {
@@ -303,9 +333,11 @@ function botoesAcaoKanban(id, status) {
 async function atualizarStatusPedido(id, novoStatus) {
     let previsao = null;
     
-    // A mágica: se aceitou, injetamos a previsão no banco!
+    // Injeta a previsão lendo o input, sem texto fixo!
     if (novoStatus === 'Em Preparo') {
-        previsao = "30 a 45 min";
+        const inputTempo = document.getElementById("input-tempo-preparo");
+        const tempoFila = inputTempo ? inputTempo.value : "40";
+        previsao = tempoFila + " min"; 
     }
 
     const corpo = previsao 
@@ -328,7 +360,6 @@ async function atualizarStatusPedido(id, novoStatus) {
     }
 }
 
-
 // ==========================================
 // INICIALIZAÇÃO DO SISTEMA
 // ==========================================
@@ -336,5 +367,5 @@ carregarProdutos();
 carregarEstoque();
 carregarPedidosAdmin();
 
-// Atualiza o painel de pedidos silenciosamente a cada 15 segundos
-setInterval(carregarPedidosAdmin, 15000);
+// Atualiza o painel silenciosamente a cada 3 segundos
+setInterval(carregarPedidosAdmin, 3000);

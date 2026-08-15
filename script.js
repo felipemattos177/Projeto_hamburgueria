@@ -78,7 +78,7 @@ function filtrarCategoria(categoria, elementoBotao) {
 
 // === 4. LÓGICA DO MODAL E CÁLCULO CIRÚRGICO DE ESTOQUE ===
 async function abrirModalProduto(id) {
-    document.body.classList.add("modal-aberto");
+    document.body.classList.add("modal-aberto"); // Esconde o menu inferior
     produtoSendoVisto = cardapio.find(p => p.id == id);
     const modal = document.getElementById("modal-produto");
     const detalhes = document.getElementById("detalhes-produto-modal");
@@ -147,7 +147,6 @@ async function abrirModalProduto(id) {
             htmlAdicionais += `</div>`;
         }
 
-        // --- CAIXA DE QUANTIDADE DO LANCHE INSERIDA AQUI ---
         detalhes.innerHTML = `
             <div class="produto-imagem" style="background-image: url('${produtoSendoVisto.imagem}'); height: 200px; background-size: cover; background-position: center; border-radius: 10px; margin-bottom: 15px;"></div>
             <h2 style="color: #fff;">${produtoSendoVisto.nome}</h2>
@@ -176,15 +175,13 @@ async function abrirModalProduto(id) {
     }
 }
 
-// === FUNÇÕES NOVAS: CONTROLE DE QUANTIDADE DO LANCHE ===
 function alterarQtdBase(delta) {
     const span = document.getElementById("qtd-produto-base");
     let qtd = parseInt(span.innerText) + delta;
-    if (qtd < 1) qtd = 1; // Não deixa pedir menos de 1 lanche
+    if (qtd < 1) qtd = 1; 
     span.innerText = qtd;
 }
 
-// === FUNÇÕES DE ADICIONAIS E CONFIRMAÇÃO ===
 function alterarQtdAdicional(id, delta) {
     const span = document.getElementById(`qtd-add-${id}`);
     const estoqueReal = parseInt(span.getAttribute("data-estoquereal")); 
@@ -204,7 +201,6 @@ function confirmarAdicao() {
     const spanQtdBase = document.getElementById("qtd-produto-base");
     const qtdBaseEscolhida = spanQtdBase ? parseInt(spanQtdBase.innerText) : 1;
 
-    // BLINDAGEM 1: Tem lanche suficiente pro pedido inteiro?
     const qtdJaNoCarrinho = carrinho.filter(item => item.produtoBase.id == produtoSendoVisto.id).length;
     if (qtdJaNoCarrinho + qtdBaseEscolhida > produtoSendoVisto.estoque_maximo) {
         alert(`Estoque atingido! O nosso estoque permite adicionar no máximo mais ${produtoSendoVisto.estoque_maximo - qtdJaNoCarrinho} unidade(s).`);
@@ -214,17 +210,16 @@ function confirmarAdicao() {
     const adicionaisEscolhidos = [];
     let totalAdicionais = 0;
 
-    // BLINDAGEM 2: Multiplica os adicionais pelo número de lanches
     const spansQtd = document.querySelectorAll(".qtd-adicional-span");
     for (const span of spansQtd) {
         const qtdPorLanche = parseInt(span.innerText);
         if (qtdPorLanche > 0) { 
             const estoqueReal = parseInt(span.getAttribute("data-estoquereal"));
-            const totalRequerido = qtdPorLanche * qtdBaseEscolhida; // Ex: Pede 2 lanches com 2 bacons = Precisa de 4 bacons
+            const totalRequerido = qtdPorLanche * qtdBaseEscolhida; 
 
             if (totalRequerido > estoqueReal) {
                 alert(`Estoque insuficiente de ${span.getAttribute("data-nome")}! Você pediu ${qtdPorLanche} porção(ões) para cada um dos ${qtdBaseEscolhida} lanches, necessitando de ${totalRequerido}, mas temos apenas ${estoqueReal}.`);
-                return; // Trava a função!
+                return; 
             }
 
             const idAdd = span.getAttribute("data-id");
@@ -236,11 +231,10 @@ function confirmarAdicao() {
         }
     }
 
-    // ADIÇÃO MULTIPLA: Coloca no carrinho como linhas separadas (Melhor UX)
     for (let i = 0; i < qtdBaseEscolhida; i++) {
         const itemParaCarrinho = {
             produtoBase: produtoSendoVisto,
-            adicionais: JSON.parse(JSON.stringify(adicionaisEscolhidos)), // Clona o array com segurança
+            adicionais: JSON.parse(JSON.stringify(adicionaisEscolhidos)), 
             precoTotalItem: produtoSendoVisto.preco + totalAdicionais
         };
         carrinho.push(itemParaCarrinho);
@@ -257,19 +251,11 @@ function atualizarContadorCart() {
     const barraSacola = document.getElementById("barra-sacola");
     
     if (qtdItens > 0) {
-        // Mostra a barra flutuante
         barraSacola.classList.remove("escondido");
-        
-        // Atualiza a bolinha branca com a quantidade
         document.getElementById("contador-sacola").innerText = qtdItens;
-        
-        // Calcula a soma total em Reais do carrinho em tempo real
         const somaTotal = carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0);
-        
-        // Atualiza o valor na barra
         document.getElementById("total-sacola").innerText = `R$ ${somaTotal.toFixed(2).replace('.', ',')}`;
     } else {
-        // Se esvaziou o carrinho, esconde a barra
         barraSacola.classList.add("escondido");
     }
 }
@@ -279,15 +265,65 @@ function abrirCheckout() {
         alert("Seu carrinho está vazio!");
         return;
     }
-    document.getElementById("tela-catalogo").classList.add("escondido");
-    document.getElementById("tela-checkout").classList.remove("escondido");
+    
+    // MÁGICA: Avisa o CSS que entramos no checkout para ele esconder os menus
+    document.body.classList.add("modo-checkout");
+    
+    // Limpa os botões azuis e esconde telas com segurança
+    document.querySelectorAll(".nav-item").forEach(btn => btn.classList.remove("ativo"));
+    
+    const telaCatalogo = document.getElementById("tela-catalogo");
+    if (telaCatalogo) telaCatalogo.classList.add("escondido");
+    
+    const telaPerfil = document.getElementById("tela-perfil");
+    if (telaPerfil) telaPerfil.classList.add("escondido");
+    
+    // Mostra o checkout
+    const telaCheckout = document.getElementById("tela-checkout");
+    if (telaCheckout) telaCheckout.classList.remove("escondido");
+
     window.scrollTo(0, 0); 
     renderizarCheckout();
+    carregarPerfilNaTela(); 
+    preencherCheckoutComPerfil();
+}
+
+function navegarPara(aba) {
+    // MÁGICA: Remove o modo checkout para o menu branco voltar a aparecer
+    document.body.classList.remove("modo-checkout");
+    
+    // Esconde todas as telas
+    const telaCatalogo = document.getElementById("tela-catalogo");
+    const telaCheckout = document.getElementById("tela-checkout");
+    const telaPerfil = document.getElementById("tela-perfil");
+
+    if (telaCatalogo) telaCatalogo.classList.add("escondido");
+    if (telaCheckout) telaCheckout.classList.add("escondido");
+    if (telaPerfil) telaPerfil.classList.add("escondido");
+    
+    // Tira o foco azul
+    document.querySelectorAll(".nav-item").forEach(btn => btn.classList.remove("ativo"));
+    
+    // Volta a mostrar a barra flutuante da sacola se tiver itens
+    atualizarContadorCart();
+
+    // Mostra a tela certa
+    if (aba === 'inicio') {
+        if (telaCatalogo) telaCatalogo.classList.remove("escondido");
+        const btnInicio = document.getElementById("btn-nav-inicio");
+        if (btnInicio) btnInicio.classList.add("ativo");
+        window.scrollTo(0, 0);
+    } else if (aba === 'perfil') {
+        if (telaPerfil) telaPerfil.classList.remove("escondido");
+        const btnPerfil = document.getElementById("btn-nav-perfil");
+        if (btnPerfil) btnPerfil.classList.add("ativo");
+        carregarPerfilNaTela();
+        window.scrollTo(0, 0);
+    }
 }
 
 function fecharCheckout() {
-    document.getElementById("tela-checkout").classList.add("escondido");
-    document.getElementById("tela-catalogo").classList.remove("escondido");
+    navegarPara('inicio');
 }
 
 function renderizarCheckout() {
@@ -311,11 +347,8 @@ function renderizarCheckout() {
         divItens.innerHTML += `
             <div class="item-checkout-card">
                 <div class="item-checkout-info">
-                    <!-- === AQUI ESTÁ A MUDANÇA: Preço base ao lado do nome === -->
                     <strong>1x ${item.produtoBase.nome} <span style="color: #aaa; font-size: 13px;">(R$ ${item.produtoBase.preco.toFixed(2).replace('.', ',')})</span></strong>
-                    
                     ${listaAddsHtml}
-                    
                     <div style="color: var(--laranja-fogo); margin-top: 5px; font-weight: bold; font-size: 15px;">
                         Subtotal: R$ ${item.precoTotalItem.toFixed(2).replace('.', ',')}
                     </div>
@@ -339,7 +372,8 @@ function removerDoCarrinho(index) {
         renderizarCheckout();
     }
 }
-// === 6. FINALIZAÇÃO, BANCO DE DADOS E WHATSAPP ===
+
+// === 6. FINALIZAÇÃO E WHATSAPP ===
 function verificarTroco() {
     const formaPagamento = document.getElementById("forma-pagamento").value;
     const campoTroco = document.getElementById("troco-dinheiro");
@@ -348,15 +382,20 @@ function verificarTroco() {
 
 async function enviarParaWhatsApp() {
     const nome = document.getElementById("nome-cliente").value;
-    const endereco = document.getElementById("endereco-cliente").value;
+    const rua = document.getElementById("rua-cliente").value;
+    const numero = document.getElementById("numero-cliente").value;
+    const bairro = document.getElementById("bairro-cliente").value;
+    const complemento = document.getElementById("complemento-cliente").value;
     const pagamento = document.getElementById("forma-pagamento").value;
 
-    if (nome === "" || endereco === "") {
-        alert("Preencha seu Nome e Endereço para a entrega!");
+    if (nome === "" || rua === "" || numero === "" || bairro === "") {
+        alert("Preencha seu Nome, Rua, Número e Bairro para a entrega!");
         return;
     }
 
+    const enderecoFormatado = `${rua}, ${numero} - ${bairro} ${complemento ? '(' + complemento + ')' : ''}`;
     const totalCalculado = carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0);
+    
     const btnFinalizar = document.querySelector("button[onclick='enviarParaWhatsApp()']");
     let textoOriginalBotao = "Enviar Pedido";
 
@@ -409,8 +448,8 @@ async function enviarParaWhatsApp() {
             }
         }
 
-        let textoPedido = `🔥 *NOVO PEDIDO #${idDoPedido} - FIRE BURGER* 🔥\n\n`;
-        textoPedido += `👤 *Cliente:* ${nome}\n📍 *Endereço:* ${endereco}\n`;
+        let textoPedido = `🔥 *NOVO PEDIDO #${idDoPedido} - VILELA BURGERS* 🔥\n\n`;
+        textoPedido += `👤 *Cliente:* ${nome}\n📍 *Endereço:* ${enderecoFormatado}\n`;
         
         if (pagamento === "Dinheiro") {
             const troco = document.getElementById("troco-dinheiro").value;
@@ -436,47 +475,115 @@ async function enviarParaWhatsApp() {
         carrinho = [];
         atualizarContadorCart();
         fecharCheckout();
-        document.getElementById("nome-cliente").value = "";
-        document.getElementById("endereco-cliente").value = "";
 
         const telefone = "5543996150221"; 
         window.open(`https://wa.me/${telefone}?text=${encodeURIComponent(textoPedido)}`, '_blank');
 
     } catch (erro) {
         console.error("Erro no checkout:", erro);
-        alert("Ops! Um ou mais itens do seu pedido esgotaram do nosso estoque neste momento. Por favor, revise o carrinho.");
+        alert("Ops! Ocorreu um erro no servidor. Tente novamente.");
         if (btnFinalizar) { btnFinalizar.innerText = textoOriginalBotao; btnFinalizar.disabled = false; }
     }
 }
 
-// === 7. FUNÇÕES DE FECHAR A JANELA ===
-function fecharModalProduto() { document.getElementById("modal-produto").classList.add("escondido"); }
-function fecharModal() { document.getElementById("modal-produto").classList.add("escondido"); }
+// === 7. FUNÇÕES DE FECHAR A JANELA (Com correção do menu) ===
+function fecharModalProduto() { 
+    document.getElementById("modal-produto").classList.add("escondido"); 
+    document.body.classList.remove("modal-aberto"); // Devolve o menu
+}
+
+function fecharModal() { 
+    document.getElementById("modal-produto").classList.add("escondido"); 
+    document.body.classList.remove("modal-aberto"); // Devolve o menu
+}
 
 window.addEventListener('click', function(event) {
     const modal = document.getElementById("modal-produto");
-    if (event.target === modal) modal.classList.add("escondido");
+    if (event.target === modal) {
+        modal.classList.add("escondido");
+        document.body.classList.remove("modal-aberto"); // Devolve o menu
+    }
 });
+
+// === 8. NAVEGAÇÃO ENTRE ABAS DO MENU INFERIOR ===
+function navegarPara(aba) {
+    // 1. Esconde todas as telas
+    document.getElementById("tela-catalogo").classList.add("escondido");
+    document.getElementById("tela-checkout").classList.add("escondido");
+    document.getElementById("tela-perfil").classList.add("escondido");
+    
+    // 2. Tira o foco azul de todos os botões
+    document.querySelectorAll(".nav-item").forEach(btn => btn.classList.remove("ativo"));
+
+    // 3. Mostra a tela certa e acende o botão
+    if (aba === 'inicio') {
+        document.getElementById("tela-catalogo").classList.remove("escondido");
+        document.getElementById("btn-nav-inicio").classList.add("ativo");
+    } else if (aba === 'perfil') {
+        document.getElementById("tela-perfil").classList.remove("escondido");
+        document.getElementById("btn-nav-perfil").classList.add("ativo");
+        carregarPerfilNaTela(); // Puxa os dados da memória
+    }
+}
+
+// === 9. MEMÓRIA DO CELULAR (LOCALSTORAGE) ===
+function salvarPerfil() {
+    const perfil = {
+        nome: document.getElementById("perfil-nome").value,
+        telefone: document.getElementById("perfil-telefone").value,
+        rua: document.getElementById("perfil-rua").value,
+        numero: document.getElementById("perfil-numero").value,
+        bairro: document.getElementById("perfil-bairro").value,
+        complemento: document.getElementById("perfil-complemento").value
+    };
+    
+    // Cofre mágico do navegador
+    localStorage.setItem("vilelaburgers_perfil", JSON.stringify(perfil));
+    
+    alert("Pronto! Seus dados foram salvos e agilizarão seus próximos pedidos.");
+    navegarPara('inicio'); 
+}
+
+function carregarPerfilNaTela() {
+    const salvo = localStorage.getItem("vilelaburgers_perfil");
+    if (salvo) {
+        const perfil = JSON.parse(salvo);
+        document.getElementById("perfil-nome").value = perfil.nome || "";
+        document.getElementById("perfil-telefone").value = perfil.telefone || "";
+        document.getElementById("perfil-rua").value = perfil.rua || "";
+        document.getElementById("perfil-numero").value = perfil.numero || "";
+        document.getElementById("perfil-bairro").value = perfil.bairro || "";
+        document.getElementById("perfil-complemento").value = perfil.complemento || "";
+    }
+}
+
+function preencherCheckoutComPerfil() {
+    const salvo = localStorage.getItem("vilelaburgers_perfil");
+    if (salvo) {
+        const perfil = JSON.parse(salvo);
+        document.getElementById("nome-cliente").value = perfil.nome || "";
+        document.getElementById("rua-cliente").value = perfil.rua || "";
+        document.getElementById("numero-cliente").value = perfil.numero || "";
+        document.getElementById("bairro-cliente").value = perfil.bairro || "";
+        document.getElementById("complemento-cliente").value = perfil.complemento || "";
+    }
+}
 
 // === INICIA O SISTEMA AO ABRIR O SITE ===
 carregarCardapioDoBanco();
 
-// === 8. RODAPÉ DO DESENVOLVEDOR (BRANDING MATHS LABS) ===
+// === 10. RODAPÉ DO DESENVOLVEDOR ===
 function renderizarRodape() {
     const dataAtual = new Date();
-    const ano = dataAtual.getFullYear(); // Pega o ano automaticamente (2026, 2027...)
-    
-    // Cria uma "Versão Automática" baseada no ano e mês para parecer sempre atualizado
-    // Exemplo do formato: v1.2026.08
+    const ano = dataAtual.getFullYear(); 
     const mes = String(dataAtual.getMonth() + 1).padStart(2, '0');
     const versaoApp = `v1.${ano}.${mes}`; 
 
     const footer = document.createElement("footer");
-    // Estilo dark moderno, combinando com o app
-    footer.style.cssText = "text-align: center; padding: 30px 15px; background: #111; color: #777; font-size: 13px; margin-top: 50px; border-top: 1px solid #222; width: 100%;";
+    footer.style.cssText = "text-align: center; padding: 30px 15px; background: #111; color: #777; font-size: 13px; margin-top: 50px; border-top: 1px solid #222; width: 100%; padding-bottom: 120px;"; // Padding extra por causa do menu
     
     footer.innerHTML = `
-        <div style="margin-bottom: 8px;">&copy; ${ano} Fire Burger. Todos os direitos reservados.</div>
+        <div style="margin-bottom: 8px;">&copy; ${ano} Vilela Burgers. Todos os direitos reservados.</div>
         <div style="margin-bottom: 8px;">
             Desenvolvido por <a href="https://mathshub.com.br" target="_blank" style="color: #ff5e00; text-decoration: none; font-weight: bold;">Maths Labs</a> 🚀
         </div>
@@ -486,5 +593,4 @@ function renderizarRodape() {
     document.body.appendChild(footer);
 }
 
-// Executa a função para o rodapé aparecer sozinho
 renderizarRodape();

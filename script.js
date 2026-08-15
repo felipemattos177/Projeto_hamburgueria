@@ -587,24 +587,52 @@ function preencherCheckoutComPerfil() {
 carregarCardapioDoBanco();
 
 // === 10. RODAPÉ DO DESENVOLVEDOR ===
-function renderizarRodape() {
+async function renderizarRodape() {
     const dataAtual = new Date();
     const ano = dataAtual.getFullYear(); 
-    const mes = String(dataAtual.getMonth() + 1).padStart(2, '0');
-    const versaoApp = `v1.${ano}.${mes}`; 
-
-    const footer = document.createElement("footer");
-    footer.style.cssText = "text-align: center; padding: 30px 15px; background: #111; color: #777; font-size: 13px; margin-top: 50px; border-top: 1px solid #222; width: 100%; padding-bottom: 120px;"; // Padding extra por causa do menu
     
+    const footer = document.createElement("footer");
+    footer.style.cssText = "text-align: center; padding: 30px 15px; background: #111; color: #777; font-size: 13px; margin-top: 50px; border-top: 1px solid #222; width: 100%; padding-bottom: 120px;"; 
+    
+    // Note que coloquei um ID na div da versão para o JS achar ela facilmente
     footer.innerHTML = `
         <div style="margin-bottom: 8px;">&copy; ${ano} Vilela Burgers. Todos os direitos reservados.</div>
         <div style="margin-bottom: 8px;">
             Desenvolvido por <a href="https://mathshub.com.br" target="_blank" style="color: #ff5e00; text-decoration: none; font-weight: bold;">Maths Labs</a> 🚀
         </div>
-        <div style="font-size: 11px; color: #444; margin-top: 10px;">Versão do Sistema ${versaoApp}</div>
+        <div id="versao-app" style="font-size: 11px; color: #444; margin-top: 10px;">Sincronizando versão...</div>
     `;
-
     document.body.appendChild(footer);
-}
 
+    try {
+        // MÁGICA: O site vai perguntar pro GitHub qual é a última atualização
+        // ATENÇÃO: Substitua pelos seus dados reais do GitHub
+        const usuarioGit = "felipemattos177";
+        const repositorioGit = "Projeto_hamburgueria";
+        const branch = "main"; // Pode ser que o seu seja "master"
+        
+        const resposta = await fetch(`https://api.github.com/repos/${usuarioGit}/${repositorioGit}/commits/${branch}`);
+        
+        if (!resposta.ok) throw new Error("Não foi possível buscar a versão");
+        
+        const dados = await resposta.json();
+        
+        // Pega os 7 primeiros caracteres da atualização (Exemplo: 4a2b9f1)
+        const hashAtualizacao = dados.sha.substring(0, 7);
+        
+        // Formata a data em que você subiu o código
+        const dataCommit = new Date(dados.commit.author.date);
+        const dia = String(dataCommit.getDate()).padStart(2, '0');
+        const mes = String(dataCommit.getMonth() + 1).padStart(2, '0');
+        const hora = String(dataCommit.getHours()).padStart(2, '0');
+        const minuto = String(dataCommit.getMinutes()).padStart(2, '0');
+
+        document.getElementById("versao-app").innerText = `Build: ${hashAtualizacao} (${dia}/${mes} às ${hora}:${minuto})`;
+
+    } catch (erro) {
+        // Se der erro (ex: cliente sem internet na hora, ou o GitHub demorar), ele põe a data de hoje como garantia
+        const mesAtual = String(dataAtual.getMonth() + 1).padStart(2, '0');
+        document.getElementById("versao-app").innerText = `Versão do Sistema v1.${ano}.${mesAtual}`;
+    }
+}
 renderizarRodape();

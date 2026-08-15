@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fire Burger - Pedido Online</title>
+    
+    <!-- Fontes e Ícones -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Header Fixo -->
+    <header class="header">
+        <div class="logo">
+            <i class="fa-solid fa-fire-flame-curved"></i> Fire Burger
+        </div>
+        <div class="carrinho-icone" onclick="abrirCheckout()">
+            <i class="fa-solid fa-cart-shopping"></i>
+            <span id="contador-carrinho">0</span>
+        </div>
+    </header>
+
+    <!-- ========================================== -->
+    <!-- TELA 1: CATÁLOGO E CARDÁPIO                -->
+    <!-- ========================================== -->
+    <div id="tela-catalogo">
+        <!-- Banner Principal de Fogo -->
+        <section class="hero">
+            <div class="hero-texto">
+                <h2>Grelhado no fogo.</h2>
+                <p>O verdadeiro sabor do churrasco no seu hambúrguer.</p>
+            </div>
+        </section>
+
+        <!-- Menu Deslizante de Categorias -->
+        <nav class="menu-categorias">
+            <button class="btn-categoria ativo" onclick="filtrarCategoria('Todos', this)">Todos</button>
+            <button class="btn-categoria" onclick="filtrarCategoria('Smash', this)">Smash</button>
+            <button class="btn-categoria" onclick="filtrarCategoria('Artesanal', this)">Artesanal</button>
+            <button class="btn-categoria" onclick="filtrarCategoria('Bebidas', this)">Bebidas</button>
+        </nav>
+
+        <!-- Grid de Produtos -->
+        <main class="container">
+            <div id="lista-produtos" class="grid-produtos">
+                <!-- Produtos gerados pelo JS -->
+            </div>
+        </main>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TELA 2: CHECKOUT (ENTREGA E PAGAMENTO)     -->
+    <!-- ========================================== -->
+    <div id="tela-checkout" class="escondido">
+        <div class="checkout-header">
+            <button class="btn-voltar" onclick="fecharCheckout()"><i class="fa-solid fa-arrow-left"></i> Voltar ao Cardápio</button>
+            <h2>Finalizar Pedido</h2>
+        </div>
+
+        <main class="container">
+            <!-- Resumo do Carrinho -->
+            <section class="checkout-secao">
+                <h3><i class="fa-solid fa-basket-shopping"></i> Seu Pedido</h3>
+                <div id="itens-checkout" class="lista-checkout">
+                    <!-- Itens do carrinho aparecem aqui -->
+                </div>
+                <div class="total-checkout">
+                    <span>Total:</span>
+                    <span id="valor-total">R$ 0,00</span>
+                </div>
+            </section>
+
+            <!-- Dados do Cliente -->
+            <section class="checkout-secao">
+                <h3><i class="fa-solid fa-location-dot"></i> Entrega</h3>
+                <input type="text" id="nome-cliente" placeholder="Seu Nome Completo">
+                <input type="text" id="endereco-cliente" placeholder="Rua, Número, Bairro, Referência">
+            </section>
+
+            <!-- Pagamento -->
+            <section class="checkout-secao" style="margin-bottom: 100px;">
+                <h3><i class="fa-solid fa-wallet"></i> Pagamento na Entrega</h3>
+                <select id="forma-pagamento" onchange="verificarTroco()">
+                    <option value="Pix">Pix</option>
+                    <option value="Cartão">Cartão de Crédito/Débito</option>
+                    <option value="Dinheiro">Dinheiro</option>
+                </select>
+                <input type="number" id="troco-dinheiro" placeholder="Troco para quanto? (Ex: 100)" style="display: none;">
+            </section>
+        </main>
+
+        <!-- Rodapé do Checkout -->
+        <footer class="rodape-fixo">
+            <button class="btn-whatsapp" onclick="enviarParaWhatsApp()">
+                <i class="fa-brands fa-whatsapp"></i> Enviar Pedido
+            </button>
+        </footer>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- MODAL DE PRODUTO (ADICIONAIS)              -->
+    <!-- ========================================== -->
+    <div id="modal-produto" class="modal-overlay escondido">
+        <div class="modal-conteudo">
+            <button class="btn-fechar-modal" onclick="fecharModal()"><i class="fa-solid fa-xmark"></i></button>
+            <div id="detalhes-produto-modal">
+                <!-- Conteúdo injetado pelo JS -->
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

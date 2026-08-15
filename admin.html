@@ -5,10 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel de Gestão - Fire Burger</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        :root { --laranja-fogo: #ff5e00; }
         body { font-family: 'Roboto', sans-serif; background-color: #f4f6f8; margin: 0; padding: 20px; color: #333; padding-bottom: 50px;}
-        .header-admin { display: flex; justify-content: space-between; align-items: center; background: #121212; color: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; margin-top: 40px;}
-        .header-admin h1 { margin: 0; font-size: 24px; color: #ff5e00; }
+        
+        /* === NAVEGAÇÃO DE SUBMENUS (TABS) === */
+        .tabs-container { display: flex; gap: 10px; background: #121212; padding: 15px 20px; border-radius: 10px; margin-bottom: 20px; align-items: center; }
+        .tabs-logo { color: var(--laranja-fogo); font-weight: bold; font-size: 20px; margin-right: auto; }
+        .tab-btn { background: #333; color: #ccc; border: none; padding: 12px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 14px; display: flex; align-items: center; gap: 8px;}
+        .tab-btn.ativa { background: var(--laranja-fogo); color: white; }
+        .tab-btn:hover:not(.ativa) { background: #444; }
+        
+        /* Controle de visibilidade das abas */
+        .view-section { display: none; }
+        .view-section.ativa { display: block; animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* === ESTILOS ORIGINAIS DO SEU PAINEL DE ESTOQUE === */
+        .header-admin { display: flex; justify-content: space-between; align-items: center; background: #121212; color: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; margin-top: 20px;}
+        .header-admin h1 { margin: 0; font-size: 24px; color: var(--laranja-fogo); }
         .btn-novo { background-color: #2ed573; color: white; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; transition: 0.2s;}
         .btn-novo:hover { background-color: #26b963; }
         
@@ -28,7 +44,7 @@
         
         .estoque-baixo { color: #ff4757; font-weight: bold; }
         
-        /* Modais */
+        /* Modais originais */
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 1000; }
         .modal-conteudo { background: white; padding: 30px; border-radius: 10px; width: 400px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); max-height: 90vh; overflow-y: auto; }
         .modal-conteudo.largo { width: 600px; }
@@ -36,56 +52,124 @@
         .modal-conteudo input, .modal-conteudo select { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
         .modal-botoes { display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; }
         .btn-cancelar { background-color: #dfe4ea; color: #333; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; }
-        
         .box-add-ingrediente { background: #f1f2f6; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #dfe4ea; }
+
+        /* === ESTILOS DO KANBAN DE PEDIDOS === */
+        .painel-board { display: flex; gap: 20px; overflow-x: auto; min-height: calc(100vh - 120px); }
+        .coluna { flex: 1; min-width: 320px; background: #121212; border-radius: 10px; padding: 15px; display: flex; flex-direction: column; }
+        .coluna h2 { font-size: 18px; text-align: center; margin-top: 0; padding-bottom: 15px; border-bottom: 1px solid #333; color: #fff; }
+        .coluna-pedidos { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; padding-right: 5px; }
+        
+        .card-pedido { background: #1e1e1e; padding: 15px; border-radius: 8px; border-left: 5px solid #555; position: relative; color: #f1f2f6; box-shadow: 0 4px 6px rgba(0,0,0,0.2);}
+        .card-pedido.pendente { border-left-color: #ff4757; }
+        .card-pedido.preparo { border-left-color: #ffa502; }
+        .card-pedido.entrega { border-left-color: #2ed573; }
+        
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .pedido-id { font-weight: 800; font-size: 18px; }
+        .pedido-tempo { font-size: 12px; color: #aaa; }
+        
+        .info-cliente { margin-bottom: 15px; font-size: 14px; line-height: 1.5; color: #ccc;}
+        .info-cliente strong { color: var(--laranja-fogo); font-size: 15px;}
+        
+        .btn-acao-kanban { width: 100%; padding: 12px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; font-size: 14px; margin-top: 5px;}
+        .btn-aceitar { background: #ffa502; color: #000; }
+        .btn-despachar { background: #2ed573; color: #000; }
+        .btn-entregue { background: #57606f; color: #fff; }
+        
+        .coluna-pedidos::-webkit-scrollbar { width: 6px; }
+        .coluna-pedidos::-webkit-scrollbar-thumb { background: #444; border-radius: 10px; }
     </style>
 </head>
 <body>
 
-    <!-- SESSÃO 1: PRODUTOS -->
-    <div class="header-admin" style="margin-top: 0;">
-        <h1>🍔 Gestão do Cardápio</h1>
-        <button class="btn-novo" onclick="abrirModalAdmin()">+ Novo Produto</button>
+    <!-- SUBMENU DE NAVEGAÇÃO -->
+    <div class="tabs-container">
+        <div class="tabs-logo"><i class="fa-solid fa-fire-flame-curved"></i> Fire Burger Admin</div>
+        <button class="tab-btn ativa" onclick="mudarAbaAdmin('view-estoque', this)"><i class="fa-solid fa-boxes-stacked"></i> Cardápio & Estoque</button>
+        <button class="tab-btn" onclick="mudarAbaAdmin('view-pedidos', this)"><i class="fa-solid fa-motorcycle"></i> Gestão de Pedidos</button>
     </div>
 
-    <table>
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Nome do Produto</th>
-                <th>Categoria</th>
-                <th>Preço</th>
-                <th>Status</th>
-                <th>Ações</th>
-            </tr>
-        </thead>
-        <tbody id="tabela-produtos">
-            <tr><td colspan="6" style="text-align: center;">Carregando produtos...</td></tr>
-        </tbody>
-    </table>
+    <!-- ========================================== -->
+    <!-- ABA 1: GESTÃO E ESTOQUE                    -->
+    <!-- ========================================== -->
+    <div id="view-estoque" class="view-section ativa">
+        
+        <div class="header-admin" style="margin-top: 0;">
+            <h1>🍔 Gestão do Cardápio</h1>
+            <button class="btn-novo" onclick="abrirModalAdmin()">+ Novo Produto</button>
+        </div>
 
-    <!-- SESSÃO 2: ESTOQUE -->
-    <div class="header-admin">
-        <h1>📦 Controle de Estoque (Ingredientes)</h1>
-        <button class="btn-novo" onclick="alert('Em breve: Cadastro de nova matéria-prima!')">+ Nova Matéria-Prima</button>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nome do Produto</th>
+                    <th>Categoria</th>
+                    <th>Preço</th>
+                    <th>Status</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody id="tabela-produtos">
+                <tr><td colspan="6" style="text-align: center;">Carregando produtos...</td></tr>
+            </tbody>
+        </table>
+
+        <div class="header-admin">
+            <h1>📦 Controle de Estoque (Ingredientes)</h1>
+            <button class="btn-novo" onclick="alert('Em breve: Cadastro de nova matéria-prima!')">+ Nova Matéria-Prima</button>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Matéria-Prima</th>
+                    <th>Unidade</th>
+                    <th>Saldo Atual</th>
+                    <th>Ação</th>
+                </tr>
+            </thead>
+            <tbody id="tabela-estoque">
+                <tr><td colspan="5" style="text-align: center;">Carregando estoque...</td></tr>
+            </tbody>
+        </table>
     </div>
 
-    <table>
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Matéria-Prima</th>
-                <th>Unidade</th>
-                <th>Saldo Atual</th>
-                <th>Ação</th>
-            </tr>
-        </thead>
-        <tbody id="tabela-estoque">
-            <tr><td colspan="5" style="text-align: center;">Carregando estoque...</td></tr>
-        </tbody>
-    </table>
+    <!-- ========================================== -->
+    <!-- ABA 2: KANBAN DE PEDIDOS (TEMPO REAL)      -->
+    <!-- ========================================== -->
+    <div id="view-pedidos" class="view-section">
+        <div class="painel-board">
+            
+            <!-- Coluna 1: Pendentes (Novos) -->
+            <div class="coluna">
+                <h2 style="color: #ff4757;"><i class="fa-solid fa-bell"></i> Novos (Pendentes)</h2>
+                <div id="col-pendentes" class="coluna-pedidos">
+                    <p style="text-align: center; color: #666; margin-top: 20px;">Carregando pedidos...</p>
+                </div>
+            </div>
 
-    <!-- MODAL 1: CADASTRAR PRODUTO -->
+            <!-- Coluna 2: Em Preparo -->
+            <div class="coluna">
+                <h2 style="color: #ffa502;"><i class="fa-solid fa-fire-burner"></i> Em Preparo</h2>
+                <div id="col-preparo" class="coluna-pedidos"></div>
+            </div>
+
+            <!-- Coluna 3: Em Entrega -->
+            <div class="coluna">
+                <h2 style="color: #2ed573;"><i class="fa-solid fa-motorcycle"></i> Saiu p/ Entrega</h2>
+                <div id="col-entrega" class="coluna-pedidos"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- MODAIS DO ESTOQUE (MANTIDOS INTACTOS)      -->
+    <!-- ========================================== -->
+    
     <div id="modal-novo-produto" class="modal-overlay">
         <div class="modal-conteudo">
             <h2>Cadastrar Lanche</h2>
@@ -105,7 +189,6 @@
         </div>
     </div>
 
-    <!-- MODAL 2: FICHA TÉCNICA (RECEITA) -->
     <div id="modal-receita" class="modal-overlay">
         <div class="modal-conteudo largo">
             <h2 id="titulo-modal-receita">Ficha Técnica</h2>
@@ -115,7 +198,7 @@
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <select id="select-ingrediente" style="margin-bottom: 0; flex: 2;"></select>
                     <input type="number" id="input-qtd-ingrediente" placeholder="Qtd" step="0.01" style="margin-bottom: 0; flex: 1;">
-                    <span id="label-unidade" style="font-weight: bold; color: #ff5e00; width: 60px;"></span>
+                    <span id="label-unidade" style="font-weight: bold; color: var(--laranja-fogo); width: 60px;"></span>
                 </div>
                 <button class="btn-novo" style="margin-top: 10px; width: 100%;" onclick="salvarIngredienteNaReceita()">Vincular Ingrediente</button>
             </div>
@@ -139,6 +222,20 @@
         </div>
     </div>
 
+    <!-- Script de navegação embutido (apenas visual) -->
+    <script>
+        function mudarAbaAdmin(abaId, elementoBotao) {
+            // Esconde todas as abas
+            document.querySelectorAll('.view-section').forEach(view => view.classList.remove('ativa'));
+            // Tira a cor ativa de todos os botões
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('ativa'));
+            
+            // Mostra a aba selecionada e pinta o botão clicado
+            document.getElementById(abaId).classList.add('ativa');
+            elementoBotao.classList.add('ativa');
+        }
+    </script>
+    
     <script src="admin.js"></script>
 </body>
 </html>

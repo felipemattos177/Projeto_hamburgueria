@@ -1,4 +1,4 @@
-// 1. CREDENCIAIS (Use as mesmas que você usou no script.js)
+// 1. CREDENCIAIS
 const SUPABASE_URL = "https://tjievzloufqptabbvumz.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqaWV2emxvdWZxcHRhYmJ2dW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY3NTY1NjIsImV4cCI6MjEwMjMzMjU2Mn0.HAIHej243RMeLMBueFjcN0-99y41BEbb3v4PgCj1Vs4";
 
@@ -22,6 +22,7 @@ async function carregarProdutos() {
 
 function renderizarTabelaProdutos(produtos) {
     const tbody = document.getElementById("tabela-produtos");
+    if(!tbody) return; // Evita erro se a aba não estiver visível
     tbody.innerHTML = "";
     produtos.forEach(produto => {
         const badgeClass = produto.ativo ? "status-ativo" : "status-inativo";
@@ -39,7 +40,6 @@ function renderizarTabelaProdutos(produtos) {
                     <button class="btn-acao btn-toggle" onclick="mudarStatusProduto(${produto.id}, ${!produto.ativo})">
                         ${botaoTexto}
                     </button>
-                    <!-- NOVO BOTÃO DE RECEITA AQUI -->
                     <button class="btn-acao btn-receita" onclick="abrirModalReceita(${produto.id}, '${produto.nome}')">
                         📋 Ficha Técnica
                     </button>
@@ -58,10 +58,8 @@ async function mudarStatusProduto(id, novoStatus) {
     carregarProdutos();
 }
 
-// Modal Produto (Simples)
 function abrirModalAdmin() { document.getElementById("modal-novo-produto").style.display = "flex"; }
 function fecharModalAdmin() { document.getElementById("modal-novo-produto").style.display = "none"; }
-// (Função salvarNovoProduto ficaria aqui)
 
 // ==========================================
 // MÓDULO 2: CONTROLE DE ESTOQUE
@@ -73,13 +71,14 @@ async function carregarEstoque() {
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
         });
         const dados = await resposta.json();
-        listaDeIngredientesGlobal = dados; // Salva a lista para usarmos no Módulo 3 depois
+        listaDeIngredientesGlobal = dados; 
         renderizarTabelaEstoque(dados);
     } catch (erro) { console.error(erro); }
 }
 
 function renderizarTabelaEstoque(ingredientes) {
     const tbody = document.getElementById("tabela-estoque");
+    if(!tbody) return;
     tbody.innerHTML = "";
     ingredientes.forEach(ing => {
         let classeAlerta = ing.estoque <= 10 ? "estoque-baixo" : "";
@@ -113,16 +112,13 @@ async function ajustarSaldo(id, nome, saldoAtual) {
 }
 
 // ==========================================
-// MÓDULO 3: GESTÃO DE FICHAS TÉCNICAS (NOVO!)
+// MÓDULO 3: GESTÃO DE FICHAS TÉCNICAS
 // ==========================================
-
-// 1. Abre a tela e prepara os ingredientes
 async function abrirModalReceita(produtoId, produtoNome) {
     produtoAtualParaReceita = produtoId;
     document.getElementById("titulo-modal-receita").innerText = `Ficha Técnica: ${produtoNome}`;
     document.getElementById("modal-receita").style.display = "flex";
 
-    // Preenche a caixa de seleção de ingredientes
     const select = document.getElementById("select-ingrediente");
     select.innerHTML = '<option value="">Escolha a matéria-prima...</option>';
     
@@ -130,13 +126,11 @@ async function abrirModalReceita(produtoId, produtoNome) {
         select.innerHTML += `<option value="${ing.id}" data-unidade="${ing.unidade}">${ing.nome}</option>`;
     });
 
-    // Evento: Quando o gestor seleciona um ingrediente, mostra a unidade de medida dele (ex: "fatia")
     select.onchange = function() {
         const opcaoSelecionada = select.options[select.selectedIndex];
         document.getElementById("label-unidade").innerText = opcaoSelecionada ? opcaoSelecionada.getAttribute('data-unidade') : "";
     };
 
-    // Carrega a tabela de ingredientes que já estão salvos neste lanche
     buscarIngredientesDesteLanche(produtoId);
 }
 
@@ -144,7 +138,6 @@ function fecharModalReceita() {
     document.getElementById("modal-receita").style.display = "none";
 }
 
-// 2. Busca e Desenha a Receita na Tela
 async function buscarIngredientesDesteLanche(produtoId) {
     try {
         const resposta = await fetch(`${SUPABASE_URL}/rest/v1/receita_produto?produto_id=eq.${produtoId}`, {
@@ -162,7 +155,6 @@ async function buscarIngredientesDesteLanche(produtoId) {
         }
 
         receitaDoBanco.forEach(itemDaReceita => {
-            // Cruza os dados: Acha o nome e a unidade do ingrediente baseado no ID
             const detalhesDoIngrediente = listaDeIngredientesGlobal.find(i => i.id === itemDaReceita.ingrediente_id);
             const nome = detalhesDoIngrediente ? detalhesDoIngrediente.nome : "Ingrediente Excluído";
             const unidade = detalhesDoIngrediente ? detalhesDoIngrediente.unidade : "";
@@ -180,7 +172,6 @@ async function buscarIngredientesDesteLanche(produtoId) {
     } catch (erro) { console.error("Erro ao buscar receita:", erro); }
 }
 
-// 3. Salva um novo ingrediente no lanche (COM MODO DEBUG ATIVADO)
 async function salvarIngredienteNaReceita() {
     const ingredienteId = document.getElementById("select-ingrediente").value;
     const quantidade = document.getElementById("input-qtd-ingrediente").value;
@@ -190,7 +181,6 @@ async function salvarIngredienteNaReceita() {
         return;
     }
 
-    // Muda o botão para mostrar que está pensando
     const btn = document.querySelector(".box-add-ingrediente .btn-novo");
     const textoOriginal = btn.innerText;
     btn.innerText = "Salvando...";
@@ -199,10 +189,8 @@ async function salvarIngredienteNaReceita() {
         const resposta = await fetch(`${SUPABASE_URL}/rest/v1/receita_produto`, {
             method: 'POST',
             headers: {
-                'apikey': SUPABASE_KEY,
-                'Authorization': `Bearer ${SUPABASE_KEY}`,
-                'Content-Type': 'application/json',
-                'Prefer': 'return=representation' // Exige que o banco devolva a resposta
+                'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`,
+                'Content-Type': 'application/json', 'Prefer': 'return=representation'
             },
             body: JSON.stringify({
                 produto_id: produtoAtualParaReceita,
@@ -211,7 +199,6 @@ async function salvarIngredienteNaReceita() {
             })
         });
 
-        // O ESPIÃO: Se a resposta não for OK (200~299), ele captura o erro real
         if (!resposta.ok) {
             const erroBanco = await resposta.json();
             alert(`🚨 Erro do Banco de Dados: ${erroBanco.message || erroBanco.error}`);
@@ -220,12 +207,10 @@ async function salvarIngredienteNaReceita() {
             return;
         }
 
-        // Limpa as caixinhas se deu certo
         document.getElementById("select-ingrediente").value = "";
         document.getElementById("input-qtd-ingrediente").value = "";
         document.getElementById("label-unidade").innerText = "";
 
-        // Recarrega a tabela para mostrar o item novo
         buscarIngredientesDesteLanche(produtoAtualParaReceita);
         btn.innerText = textoOriginal;
 
@@ -236,21 +221,120 @@ async function salvarIngredienteNaReceita() {
     }
 }
 
-// 4. Remove um ingrediente do lanche
 async function removerDaReceita(idDaReceita) {
     if(!confirm("Remover este item da ficha técnica do lanche?")) return;
-
     try {
         await fetch(`${SUPABASE_URL}/rest/v1/receita_produto?id=eq.${idDaReceita}`, {
             method: 'DELETE',
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
         });
-        
-        // Recarrega a tabela para sumir com o item removido
         buscarIngredientesDesteLanche(produtoAtualParaReceita);
     } catch (erro) { console.error("Erro ao remover:", erro); }
 }
 
-// Inicia as duas tabelas principais ao carregar a página
+
+// ==========================================
+// MÓDULO 4: GESTÃO DE PEDIDOS (KANBAN)
+// ==========================================
+async function carregarPedidosAdmin() {
+    try {
+        // Busca pedidos que não estão marcados como 'Entregue'
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/pedidos?status=neq.Entregue&select=*&order=id.asc`, {
+            method: 'GET',
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+        });
+        const pedidos = await res.json();
+        renderizarKanban(pedidos);
+    } catch (erro) {
+        console.error("Erro ao puxar pedidos:", erro);
+    }
+}
+
+function renderizarKanban(pedidos) {
+    const colPendentes = document.getElementById("col-pendentes");
+    const colPreparo = document.getElementById("col-preparo");
+    const colEntrega = document.getElementById("col-entrega");
+
+    if (!colPendentes || !colPreparo || !colEntrega) return; // Trava de segurança
+
+    colPendentes.innerHTML = ""; colPreparo.innerHTML = ""; colEntrega.innerHTML = "";
+
+    if (pedidos.length === 0) {
+        colPendentes.innerHTML = "<p style='text-align: center; color: #666; margin-top: 20px;'>Nenhum pedido na fila.</p>";
+    }
+
+    pedidos.forEach(ped => {
+        const statusStr = ped.status || "Pendente";
+        const dataObj = new Date(ped.created_at);
+        const hora = dataObj.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+
+        const cardHtml = `
+            <div class="card-pedido ${statusStr.toLowerCase().replace(' ', '-')}">
+                <div class="card-header">
+                    <span class="pedido-id">#${ped.id}</span>
+                    <span class="pedido-tempo"><i class="fa-regular fa-clock"></i> ${hora}</span>
+                </div>
+                <div class="info-cliente">
+                    <strong>${ped.nome_cliente}</strong><br>
+                    Pagamento: ${ped.forma_pagamento}<br>
+                    <span style="color: #2ed573; font-weight: bold;">R$ ${parseFloat(ped.total).toFixed(2).replace('.', ',')}</span>
+                </div>
+                ${botoesAcaoKanban(ped.id, statusStr)}
+            </div>
+        `;
+
+        if (statusStr === "Pendente") colPendentes.innerHTML += cardHtml;
+        else if (statusStr === "Em Preparo") colPreparo.innerHTML += cardHtml;
+        else if (statusStr === "Saiu para Entrega") colEntrega.innerHTML += cardHtml;
+    });
+}
+
+function botoesAcaoKanban(id, status) {
+    if (status === "Pendente") {
+        return `<button class="btn-acao-kanban btn-aceitar" onclick="atualizarStatusPedido(${id}, 'Em Preparo')"><i class="fa-solid fa-fire"></i> Aceitar (30-45m)</button>`;
+    } else if (status === "Em Preparo") {
+        return `<button class="btn-acao-kanban btn-despachar" onclick="atualizarStatusPedido(${id}, 'Saiu para Entrega')"><i class="fa-solid fa-motorcycle"></i> Despachar Moto</button>`;
+    } else if (status === "Saiu para Entrega") {
+        return `<button class="btn-acao-kanban btn-entregue" onclick="atualizarStatusPedido(${id}, 'Entregue')"><i class="fa-solid fa-check-double"></i> Concluir Pedido</button>`;
+    }
+    return "";
+}
+
+async function atualizarStatusPedido(id, novoStatus) {
+    let previsao = null;
+    
+    // A mágica: se aceitou, injetamos a previsão no banco!
+    if (novoStatus === 'Em Preparo') {
+        previsao = "30 a 45 min";
+    }
+
+    const corpo = previsao 
+        ? { status: novoStatus, previsao_entrega: previsao }
+        : { status: novoStatus };
+
+    try {
+        await fetch(`${SUPABASE_URL}/rest/v1/pedidos?id=eq.${id}`, {
+            method: 'PATCH',
+            headers: {
+                'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`,
+                'Content-Type': 'application/json', 'Prefer': 'return=representation'
+            },
+            body: JSON.stringify(corpo)
+        });
+        
+        carregarPedidosAdmin();
+    } catch (erro) {
+        alert("Erro ao atualizar status do pedido.");
+    }
+}
+
+
+// ==========================================
+// INICIALIZAÇÃO DO SISTEMA
+// ==========================================
 carregarProdutos();
 carregarEstoque();
+carregarPedidosAdmin();
+
+// Atualiza o painel de pedidos silenciosamente a cada 15 segundos
+setInterval(carregarPedidosAdmin, 15000);

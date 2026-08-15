@@ -470,14 +470,14 @@ async function enviarParaWhatsApp() {
 
         textoPedido += `\n💰 *TOTAL DO PEDIDO: R$ ${totalCalculado.toFixed(2).replace('.', ',')}*`;
 
-        if (btnFinalizar) { btnFinalizar.innerText = textoOriginalBotao; btnFinalizar.disabled = false; }
+       if (btnFinalizar) { btnFinalizar.innerText = textoOriginalBotao; btnFinalizar.disabled = false; }
         
         carrinho = [];
         atualizarContadorCart();
+        renderizarCardapio(); // <-- ADICIONE ESTA LINHA: Ela "limpa" os esgotados da tela quando o pedido termina
         fecharCheckout();
-
-        const telefone = "5543996150221"; 
-        window.open(`https://wa.me/${telefone}?text=${encodeURIComponent(textoPedido)}`, '_blank');
+        window.open(`https://wa.me/5543996150221?text=${encodeURIComponent(textoPedido)}`, '_blank');
+        // ...
 
     } catch (erro) {
         console.error("Erro no checkout:", erro);

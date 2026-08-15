@@ -194,14 +194,14 @@ function removerDoCarrinho(index) {
     }
 }
 
-// === 6. FINALIZAÇÃO E WHATSAPP ===
+// === 6. FINALIZAÇÃO, BANCO DE DADOS E WHATSAPP ===
 function verificarTroco() {
     const formaPagamento = document.getElementById("forma-pagamento").value;
     const campoTroco = document.getElementById("troco-dinheiro");
     campoTroco.style.display = (formaPagamento === "Dinheiro") ? "block" : "none";
 }
 
-function enviarParaWhatsApp() {
+async function enviarParaWhatsApp() {
     const nome = document.getElementById("nome-cliente").value;
     const endereco = document.getElementById("endereco-cliente").value;
     const pagamento = document.getElementById("forma-pagamento").value;
@@ -211,33 +211,99 @@ function enviarParaWhatsApp() {
         return;
     }
 
-    let textoPedido = "🔥 *NOVO PEDIDO - FIRE BURGER* 🔥\n\n";
-    textoPedido += `👤 *Cliente:* ${nome}\n`;
-    textoPedido += `📍 *Endereço:* ${endereco}\n`;
-    
-    if (pagamento === "Dinheiro") {
-        const troco = document.getElementById("troco-dinheiro").value;
-        textoPedido += `💳 *Pagamento:* Dinheiro (Troco para R$ ${troco})\n\n`;
-    } else {
-        textoPedido += `💳 *Pagamento:* ${pagamento}\n\n`;
-    }
-
-    textoPedido += "🛒 *ITENS DO PEDIDO:*\n";
-    carrinho.forEach(item => {
-        textoPedido += `\n*1x ${item.produtoBase.nome}* (R$ ${item.produtoBase.preco.toFixed(2).replace('.', ',')})\n`;
-        item.adicionais.forEach(add => {
-            textoPedido += `   + ${add.nome} (R$ ${add.preco.toFixed(2).replace('.', ',')})\n`;
-        });
-        textoPedido += `   *Subtotal do item: R$ ${item.precoTotalItem.toFixed(2).replace('.', ',')}*\n`;
-    });
-
+    // Calcula o total
     const totalCalculado = carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0);
-    textoPedido += `\n💰 *TOTAL DO PEDIDO: R$ ${totalCalculado.toFixed(2).replace('.', ',')}*`;
 
-    // Substitua pelo seu telefone com DDD
-    const telefone = "5543999999999"; 
-    const mensagemCodificada = encodeURIComponent(textoPedido);
-    window.open(`https://wa.me/${telefone}?text=${mensagemCodificada}`, '_blank');
+    // Muda o texto do botão para mostrar que está carregando
+    const btnFinalizar = document.querySelector(".tela-checkout .btn-novo");
+    const textoOriginalBotao = btnFinalizar.innerText;
+    btnFinalizar.innerText = "Processando Pedido...";
+    btnFinalizar.disabled = true;
+
+    try {
+        // PASSO 1: Salvar o Pedido no Banco de Dados
+        const resPedido = await fetch(`${SUPABASE_URL}/rest/v1/pedidos`, {
+            method: 'POST',
+            headers: {
+                'apikey': SUPABASE_KEY,
+                'Authorization': `Bearer ${SUPABASE_KEY}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=representation' // Pede para a API devolver o ID que acabou de gerar
+            },
+            body: JSON.stringify({
+                nome_cliente: nome,
+                forma_pagamento: pagamento,
+                total: totalCalculado
+            })
+        });
+
+        if (!resPedido.ok) throw new Error("Erro ao gerar pedido no banco.");
+        const pedidoSalvo = await resPedido.json();
+        const idDoPedido = pedidoSalvo[0].id; 
+
+        // PASSO 2: Salvar os Itens (ISSO VAI ACIONAR SEU TRIGGER DE ESTOQUE)
+        for (const item of carrinho) {
+            await fetch(`${SUPABASE_URL}/rest/v1/itens_pedido`, {
+                method: 'POST',
+                headers: {
+                    'apikey': SUPABASE_KEY,
+                    'Authorization': `Bearer ${SUPABASE_KEY}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    pedido_id: idDoPedido,
+                    produto_id: item.produtoBase.id,
+                    quantidade: 1, 
+                    preco_unitario: item.precoTotalItem
+                })
+            });
+        }
+
+        // PASSO 3: Montar a mensagem do WhatsApp
+        let textoPedido = `🔥 *NOVO PEDIDO #${idDoPedido} - FIRE BURGER* 🔥\n\n`;
+        textoPedido += `👤 *Cliente:* ${nome}\n`;
+        textoPedido += `📍 *Endereço:* ${endereco}\n`;
+        
+        if (pagamento === "Dinheiro") {
+            const troco = document.getElementById("troco-dinheiro").value;
+            textoPedido += `💳 *Pagamento:* Dinheiro (Troco para R$ ${troco})\n\n`;
+        } else {
+            textoPedido += `💳 *Pagamento:* ${pagamento}\n\n`;
+        }
+
+        textoPedido += "🛒 *ITENS DO PEDIDO:*\n";
+        carrinho.forEach(item => {
+            textoPedido += `\n*1x ${item.produtoBase.nome}* (R$ ${item.produtoBase.preco.toFixed(2).replace('.', ',')})\n`;
+            item.adicionais.forEach(add => {
+                textoPedido += `   + ${add.nome} (R$ ${add.preco.toFixed(2).replace('.', ',')})\n`;
+            });
+            textoPedido += `   *Subtotal do item: R$ ${item.precoTotalItem.toFixed(2).replace('.', ',')}*\n`;
+        });
+
+        textoPedido += `\n💰 *TOTAL DO PEDIDO: R$ ${totalCalculado.toFixed(2).replace('.', ',')}*`;
+
+        // Restaura o botão e limpa o carrinho
+        btnFinalizar.innerText = textoOriginalBotao;
+        btnFinalizar.disabled = false;
+        
+        carrinho = [];
+        atualizarContadorCart();
+        fecharCheckout();
+        
+        document.getElementById("nome-cliente").value = "";
+        document.getElementById("endereco-cliente").value = "";
+
+        // Envia para o WhatsApp
+        const telefone = "5543999999999"; // Coloque seu número aqui
+        const mensagemCodificada = encodeURIComponent(textoPedido);
+        window.open(`https://wa.me/${telefone}?text=${mensagemCodificada}`, '_blank');
+
+    } catch (erro) {
+        console.error("Erro no checkout:", erro);
+        alert("Houve um erro de conexão ao processar o pedido. Tente novamente.");
+        btnFinalizar.innerText = textoOriginalBotao;
+        btnFinalizar.disabled = false;
+    }
 }
 
 // === INICIA O SISTEMA AO ABRIR O SITE ===

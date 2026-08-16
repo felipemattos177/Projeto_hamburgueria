@@ -206,6 +206,16 @@ function alterarQtdBase(delta) {
     const span = document.getElementById("qtd-produto-base");
     let qtd = parseInt(span.innerText) + delta;
     if (qtd < 1) qtd = 1; 
+
+    // NOVO: Trava que não deixa passar do estoque máximo logo no clique do botão +
+    const qtdJaNoCarrinho = carrinho.filter(item => item.produtoBase.id == produtoSendoVisto.id).length;
+    const limiteDisponivel = produtoSendoVisto.estoque_maximo - qtdJaNoCarrinho;
+    
+    if (qtd > limiteDisponivel) {
+        alert(`Limite atingido! Temos ingredientes para apenas mais ${limiteDisponivel} unidade(s) deste lanche.`);
+        return;
+    }
+
     span.innerText = qtd;
 }
 
@@ -441,7 +451,7 @@ async function enviarParaWhatsApp() {
         const telefoneCliente = perfilSalvo.telefone ? String(perfilSalvo.telefone).replace(/\D/g, '') : "";
         const clienteId = obterOuCriarClienteId();
 
-// 1. SALVA NO SUPABASE (MANDANDO O CARRINHO COMPLETO)
+        // 1. SALVA NO SUPABASE (MANDANDO O CARRINHO COMPLETO)
         const dadosPedidoCompleto = {
             p_nome_cliente: nome,
             p_forma_pagamento: pagamento,
@@ -450,7 +460,7 @@ async function enviarParaWhatsApp() {
             p_telefone_cliente: telefoneCliente,
             p_status: "Pendente",
             p_previsao_entrega: "Em até 50 minutos",
-            p_carrinho: carrinho // Enviando os lanches e adicionais
+            p_carrinho: carrinho 
         };
 
         const resSupabase = await fetch(`${SUPABASE_URL}/rest/v1/rpc/registrar_pedido_completo`, {
@@ -464,11 +474,23 @@ async function enviarParaWhatsApp() {
         });
 
         if (!resSupabase.ok) {
-            console.error("Erro ao inserir no Supabase:", await resSupabase.text());
-        }
-
-        if (!resSupabase.ok) {
-            console.error("Erro ao inserir no Supabase:", await resSupabase.text());
+            const erroDB = await resSupabase.json();
+            console.error("Erro no Supabase:", erroDB);
+            
+            // NOVO: Lê a trava do banco de dados e avisa o usuário sem quebrar a tela
+            if (erroDB.code === "23514" || (erroDB.message && erroDB.message.includes("trava_estoque_positivo"))) {
+                let itemFalho = "algum ingrediente";
+                if (erroDB.details) {
+                    const partes = erroDB.details.split(',');
+                    if (partes.length > 1) itemFalho = partes[1].trim(); 
+                }
+                alert(`⚠️ Ops! O estoque de ${itemFalho} acabou agorinha mesmo ou é insuficiente para o total pedido. Por favor, remova ou diminua a quantidade no carrinho.`);
+            } else {
+                alert("Erro ao registrar o pedido no sistema. Tente novamente.");
+            }
+            
+            if (btnFinalizar) { btnFinalizar.innerText = textoOriginalBotao; btnFinalizar.disabled = false; }
+            return; // PARA A EXECUÇÃO AQUI! O pedido não vai pro WhatsApp e a venda não fura o estoque.
         }
 
         // 2. MONTAGEM DA MENSAGEM DO WHATSAPP

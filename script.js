@@ -14,7 +14,7 @@ let configLoja = {
 let lojaAberta = true;
 let mensagemFechado = "";
 
-// === FUNÇÃO DE AVISOS PERSONALIZADOS (Adeus alert feio!) ===
+// === FUNÇÃO DE AVISOS PERSONALIZADOS ===
 function mostrarAviso(mensagem, titulo = "Ops!", tipo = "aviso") {
     let caixa = document.getElementById("caixa-aviso-custom");
     if (!caixa) {
@@ -77,17 +77,21 @@ function fecharAviso() {
     }
 }
 
-// === FUNÇÃO MÁGICA ANTI-CACHE CORRIGIDA ===
-async function fetchSupabase(endpoint) {
-    return await fetch(`${SUPABASE_URL}${endpoint}`, {
+// === FUNÇÃO MÁGICA ANTI-CACHE CORRIGIDA (AGORA ACEITA GET E POST) ===
+async function fetchSupabase(endpoint, options = {}) {
+    const configuracao = {
+        ...options,
+        method: options.method || 'GET',
         headers: { 
             'apikey': SUPABASE_KEY, 
             'Authorization': `Bearer ${SUPABASE_KEY}`,
             'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache'
+            'Pragma': 'no-cache',
+            ...(options.headers || {}) // Se tiver Content-Type (no caso do POST), ele mescla aqui
         },
         cache: 'no-store' 
-    });
+    };
+    return await fetch(`${SUPABASE_URL}${endpoint}`, configuracao);
 }
 
 function obterOuCriarClienteId() {
@@ -147,9 +151,12 @@ function renderizarCardapio(categoriaFiltro = "Todos") {
             const eventoClique = isEsgotado ? "" : `onclick="abrirModalProduto(${produto.id})"`;
             const badgeEsgotado = isEsgotado ? `<div class="selo-esgotado">Esgotado</div>` : "";
 
+            // TRATATIVA DO ERRO 404 DE IMAGEM NULL 
+            const imgSegura = (produto.imagem && produto.imagem !== "null") ? `background-image: url('${produto.imagem}');` : `background-color: #2a2a2a;`;
+
             htmlAcumulado += `
                 <div class="${classeCard}" ${eventoClique}>
-                    <div class="produto-imagem" style="background-image: url('${produto.imagem}');">
+                    <div class="produto-imagem" style="${imgSegura}">
                         ${badgeEsgotado}
                     </div>
                     <div class="produto-info">
@@ -287,8 +294,10 @@ async function abrirModalProduto(id) {
             btnAdicionarHtml = `<button class="btn-add-carrinho" onclick="confirmarAdicao()" style="width: 100%; padding: 15px; background: #2ed573; color: #000; border: none; border-radius: 8px; font-weight: bold; font-size: 16px; margin-top: 15px; cursor: pointer;"><i class="fa-solid fa-plus"></i> Adicionar ao Pedido</button>`;
         }
 
+        const imgModalSegura = (produtoSendoVisto.imagem && produtoSendoVisto.imagem !== "null") ? `background-image: url('${produtoSendoVisto.imagem}');` : `background-color: #2a2a2a;`;
+
         detalhes.innerHTML = `
-            <div class="produto-imagem" style="background-image: url('${produtoSendoVisto.imagem}'); height: 200px; background-size: cover; background-position: center; border-radius: 10px; margin-bottom: 15px; width: 100%;"></div>
+            <div class="produto-imagem" style="${imgModalSegura} height: 200px; background-size: cover; background-position: center; border-radius: 10px; margin-bottom: 15px; width: 100%;"></div>
             <h2 style="color: #fff; font-size: 22px;">${produtoSendoVisto.nome}</h2>
             <p style="color: #aaa; font-size: 14px; margin-bottom: 10px;">${produtoSendoVisto.descricao}</p>
             <h3 style="color: var(--laranja-fogo, #ff5e00); font-size: 22px;">R$ ${produtoSendoVisto.preco.toFixed(2).replace('.', ',')}</h3>
@@ -641,6 +650,16 @@ function verificarTroco() {
     }
 }
 
+// === FUNÇÃO DO PIX DEVOLVIDA PRO LUGAR! ===
+function gerarPixCopiaECola(valorPix) {
+    const formatarTamanho = (id, valor) => `${id}${String(valor.length).padStart(2, '0')}${valor}`;
+    const chaveLimpa = (configLoja.chave_pix || "").trim();
+    let payload = "000201" + formatarTamanho("26", formatarTamanho("00", "br.gov.bcb.pix") + formatarTamanho("01", chaveLimpa)) + "520400005303986" + formatarTamanho("54", valorPix.toFixed(2)) + "5802BR" + formatarTamanho("59", (configLoja.nome_recebedor || "Hamburgueria").normalize("NFD").replace(/[\u0300-\u036f]/g, "").substring(0, 25)) + formatarTamanho("60", (configLoja.cidade_recebedor || "Arapoti").normalize("NFD").replace(/[\u0300-\u036f]/g, "").substring(0, 15)) + formatarTamanho("62", formatarTamanho("05", "***")) + "6304";
+    let polynomial = 0x1021; let result = 0xFFFF;
+    for (let i = 0; i < payload.length; i++) { result ^= payload.charCodeAt(i) << 8; for (let j = 0; j < 8; j++) { if ((result & 0x8000) !== 0) result = (result << 1) ^ polynomial; else result <<= 1; result &= 0xFFFF; } }
+    return payload + result.toString(16).toUpperCase().padStart(4, '0');
+}
+
 function copiarPixParaAreaDeTransferencia() {
     const totalCalculado = carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0);
     const codigoPix = gerarPixCopiaECola(totalCalculado);
@@ -702,9 +721,10 @@ async function enviarParaWhatsApp() {
             p_carrinho: carrinho 
         };
 
+        // O SEGREDO DO ERRO 404 ESTAVA AQUI: Agora passamos method: 'POST' 
         const resSupabase = await fetchSupabase(`/rest/v1/rpc/registrar_pedido_completo`, {
             method: 'POST',
-            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(dadosPedidoCompleto)
         });
 

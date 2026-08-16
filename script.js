@@ -441,27 +441,31 @@ async function enviarParaWhatsApp() {
         const telefoneCliente = perfilSalvo.telefone ? String(perfilSalvo.telefone).replace(/\D/g, '') : "";
         const clienteId = obterOuCriarClienteId();
 
-        // 1. SALVA NO SUPABASE
-        const dadosPedido = {
-            nome_cliente: nome,
-            forma_pagamento: pagamento,
-            total: totalCalculado,
-            cliente_id: clienteId,
-            telefone_cliente: telefoneCliente,
-            status: "Pendente",
-            previsao_entrega: "Em até 50 minutos"
+// 1. SALVA NO SUPABASE (MANDANDO O CARRINHO COMPLETO)
+        const dadosPedidoCompleto = {
+            p_nome_cliente: nome,
+            p_forma_pagamento: pagamento,
+            p_total: totalCalculado,
+            p_cliente_id: clienteId,
+            p_telefone_cliente: telefoneCliente,
+            p_status: "Pendente",
+            p_previsao_entrega: "Em até 50 minutos",
+            p_carrinho: carrinho // Enviando os lanches e adicionais
         };
 
-        const resSupabase = await fetch(`${SUPABASE_URL}/rest/v1/pedidos`, {
+        const resSupabase = await fetch(`${SUPABASE_URL}/rest/v1/rpc/registrar_pedido_completo`, {
             method: 'POST',
             headers: {
                 'apikey': SUPABASE_KEY,
                 'Authorization': `Bearer ${SUPABASE_KEY}`,
-                'Content-Type': 'application/json',
-                'Prefer': 'return=minimal'
+                'Content-Type': 'application/json'
             },
-            body: JSON.stringify(dadosPedido)
+            body: JSON.stringify(dadosPedidoCompleto)
         });
+
+        if (!resSupabase.ok) {
+            console.error("Erro ao inserir no Supabase:", await resSupabase.text());
+        }
 
         if (!resSupabase.ok) {
             console.error("Erro ao inserir no Supabase:", await resSupabase.text());

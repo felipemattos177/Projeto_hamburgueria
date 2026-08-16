@@ -1005,7 +1005,47 @@ function verificarHorarioLoja() {
     } else {
         if (bannerHtml) bannerHtml.style.display = "none";
     }
+}// ==========================================
+// IDENTIDADE VISUAL DINÂMICA (WHITE-LABEL)
+// ==========================================
+async function carregarIdentidadeVisual() {
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracoes?id=eq.1&select=*`, {
+            method: 'GET',
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+        });
+        const dados = await res.json();
+        
+        if (dados && dados.length > 0) {
+            const config = dados[0];
+            
+            // 1. Trocando os Textos
+            const elNomeLoja = document.getElementById("loja-nome");
+            const elTituloBanner = document.getElementById("banner-titulo");
+            const elSubtituloBanner = document.getElementById("banner-subtitulo");
+            
+            if(elNomeLoja && config.nome_loja) elNomeLoja.innerText = config.nome_loja;
+            if(elTituloBanner && config.titulo_banner) elTituloBanner.innerText = config.titulo_banner;
+            if(elSubtituloBanner && config.subtitulo_banner) elSubtituloBanner.innerText = config.subtitulo_banner;
+            
+            // 2. Trocando a Imagem de Fundo (se existir)
+            const bannerDiv = document.getElementById("banner-fundo");
+            if(bannerDiv && config.imagem_banner && config.imagem_banner.trim() !== "") {
+                bannerDiv.style.backgroundImage = `url('${config.imagem_banner}')`;
+            }
+            
+            // 3. Trocando a Cor Principal (A Mágica!)
+            if(config.cor_principal) {
+                document.documentElement.style.setProperty('--laranja-fogo', config.cor_principal);
+            }
+        }
+    } catch (erro) {
+        console.error("Erro ao carregar a identidade visual da loja:", erro);
+    }
 }
+
+// Roda a função assim que o cliente abre o site
+carregarIdentidadeVisual();
 
 // === INICIALIZAÇÃO DO SISTEMA ===
 carregarConfiguracoes(); 

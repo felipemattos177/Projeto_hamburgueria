@@ -602,7 +602,8 @@ async function carregarConfiguracoesAdmin() {
         
         if (dados && dados.length > 0) {
             const config = dados[0];
-            // Preenche todos os inputs da tela com o que está no banco
+            
+            // Dados da Loja
             document.getElementById("admin-chave-pix").value = config.chave_pix || "";
             document.getElementById("admin-nome-pix").value = config.nome_recebedor || "";
             document.getElementById("admin-cidade-pix").value = config.cidade_recebedor || "";
@@ -610,6 +611,13 @@ async function carregarConfiguracoesAdmin() {
             document.getElementById("admin-hora-abre").value = config.horario_abertura || "";
             document.getElementById("admin-hora-fecha").value = config.horario_fechar || "";
             document.getElementById("admin-whatsapp").value = config.numero_whatsapp || "";
+
+            // Identidade Visual
+            document.getElementById("admin-nome-loja").value = config.nome_loja || "";
+            document.getElementById("admin-titulo-banner").value = config.titulo_banner || "";
+            document.getElementById("admin-subtitulo-banner").value = config.subtitulo_banner || "";
+            document.getElementById("admin-img-banner").value = config.imagem_banner || "";
+            document.getElementById("admin-cor-principal").value = config.cor_principal || "#ff5e00";
         }
     } catch (erro) {
         console.error("Erro ao puxar configurações no Admin:", erro);
@@ -622,15 +630,22 @@ async function salvarConfiguracoesLoja() {
     btn.innerHTML = "⏳ Salvando Configurações...";
     btn.disabled = true;
 
-    // Coleta o que você digitou na tela
     const corpoDb = {
+        // Dados da Loja
         chave_pix: document.getElementById("admin-chave-pix").value,
         nome_recebedor: document.getElementById("admin-nome-pix").value,
         cidade_recebedor: document.getElementById("admin-cidade-pix").value,
         dias_trabalho: document.getElementById("admin-dias-trabalho").value,
         horario_abertura: document.getElementById("admin-hora-abre").value,
         horario_fechar: document.getElementById("admin-hora-fecha").value,
-        numero_whatsapp: document.getElementById("admin-whatsapp").value
+        numero_whatsapp: document.getElementById("admin-whatsapp").value,
+        
+        // Identidade Visual
+        nome_loja: document.getElementById("admin-nome-loja").value,
+        titulo_banner: document.getElementById("admin-titulo-banner").value,
+        subtitulo_banner: document.getElementById("admin-subtitulo-banner").value,
+        imagem_banner: document.getElementById("admin-img-banner").value,
+        cor_principal: document.getElementById("admin-cor-principal").value
     };
 
     try {
@@ -645,7 +660,7 @@ async function salvarConfiguracoesLoja() {
 
         if (!res.ok) throw new Error("Falha ao salvar no banco");
         
-        alert("✅ Loja atualizada! Chave PIX, horários e WhatsApp salvos com sucesso.");
+        alert("✅ Loja e Identidade Visual atualizadas com sucesso!");
     } catch (erro) {
         alert("Erro ao salvar configurações. Verifique o console.");
         console.error(erro);

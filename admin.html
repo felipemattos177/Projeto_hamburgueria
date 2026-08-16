@@ -228,6 +228,37 @@
         <button id="btn-salvar-config" style="width: 100%; background: #2ed573; color: #000; font-weight: bold; padding: 15px; font-size: 18px; border: none; border-radius: 8px; margin-top: 20px; cursor: pointer; transition: 0.3s;" onclick="salvarConfiguracoesLoja()">
             💾 Salvar Todas as Configurações
         </button>
+        <!-- Bloco de Identidade Visual -->
+        <div style="background: #1e1e1e; padding: 20px; border-radius: 10px; border-left: 4px solid #e84393; margin-top: 20px;">
+            <h3 style="color: #e84393; margin-top: 0;"><i class="fa-solid fa-palette"></i> Identidade Visual do Site</h3>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+                <div>
+                    <label style="color: #aaa; font-size: 14px;">Nome da Hamburgueria:</label>
+                    <input type="text" id="admin-nome-loja" placeholder="Ex: Vilela Burgers" style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 5px; border: 1px solid #333; background: #111; color: #fff;">
+                </div>
+                
+                <div>
+                    <label style="color: #aaa; font-size: 14px;">Título do Banner:</label>
+                    <input type="text" id="admin-titulo-banner" placeholder="Ex: Grelhado no fogo." style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 5px; border: 1px solid #333; background: #111; color: #fff;">
+                </div>
+
+                <div>
+                    <label style="color: #aaa; font-size: 14px;">Subtítulo do Banner:</label>
+                    <input type="text" id="admin-subtitulo-banner" placeholder="Ex: O verdadeiro sabor..." style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 5px; border: 1px solid #333; background: #111; color: #fff;">
+                </div>
+
+                <div>
+                    <label style="color: #aaa; font-size: 14px;">Link da Foto de Fundo:</label>
+                    <input type="text" id="admin-img-banner" placeholder="URL da imagem" style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 5px; border: 1px solid #333; background: #111; color: #fff;">
+                </div>
+
+                <div>
+                    <label style="color: #aaa; font-size: 14px;">Cor Principal (Botões):</label>
+                    <input type="color" id="admin-cor-principal" value="#ff5e00" style="width: 100%; height: 40px; padding: 2px; margin-top: 5px; border-radius: 5px; border: 1px solid #333; background: #111; cursor: pointer;">
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- ========================================== -->

@@ -5,7 +5,7 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 let cardapio = [];
 let carrinho = [];
 let produtoSendoVisto = null;
-let receitasGlobais = []; // Guarda a receita em memória para cálculos em milissegundos
+let receitasGlobais = []; // Guarda a ficha técnica em memória para bloqueios em milissegundos
 
 // === COFRE DE CONFIGURAÇÕES E ESTADO DA LOJA ===
 let configLoja = { 
@@ -28,14 +28,14 @@ function obterOuCriarClienteId() {
     return id;
 }
 
-// === 2. EXTRAÇÃO DE DADOS (API DO SUPABASE) ===
+// === 2. EXTRAÇÃO DE DADOS E FICHAS TÉCNICAS (API DO SUPABASE) ===
 async function carregarCardapioDoBanco() {
     try {
+        // Puxa os lanches
         const resposta = await fetch(`${SUPABASE_URL}/rest/v1/cardapio_inteligente?select=*&ativo=eq.true`, {
             method: 'GET',
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
         });
-
         if (!resposta.ok) throw new Error(`Erro na API: HTTP ${resposta.status}`);
         const dados = await resposta.json();
 
@@ -50,6 +50,13 @@ async function carregarCardapioDoBanco() {
             estoque_maximo: item.estoque_maximo,
             adicionais: [] 
         }));
+
+        // Puxa as fichas técnicas globalmente para usar nas travas de botão
+        const resRec = await fetch(`${SUPABASE_URL}/rest/v1/receita_produto?select=*`, {
+            method: 'GET',
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+        });
+        receitasGlobais = await resRec.json();
 
         renderizarCardapio();
 
@@ -98,14 +105,14 @@ function filtrarCategoria(categoria, elementoBotao) {
     renderizarCardapio(categoria);
 }
 
-// === 4. LÓGICA DO MODAL E ESTOQUE ===
+// === 4. LÓGICA DO MODAL (OCULTAÇÃO DE ESGOTADOS E RENDERIZAÇÃO) ===
 async function abrirModalProduto(id) {
     document.body.classList.add("modal-aberto"); 
     produtoSendoVisto = cardapio.find(p => p.id == id);
     const modal = document.getElementById("modal-produto");
     const detalhes = document.getElementById("detalhes-produto-modal");
 
-    detalhes.innerHTML = `<p style="text-align: center; padding: 20px; color: #fff;">Carregando opções...</p>`;
+    detalhes.innerHTML = `<p style="text-align: center; padding: 20px; color: #fff;">Calculando estoque em tempo real...</p>`;
     modal.classList.remove("escondido");
 
     try {
@@ -115,11 +122,12 @@ async function abrirModalProduto(id) {
         });
         const adicionaisDoBanco = await resExtras.json();
 
+        // Atualiza a ficha técnica para ter os dados mais frescos ao abrir o modal
         const resRec = await fetch(`${SUPABASE_URL}/rest/v1/receita_produto?select=*`, {
             method: 'GET',
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
         });
-        receitasGlobais = await resRec.json(); // Salva globalmente para checagem rápida depois
+        receitasGlobais = await resRec.json();
 
         const receitaDesteLanche = receitasGlobais.filter(r => r.produto_id == produtoSendoVisto.id);
 
@@ -147,7 +155,7 @@ async function abrirModalProduto(id) {
 
                 const estoqueRealDisponivel = Number(add.estoque) - qtdPresaNoCarrinho - qtdGastaNesteLanche;
                 
-                // SE NÃO TEM ESTOQUE LIVRE, ELE NEM APARECE NA LISTA (Ocultação automática)
+                // Só mostra o adicional se o estoque real for maior que zero
                 if(estoqueRealDisponivel > 0) {
                     htmlAdicionais += `
                         <div class="adicional-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 12px; background: #222; border-radius: 8px; border: 1px solid #333;">
@@ -203,7 +211,7 @@ async function abrirModalProduto(id) {
     }
 }
 
-// === VERIFICAÇÃO EM TEMPO REAL AO ADICIONAR LANCHE BASE ===
+// === VERIFICAÇÃO EM TEMPO REAL: LIMITA O BOTÃO '+' DO LANCHE BASE PELOS INGREDIENTES ===
 async function alterarQtdBase(delta) {
     if(!lojaAberta) return;
     const span = document.getElementById("qtd-produto-base");
@@ -214,40 +222,81 @@ async function alterarQtdBase(delta) {
         return;
     }
 
-    // Trava visual enquanto checa o banco de dados em milissegundos
+    // Congela visualmente o botão por milissegundos enquanto cruza os dados
     const btn = span.nextElementSibling;
     const textoBotaoOrig = btn.innerHTML;
     btn.innerHTML = "...";
     btn.disabled = true;
 
     try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/cardapio_inteligente?select=estoque_maximo,tem_estoque&id=eq.${produtoSendoVisto.id}`, {
+        // Puxa o estoque real de TODOS os ingredientes ao vivo
+        const resIng = await fetch(`${SUPABASE_URL}/rest/v1/ingredientes?select=id,nome,estoque`, {
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
         });
-        const dados = await res.json();
+        const ingredientesLive = await resIng.json();
 
-        if (dados && dados.length > 0) {
-            const estoqueMaxAtualizado = dados[0].estoque_maximo;
-            const temEstoqueAtualizado = dados[0].tem_estoque;
+        // Puxa a receita apenas deste lanche
+        const receitaDesteLanche = receitasGlobais.filter(r => r.produto_id == produtoSendoVisto.id);
 
-            const qtdJaNoCarrinho = carrinho.filter(item => item.produtoBase.id == produtoSendoVisto.id).length;
-            const limiteDisponivel = estoqueMaxAtualizado - qtdJaNoCarrinho;
+        let temEstoqueSuficiente = true;
+        let ingredienteFaltando = "";
 
-            if (!temEstoqueAtualizado || qtdAtual + 1 > limiteDisponivel) {
-                alert(`⚠️ Limite atingido! Alguém acabou de comprar ou temos estoque para apenas mais ${limiteDisponivel > 0 ? limiteDisponivel : 0} unidade(s) deste lanche.`);
-            } else {
-                span.innerText = qtdAtual + 1;
+        // Analisa ingrediente por ingrediente da receita para ver qual vai acabar primeiro
+        for (let itemReceita of receitaDesteLanche) {
+            const ingDb = ingredientesLive.find(i => i.id == itemReceita.ingrediente_id);
+            if (ingDb) {
+                const estoqueTotalDB = Number(ingDb.estoque);
+
+                // 1. Quanto de estoque já está reservado no carrinho inteiro?
+                let qtdPresaNoCarrinho = 0;
+                carrinho.forEach(itemCart => {
+                    const recCart = receitasGlobais.filter(r => r.produto_id == itemCart.produtoBase.id);
+                    const usoRec = recCart.find(r => r.ingrediente_id == ingDb.id);
+                    if (usoRec) qtdPresaNoCarrinho += Number(usoRec.quantidade);
+
+                    itemCart.adicionais.forEach(extra => {
+                        if (extra.id == ingDb.id) qtdPresaNoCarrinho += Number(extra.quantidade);
+                    });
+                });
+
+                // 2. Quanto do Adicional já está marcado NA TELA deste modal agora?
+                let extraNesteModal = 0;
+                const spanAdicional = document.getElementById(`qtd-add-${ingDb.id}`);
+                if (spanAdicional) {
+                    extraNesteModal = parseInt(spanAdicional.innerText);
+                }
+
+                // O consumo para adicionar MAIS UM lanche = Receita Base + O que já pediu de extra para ele
+                const consumoParaMaisUmLanche = Number(itemReceita.quantidade) + extraNesteModal;
+
+                // O que já está sendo consumido pelos lanches que já estão no número do modal
+                const consumoAtualNaTela = (Number(itemReceita.quantidade) * qtdAtual) + (extraNesteModal * qtdAtual);
+
+                const livreParaAdicionar = estoqueTotalDB - qtdPresaNoCarrinho - consumoAtualNaTela;
+
+                if (consumoParaMaisUmLanche > livreParaAdicionar) {
+                    temEstoqueSuficiente = false;
+                    ingredienteFaltando = ingDb.nome;
+                    break; // Trava o loop imediatamente no primeiro ingrediente que zerou
+                }
             }
         }
+
+        if (!temEstoqueSuficiente) {
+            alert(`⚠️ Limite atingido! O estoque de "${ingredienteFaltando}" acabou e não é possível montar mais lanches.`);
+        } else {
+            span.innerText = qtdAtual + 1;
+        }
+
     } catch(e) {
-        console.error("Falha ao consultar estoque ao vivo:", e);
+        console.error("Erro live:", e);
     } finally {
         btn.innerHTML = textoBotaoOrig;
         btn.disabled = false;
     }
 }
 
-// === VERIFICAÇÃO EM TEMPO REAL AO ADICIONAR INGREDIENTE EXTRA ===
+// === VERIFICAÇÃO EM TEMPO REAL: LIMITA O BOTÃO '+' DO ADICIONAL (Ex: Bacon) ===
 async function alterarQtdAdicional(id, delta) {
     if(!lojaAberta) return;
     const span = document.getElementById(`qtd-add-${id}`);
@@ -258,7 +307,6 @@ async function alterarQtdAdicional(id, delta) {
         return;
     }
 
-    // Trava visual enquanto checa o banco de dados em milissegundos
     const btn = span.nextElementSibling;
     const textoBotaoOrig = btn.innerHTML;
     btn.innerHTML = "...";
@@ -274,7 +322,6 @@ async function alterarQtdAdicional(id, delta) {
             const estoqueLive = Number(dadosIng[0].estoque);
             const nomeIngrediente = dadosIng[0].nome;
 
-            // Calcula o que já está comprometido no carrinho do cliente
             let qtdPresaNoCarrinho = 0;
             carrinho.forEach(itemCart => {
                 const recCart = receitasGlobais.filter(r => r.produto_id == itemCart.produtoBase.id);
@@ -286,64 +333,120 @@ async function alterarQtdAdicional(id, delta) {
                 });
             });
 
-            // Calcula o gasto da receita base do lanche atual
-            let qtdGastaNesteLanche = 0;
+            const spanQtdBase = document.getElementById("qtd-produto-base");
+            const qtdBase = spanQtdBase ? parseInt(spanQtdBase.innerText) : 1;
+
+            let qtdGastaNesteLancheReceita = 0;
             const usoNeste = receitasGlobais.find(r => r.produto_id == produtoSendoVisto.id && r.ingrediente_id == id);
             if (usoNeste) {
-                const spanQtdBase = document.getElementById("qtd-produto-base");
-                const qtdBase = spanQtdBase ? parseInt(spanQtdBase.innerText) : 1;
-                qtdGastaNesteLanche = Number(usoNeste.quantidade) * qtdBase;
+                qtdGastaNesteLancheReceita = Number(usoNeste.quantidade) * qtdBase;
             }
 
-            // O Estoque Perfeito e Real:
-            const estoqueLivre = estoqueLive - qtdPresaNoCarrinho - qtdGastaNesteLanche;
+            const extraJaSelecionadoTotal = qtdAtual * qtdBase;
+            const quantidadeParaAdicionar = 1 * qtdBase; // Se tem 2 lanches selecionados, +1 extra gasta 2 ingredientes
+            const estoqueLivre = estoqueLive - qtdPresaNoCarrinho - qtdGastaNesteLancheReceita - extraJaSelecionadoTotal;
 
-            if (qtdAtual + 1 > estoqueLivre) {
-                alert(`⚠️ Estoque indisponível! Outro pedido puxou o estoque ou temos apenas mais ${estoqueLivre > 0 ? estoqueLivre : 0} de ${nomeIngrediente} no momento.`);
+            if (quantidadeParaAdicionar > estoqueLivre) {
+                alert(`⚠️ Estoque indisponível! Você não pode adicionar mais "${nomeIngrediente}" no momento.`);
             } else {
                 span.innerText = qtdAtual + 1;
             }
         }
     } catch (e) {
-        console.error("Falha ao consultar adicional ao vivo:", e);
+        console.error("Falha ao consultar adicional:", e);
     } finally {
         btn.innerHTML = textoBotaoOrig;
         btn.disabled = false;
     }
 }
 
-function confirmarAdicao() {
+// === CONFIRMAÇÃO FINAL: IMPEDE DE ADICIONAR SE ALGUÉM BURLOU OS CLIQUES ===
+async function confirmarAdicao() {
     const spanQtdBase = document.getElementById("qtd-produto-base");
     const qtdBaseEscolhida = spanQtdBase ? parseInt(spanQtdBase.innerText) : 1;
 
-    const adicionaisEscolhidos = [];
-    let totalAdicionais = 0;
+    const btnConfirmar = document.querySelector(".btn-add-carrinho");
+    if(btnConfirmar) {
+        btnConfirmar.innerHTML = "Adicionando...";
+        btnConfirmar.disabled = true;
+    }
 
-    const spansQtd = document.querySelectorAll(".qtd-adicional-span");
-    for (const span of spansQtd) {
-        const qtdPorLanche = parseInt(span.innerText);
-        if (qtdPorLanche > 0) { 
-            const idAdd = span.getAttribute("data-id");
-            const nomeAdd = span.getAttribute("data-nome");
-            const precoAdd = parseFloat(span.getAttribute("data-preco"));
+    try {
+        const resIng = await fetch(`${SUPABASE_URL}/rest/v1/ingredientes?select=id,nome,estoque`, {
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+        });
+        const ingredientesLive = await resIng.json();
 
-            adicionaisEscolhidos.push({ id: idAdd, nome: nomeAdd, preco: precoAdd, quantidade: qtdPorLanche });
-            totalAdicionais += (precoAdd * qtdPorLanche);
+        const receitaDesteLanche = receitasGlobais.filter(r => r.produto_id == produtoSendoVisto.id);
+        let necessitaIngredientes = {};
+        
+        // Soma as quantidades da receita base
+        receitaDesteLanche.forEach(r => {
+            if(!necessitaIngredientes[r.ingrediente_id]) necessitaIngredientes[r.ingrediente_id] = 0;
+            necessitaIngredientes[r.ingrediente_id] += Number(r.quantidade) * qtdBaseEscolhida;
+        });
+
+        // Soma as quantidades dos adicionais marcados
+        const adicionaisEscolhidos = [];
+        let totalAdicionais = 0;
+        const spansQtd = document.querySelectorAll(".qtd-adicional-span");
+        for (const span of spansQtd) {
+            const qtdPorLanche = parseInt(span.innerText);
+            if (qtdPorLanche > 0) { 
+                const idAdd = span.getAttribute("data-id");
+                const nomeAdd = span.getAttribute("data-nome");
+                const precoAdd = parseFloat(span.getAttribute("data-preco"));
+
+                if(!necessitaIngredientes[idAdd]) necessitaIngredientes[idAdd] = 0;
+                necessitaIngredientes[idAdd] += qtdPorLanche * qtdBaseEscolhida;
+
+                adicionaisEscolhidos.push({ id: idAdd, nome: nomeAdd, preco: precoAdd, quantidade: qtdPorLanche });
+                totalAdicionais += (precoAdd * qtdPorLanche);
+            }
         }
-    }
 
-    for (let i = 0; i < qtdBaseEscolhida; i++) {
-        const itemParaCarrinho = {
-            produtoBase: produtoSendoVisto,
-            adicionais: JSON.parse(JSON.stringify(adicionaisEscolhidos)), 
-            precoTotalItem: produtoSendoVisto.preco + totalAdicionais
-        };
-        carrinho.push(itemParaCarrinho);
-    }
+        // Faz o cross-check final com o banco
+        for (let ingId in necessitaIngredientes) {
+            const ingDb = ingredientesLive.find(i => i.id == ingId);
+            if (ingDb) {
+                let qtdPresaNoCarrinho = 0;
+                carrinho.forEach(itemCart => {
+                    const recCart = receitasGlobais.filter(r => r.produto_id == itemCart.produtoBase.id);
+                    const usoRec = recCart.find(r => r.ingrediente_id == ingId);
+                    if (usoRec) qtdPresaNoCarrinho += Number(usoRec.quantidade);
+                    itemCart.adicionais.forEach(extra => {
+                        if (extra.id == ingId) qtdPresaNoCarrinho += Number(extra.quantidade);
+                    });
+                });
 
-    atualizarContadorCart();
-    renderizarCardapio(); 
-    fecharModal();
+                const estoqueLivre = Number(ingDb.estoque) - qtdPresaNoCarrinho;
+                if (necessitaIngredientes[ingId] > estoqueLivre) {
+                    alert(`⚠️ Estoque indisponível! O ingrediente "${ingDb.nome}" não tem quantidade suficiente para finalizar essa adição.`);
+                    if(btnConfirmar) { btnConfirmar.innerHTML = `<i class="fa-solid fa-plus"></i> Adicionar ao Pedido`; btnConfirmar.disabled = false; }
+                    return; // Aborta e não deixa colocar no carrinho
+                }
+            }
+        }
+
+        // TUDO CERTO! Envia pro carrinho
+        for (let i = 0; i < qtdBaseEscolhida; i++) {
+            const itemParaCarrinho = {
+                produtoBase: produtoSendoVisto,
+                adicionais: JSON.parse(JSON.stringify(adicionaisEscolhidos)), 
+                precoTotalItem: produtoSendoVisto.preco + totalAdicionais
+            };
+            carrinho.push(itemParaCarrinho);
+        }
+
+        atualizarContadorCart();
+        renderizarCardapio(); 
+        fecharModal();
+        
+    } catch(e) {
+        console.error("Erro na verificação dupla", e);
+    } finally {
+        if(btnConfirmar) { btnConfirmar.innerHTML = `<i class="fa-solid fa-plus"></i> Adicionar ao Pedido`; btnConfirmar.disabled = false; }
+    }
 }
 
 // === 5. LÓGICA DO CARRINHO E CHECKOUT ===
@@ -541,7 +644,7 @@ async function enviarParaWhatsApp() {
             body: JSON.stringify(dadosPedidoCompleto)
         });
 
-        // O SEGUNDO ESCUDO (Garante que nada fure o estoque se o milissegundo não for suficiente)
+        // O SEGUNDO ESCUDO (Garante que nada fure o estoque na hora de pagar)
         if (!resSupabase.ok) {
             const erroDB = await resSupabase.json();
             console.error("Erro no Supabase:", erroDB);

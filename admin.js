@@ -32,8 +32,25 @@ async function carregarProdutos() {
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
         });
         const dados = await resposta.json();
-        listaDeProdutosGlobal = dados; // Salva na memória para podermos editar depois
+        listaDeProdutosGlobal = dados; 
         renderizarTabelaProdutos(dados);
+
+        // --- MÁGICA DAS CATEGORIAS DINÂMICAS ---
+        // Extrai apenas as categorias únicas que existem no banco
+        // --- MÁGICA DAS CATEGORIAS (COM DROP DOWN) ---
+        const categoriasUnicas = [...new Set(dados.map(p => p.categoria).filter(c => c))];
+        const selectCat = document.getElementById("novo-categoria");
+        if(selectCat) {
+            selectCat.innerHTML = ""; // Limpa as antigas
+            categoriasUnicas.forEach(cat => {
+                selectCat.innerHTML += `<option value="${cat}">${cat}</option>`;
+            });
+            // Adiciona a opção de Nova Categoria no final da lista
+            selectCat.innerHTML += `<option value="nova_cat">➕ Criar Nova Categoria...</option>`;
+        }
+        // --------------------------------------
+        // --------------------------------------
+
     } catch (erro) { console.error(erro); }
 }
 
@@ -81,19 +98,32 @@ async function mudarStatusProduto(id, novoStatus) {
     carregarProdutos();
 }
 
-// === ABRIR MODAL VAZIO (NOVO PRODUTO) ===
+/// === ABRIR MODAL VAZIO (NOVO PRODUTO) ===
 function abrirModalAdmin() { 
     produtoEdicaoId = null; // Avisa o sistema que é um cadastro novo
     document.querySelector("#modal-novo-produto h2").innerText = "Cadastrar Lanche";
+    
+    // Limpa textos e preços
     document.getElementById("novo-nome").value = "";
     document.getElementById("novo-descricao").value = "";
     document.getElementById("novo-preco").value = "";
-    document.getElementById("novo-categoria").value = "Artesanal";
+    
+    // Volta o select de categoria pro padrão e ESCONDE a caixa de criar nova
+    const selectCat = document.getElementById("novo-categoria");
+    if(selectCat && selectCat.options.length > 0) selectCat.selectedIndex = 0;
+    
+    const novaCatTexto = document.getElementById("nova-categoria-texto");
+    if(novaCatTexto) {
+        novaCatTexto.value = "";
+        novaCatTexto.style.display = "none";
+    }
+
+    // Limpa as imagens
     document.getElementById("novo-imagem").value = "";
+    document.getElementById("novo-file-imagem").value = "";
+    
     document.getElementById("modal-novo-produto").style.display = "flex"; 
 }
-
-function fecharModalAdmin() { document.getElementById("modal-novo-produto").style.display = "none"; }
 
 // === ABRIR MODAL PREENCHIDO (EDITAR PRODUTO) ===
 function editarProduto(id) {
@@ -107,10 +137,35 @@ function editarProduto(id) {
     document.getElementById("novo-nome").value = produto.nome || "";
     document.getElementById("novo-descricao").value = produto.descricao || "";
     document.getElementById("novo-preco").value = produto.preco || "";
-    document.getElementById("novo-categoria").value = produto.categoria || "Artesanal";
+    document.getElementById("novo-categoria").value = produto.categoria || "";
+    
+    // ESCONDE O CAMPO TEXTO (limpando a sujeira de ações anteriores)
+    const novaCatTexto = document.getElementById("nova-categoria-texto");
+    if(novaCatTexto) {
+        novaCatTexto.value = "";
+        novaCatTexto.style.display = "none";
+    }
+    
+    // Limpa imagens
     document.getElementById("novo-imagem").value = produto.imagem || "";
+    document.getElementById("novo-file-imagem").value = ""; 
 
     document.getElementById("modal-novo-produto").style.display = "flex";
+}
+
+// === MOSTRAR/ESCONDER CAMPO DE NOVA CATEGORIA ===
+function verificarNovaCategoria() {
+    const select = document.getElementById("novo-categoria");
+    const inputTexto = document.getElementById("nova-categoria-texto");
+    
+    if (select.value === "nova_cat") {
+        inputTexto.style.display = "block";
+        inputTexto.focus();
+    } else {
+        // Se ele desistir e voltar o select pra Artesanal, a gente apaga o texto intruso
+        inputTexto.style.display = "none";
+        inputTexto.value = ""; 
+    }
 }
 
 // === SALVAR (CRIA OU ATUALIZA) ===
@@ -118,7 +173,22 @@ async function salvarNovoProduto() {
     const nome = document.getElementById("novo-nome").value;
     const descricao = document.getElementById("novo-descricao").value;
     const preco = parseFloat(document.getElementById("novo-preco").value);
-    const categoria = document.getElementById("novo-categoria").value;
+    
+    // --- LÓGICA BLINDADA DA CATEGORIA ---
+    let categoria = document.getElementById("novo-categoria").value;
+    const inputNovaCat = document.getElementById("nova-categoria-texto");
+    
+    // Se a caixinha de texto estiver aparecendo e com algo escrito, ela MANDA na regra!
+    if (categoria === "nova_cat" || (inputNovaCat && inputNovaCat.style.display !== "none" && inputNovaCat.value.trim() !== "")) {
+        categoria = inputNovaCat.value.trim();
+        
+        if (categoria === "") {
+            alert("Por favor, digite o nome da nova categoria!");
+            inputNovaCat.focus();
+            return;
+        }
+    }
+    // ------------------------------------
     
     if(!nome || isNaN(preco)) {
         alert("Preencha ao menos o Nome e um Preço válido!");
@@ -126,55 +196,42 @@ async function salvarNovoProduto() {
     }
 
     // Pega o botão para mostrar que está carregando
-    const btnSalvar = document.querySelector(".btn-novo");
-    const textoOriginal = btnSalvar.innerHTML;
-    btnSalvar.innerHTML = "⏳ Salvando...";
-    btnSalvar.disabled = true;
+    const btnSalvar = document.querySelector(".btn-novo") || document.getElementById("btn-salvar-produto");
+    const textoOriginal = btnSalvar ? btnSalvar.innerHTML : "Salvar";
+    if(btnSalvar) {
+        btnSalvar.innerHTML = "⏳ Salvando...";
+        btnSalvar.disabled = true;
+    }
 
     // Lida com a imagem
-    let urlDaImagem = document.getElementById("novo-imagem").value; // Link que já estava lá ou vazio
+    let urlDaImagem = document.getElementById("novo-imagem").value; 
     const inputArquivo = document.getElementById("novo-file-imagem");
 
     try {
-        // 1. FAZ O UPLOAD DA IMAGEM (SE O USUÁRIO SELECIONOU UMA NOVA)
         if (inputArquivo && inputArquivo.files.length > 0) {
             const arquivo = inputArquivo.files[0];
             const nomeUnico = `produto-${Date.now()}-${arquivo.name.replace(/\s+/g, '-')}`;
 
             const resUpload = await fetch(`${SUPABASE_URL}/storage/v1/object/imagens/${nomeUnico}`, {
                 method: 'POST',
-                headers: {
-                    'apikey': SUPABASE_KEY,
-                    'Authorization': `Bearer ${SUPABASE_KEY}`,
-                    'Content-Type': arquivo.type 
-                },
+                headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': arquivo.type },
                 body: arquivo
             });
 
             if (!resUpload.ok) throw new Error("Falha ao subir a imagem do lanche.");
-
-            // Pega o link público da foto gerada e atualiza a variável
             urlDaImagem = `${SUPABASE_URL}/storage/v1/object/public/imagens/${nomeUnico}`;
         }
 
-        // 2. MONTA OS DADOS PARA O BANCO DE DADOS
-        const payload = { 
-            nome, 
-            descricao, 
-            preco, 
-            categoria, 
-            imagem: urlDaImagem 
-        };
+        const payload = { nome, descricao, preco, categoria, imagem: urlDaImagem };
         
         let url = `${SUPABASE_URL}/rest/v1/produtos`;
-        let metodo = 'POST'; // POST = Inserir Novo
+        let metodo = 'POST'; 
 
         if (produtoEdicaoId !== null) {
             url = `${url}?id=eq.${produtoEdicaoId}`;
-            metodo = 'PATCH'; // PATCH = Atualizar Existente
+            metodo = 'PATCH'; 
         }
 
-        // 3. ENVIA OS DADOS FINAIS
         const res = await fetch(url, {
             method: metodo,
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
@@ -183,21 +240,32 @@ async function salvarNovoProduto() {
 
         if(!res.ok) throw new Error("Erro do Supabase ao salvar.");
         
-        // Limpa o campo de arquivo para não dar problema no próximo cadastro
+        // Limpa a tela para a próxima
         if(inputArquivo) inputArquivo.value = "";
+        if(inputNovaCat) {
+            inputNovaCat.value = "";
+            inputNovaCat.style.display = "none";
+        }
         
         fecharModalAdmin();
-        carregarProdutos(); // Recarrega a tabela para mostrar as mudanças
+        carregarProdutos(); 
         
     } catch(erro) {
         alert("Erro ao salvar produto. Verifique o console.");
         console.error(erro);
     } finally {
-        // Volta o botão ao normal mesmo se der erro
-        btnSalvar.innerHTML = textoOriginal;
-        btnSalvar.disabled = false;
+        if(btnSalvar) {
+            btnSalvar.innerHTML = textoOriginal;
+            btnSalvar.disabled = false;
+        }
     }
-}// === EXCLUIR PRODUTO (COM PROTEÇÃO DE DADOS) ===
+}
+// === FECHAR MODAL DO LANCHE ===
+function fecharModalAdmin() { 
+    document.getElementById("modal-novo-produto").style.display = "none"; 
+}
+
+// === EXCLUIR PRODUTO (COM PROTEÇÃO DE DADOS) ===
 async function excluirProduto(id) {
     if(!confirm("⚠️ Tem certeza que deseja excluir este produto do cardápio?")) return;
     
@@ -230,7 +298,6 @@ async function excluirProduto(id) {
         console.error(erro);
     }
 }
-
 // ==========================================
 // MÓDULO 2: CONTROLE DE ESTOQUE E INGREDIENTES
 // ==========================================

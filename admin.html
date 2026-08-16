@@ -274,11 +274,16 @@
             <input type="text" id="novo-nome" placeholder="Nome do Lanche">
             <input type="text" id="novo-descricao" placeholder="Descrição">
             <input type="number" id="novo-preco" placeholder="Preço" step="0.01">
-            <select id="novo-categoria">
-                <option value="Artesanal">Artesanal</option>
-                <option value="Smash">Smash</option>
-                <option value="Bebidas">Bebidas</option>
+
+            <label style="font-size: 13px; color: #555; margin-top: 10px; display: block;">Categoria:</label>
+            
+            <!-- Select listando as categorias existentes -->
+            <select id="novo-categoria" onchange="verificarNovaCategoria()" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px; margin-top: 5px;">
+                <!-- O JS preenche aqui -->
             </select>
+            
+            <!-- Campo de texto invisível que só aparece se ele quiser criar uma nova -->
+            <input type="text" id="nova-categoria-texto" placeholder="Digite o nome da nova categoria (Ex: Porções)" style="display: none; width: 100%; padding: 8px; border: 1px solid var(--laranja-fogo); border-radius: 5px; margin-top: 5px;">
             
             <label style="font-size: 13px; color: #555; margin-top: 10px; display: block;">Foto do Lanche (Opcional):</label>
             <input type="file" id="novo-file-imagem" accept="image/*" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px; margin-top: 5px; cursor: pointer;">

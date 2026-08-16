@@ -11,7 +11,7 @@
         body { font-family: 'Roboto', sans-serif; background-color: #f4f6f8; margin: 0; padding: 20px; color: #333; padding-bottom: 50px;}
         
         /* === NAVEGAÇÃO DE SUBMENUS (TABS) === */
-        .tabs-container { display: flex; gap: 10px; background: #121212; padding: 15px 20px; border-radius: 10px; margin-bottom: 20px; align-items: center; }
+        .tabs-container { display: flex; gap: 10px; background: #121212; padding: 15px 20px; border-radius: 10px; margin-bottom: 20px; align-items: center; flex-wrap: wrap;}
         .tabs-logo { color: var(--laranja-fogo); font-weight: bold; font-size: 20px; margin-right: auto; }
         .tab-btn { background: #333; color: #ccc; border: none; padding: 12px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 14px; display: flex; align-items: center; gap: 8px;}
         .tab-btn.ativa { background: var(--laranja-fogo); color: white; }
@@ -88,6 +88,8 @@
         <div class="tabs-logo"><i class="fa-solid fa-fire-flame-curved"></i> Fire Burger Admin</div>
         <button class="tab-btn ativa" onclick="mudarAbaAdmin('view-estoque', this)"><i class="fa-solid fa-boxes-stacked"></i> Cardápio & Estoque</button>
         <button class="tab-btn" onclick="mudarAbaAdmin('view-pedidos', this)"><i class="fa-solid fa-motorcycle"></i> Gestão de Pedidos</button>
+        <!-- NOVO BOTÃO DAS CONFIGURAÇÕES -->
+        <button class="tab-btn" onclick="mudarAbaAdmin('view-config', this)"><i class="fa-solid fa-gear"></i> Configurações</button>
     </div>
 
     <!-- ========================================== -->
@@ -137,12 +139,12 @@
         </table>
     </div>
 
-<!-- ========================================== -->
+    <!-- ========================================== -->
     <!-- ABA 2: KANBAN DE PEDIDOS (TEMPO REAL)      -->
     <!-- ========================================== -->
     <div id="view-pedidos" class="view-section">
         
-        <!-- NOVO: CONTROLE DE TEMPO DINÂMICO -->
+        <!-- CONTROLE DE TEMPO DINÂMICO -->
         <div style="background: #1e1e1e; padding: 15px 20px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 15px; border-left: 4px solid var(--laranja-fogo);">
             <strong style="color: #fff; font-size: 16px;"><i class="fa-solid fa-clock"></i> Tempo Estimado Atual:</strong>
             <input type="number" id="input-tempo-preparo" value="40" style="width: 70px; padding: 8px; border-radius: 5px; border: 1px solid #444; background: #111; color: var(--laranja-fogo); font-weight: bold; text-align: center; font-size: 16px;" onchange="carregarPedidosAdmin()">
@@ -173,10 +175,65 @@
 
         </div>
     </div>
+
     <!-- ========================================== -->
-    <!-- MODAIS DO ESTOQUE (MANTIDOS INTACTOS)      -->
+    <!-- ABA 3: CONFIGURAÇÕES DA LOJA               -->
     <!-- ========================================== -->
-    
+    <div id="view-config" class="view-section">
+        
+        <div class="header-admin" style="margin-top: 0;">
+            <h1>⚙️ Configurações da Lanchonete</h1>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+            
+            <!-- Bloco do PIX -->
+            <div style="background: #1e1e1e; padding: 20px; border-radius: 10px; border-left: 4px solid #2ed573;">
+                <h3 style="color: #2ed573; margin-top: 0;"><i class="fa-brands fa-pix"></i> Pagamento PIX</h3>
+                <label style="color: #aaa; font-size: 14px;">Chave PIX (E-mail, CPF, CNPJ, Celular):</label>
+                <input type="text" id="admin-chave-pix" style="width: 100%; padding: 10px; margin: 5px 0 15px; border-radius: 5px; border: 1px solid #333; background: #111; color: #fff;">
+                
+                <label style="color: #aaa; font-size: 14px;">Nome do Recebedor:</label>
+                <input type="text" id="admin-nome-pix" style="width: 100%; padding: 10px; margin: 5px 0 15px; border-radius: 5px; border: 1px solid #333; background: #111; color: #fff;">
+                
+                <label style="color: #aaa; font-size: 14px;">Cidade:</label>
+                <input type="text" id="admin-cidade-pix" style="width: 100%; padding: 10px; margin: 5px 0; border-radius: 5px; border: 1px solid #333; background: #111; color: #fff;">
+            </div>
+
+            <!-- Bloco de Funcionamento -->
+            <div style="background: #1e1e1e; padding: 20px; border-radius: 10px; border-left: 4px solid #ffa502;">
+                <h3 style="color: #ffa502; margin-top: 0;"><i class="fa-solid fa-clock"></i> Horários</h3>
+                <label style="color: #aaa; font-size: 14px;">Dias Abertos (0=Dom, 1=Seg...):</label>
+                <input type="text" id="admin-dias-trabalho" placeholder="Ex: 0,1,2,3,4,5,6" style="width: 100%; padding: 10px; margin: 5px 0 15px; border-radius: 5px; border: 1px solid #333; background: #111; color: #fff;">
+                
+                <div style="display: flex; gap: 10px;">
+                    <div style="flex: 1;">
+                        <label style="color: #aaa; font-size: 14px;">Abre às:</label>
+                        <input type="time" id="admin-hora-abre" style="width: 100%; padding: 10px; margin: 5px 0; border-radius: 5px; border: 1px solid #333; background: #111; color: #fff;">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="color: #aaa; font-size: 14px;">Fecha às:</label>
+                        <input type="time" id="admin-hora-fecha" style="width: 100%; padding: 10px; margin: 5px 0; border-radius: 5px; border: 1px solid #333; background: #111; color: #fff;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bloco de Contato -->
+            <div style="background: #1e1e1e; padding: 20px; border-radius: 10px; border-left: 4px solid #3742fa;">
+                <h3 style="color: #3742fa; margin-top: 0;"><i class="fa-brands fa-whatsapp"></i> WhatsApp</h3>
+                <label style="color: #aaa; font-size: 14px;">Número Oficial (+55 + DDD):</label>
+                <input type="text" id="admin-whatsapp" placeholder="Ex: 5543996150221" style="width: 100%; padding: 10px; margin: 5px 0; border-radius: 5px; border: 1px solid #333; background: #111; color: #fff;">
+            </div>
+        </div>
+
+        <button id="btn-salvar-config" style="width: 100%; background: #2ed573; color: #000; font-weight: bold; padding: 15px; font-size: 18px; border: none; border-radius: 8px; margin-top: 20px; cursor: pointer; transition: 0.3s;" onclick="salvarConfiguracoesLoja()">
+            💾 Salvar Todas as Configurações
+        </button>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- MODAIS DO ESTOQUE                          -->
+    <!-- ========================================== -->
     <div id="modal-novo-produto" class="modal-overlay">
         <div class="modal-conteudo">
             <h2>Cadastrar Lanche</h2>
@@ -229,7 +286,7 @@
         </div>
     </div>
 
-    <!-- Script de navegação embutido (apenas visual) -->
+    <!-- Script de navegação embutido (responsável pelas abas e animação) -->
     <script>
         function mudarAbaAdmin(abaId, elementoBotao) {
             // Esconde todas as abas

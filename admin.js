@@ -1,10 +1,25 @@
-// 1. CREDENCIAIS
+// ==========================================
+// 1. CREDENCIAIS DO SUPABASE
+// ==========================================
 const SUPABASE_URL = "https://tjievzloufqptabbvumz.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqaWV2emxvdWZxcHRhYmJ2dW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY3NTY1NjIsImV4cCI6MjEwMjMzMjU2Mn0.HAIHej243RMeLMBueFjcN0-99y41BEbb3v4PgCj1Vs4";
 
-// Variáveis Globais de Controle
 let produtoAtualParaReceita = null;
 let listaDeIngredientesGlobal = [];
+
+// ==========================================
+// MÓDULO 0: NAVEGAÇÃO DE ABAS ADMIN
+// ==========================================
+function mudarAbaAdmin(idAba, botaoClicado) {
+    // Esconde todas as abas
+    document.querySelectorAll('.view-section').forEach(aba => aba.style.display = 'none');
+    // Tira o foco de todos os botões
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('ativa'));
+    
+    // Mostra a aba clicada e foca o botão
+    document.getElementById(idAba).style.display = 'block';
+    if(botaoClicado) botaoClicado.classList.add('ativa');
+}
 
 // ==========================================
 // MÓDULO 1: GESTÃO DE PRODUTOS
@@ -22,7 +37,7 @@ async function carregarProdutos() {
 
 function renderizarTabelaProdutos(produtos) {
     const tbody = document.getElementById("tabela-produtos");
-    if(!tbody) return; // Evita erro se a aba não estiver visível
+    if(!tbody) return; 
     tbody.innerHTML = "";
     produtos.forEach(produto => {
         const badgeClass = produto.ativo ? "status-ativo" : "status-inativo";
@@ -202,7 +217,6 @@ async function salvarIngredienteNaReceita() {
         if (!resposta.ok) {
             const erroBanco = await resposta.json();
             alert(`🚨 Erro do Banco de Dados: ${erroBanco.message || erroBanco.error}`);
-            console.error("Detalhe do Erro:", erroBanco);
             btn.innerText = textoOriginal;
             return;
         }
@@ -216,7 +230,6 @@ async function salvarIngredienteNaReceita() {
 
     } catch (erro) { 
         alert("🚨 Erro de conexão. Verifique o console F12.");
-        console.error("Erro na requisição:", erro); 
         btn.innerText = textoOriginal;
     }
 }
@@ -333,7 +346,6 @@ function botoesAcaoKanban(id, status) {
 async function atualizarStatusPedido(id, novoStatus) {
     let previsao = null;
     
-    // Injeta a previsão lendo o input, sem texto fixo!
     if (novoStatus === 'Em Preparo') {
         const inputTempo = document.getElementById("input-tempo-preparo");
         const tempoFila = inputTempo ? inputTempo.value : "40";
@@ -361,11 +373,79 @@ async function atualizarStatusPedido(id, novoStatus) {
 }
 
 // ==========================================
+// MÓDULO 5: CONFIGURAÇÕES DA LOJA (O Cofre Mestre)
+// ==========================================
+async function carregarConfiguracoesAdmin() {
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracoes?id=eq.1&select=*`, {
+            method: 'GET',
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+        });
+        const dados = await res.json();
+        
+        if (dados && dados.length > 0) {
+            const config = dados[0];
+            // Preenche todos os inputs da tela com o que está no banco
+            document.getElementById("admin-chave-pix").value = config.chave_pix || "";
+            document.getElementById("admin-nome-pix").value = config.nome_recebedor || "";
+            document.getElementById("admin-cidade-pix").value = config.cidade_recebedor || "";
+            document.getElementById("admin-dias-trabalho").value = config.dias_trabalho || "";
+            document.getElementById("admin-hora-abre").value = config.horario_abertura || "";
+            document.getElementById("admin-hora-fecha").value = config.horario_fechar || "";
+            document.getElementById("admin-whatsapp").value = config.numero_whatsapp || "";
+        }
+    } catch (erro) {
+        console.error("Erro ao puxar configurações no Admin:", erro);
+    }
+}
+
+async function salvarConfiguracoesLoja() {
+    const btn = document.getElementById("btn-salvar-config");
+    const textoOriginal = btn.innerHTML;
+    btn.innerHTML = "⏳ Salvando Configurações...";
+    btn.disabled = true;
+
+    // Coleta o que você digitou na tela
+    const corpoDb = {
+        chave_pix: document.getElementById("admin-chave-pix").value,
+        nome_recebedor: document.getElementById("admin-nome-pix").value,
+        cidade_recebedor: document.getElementById("admin-cidade-pix").value,
+        dias_trabalho: document.getElementById("admin-dias-trabalho").value,
+        horario_abertura: document.getElementById("admin-hora-abre").value,
+        horario_fechar: document.getElementById("admin-hora-fecha").value,
+        numero_whatsapp: document.getElementById("admin-whatsapp").value
+    };
+
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracoes?id=eq.1`, {
+            method: 'PATCH',
+            headers: {
+                'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(corpoDb)
+        });
+
+        if (!res.ok) throw new Error("Falha ao salvar no banco");
+        
+        alert("✅ Loja atualizada! Chave PIX, horários e WhatsApp salvos com sucesso.");
+    } catch (erro) {
+        alert("Erro ao salvar configurações. Verifique o console.");
+        console.error(erro);
+    } finally {
+        btn.innerHTML = textoOriginal;
+        btn.disabled = false;
+    }
+}
+
+
+// ==========================================
 // INICIALIZAÇÃO DO SISTEMA
 // ==========================================
 carregarProdutos();
 carregarEstoque();
 carregarPedidosAdmin();
+carregarConfiguracoesAdmin(); // Carrega os dados da loja ao abrir o painel
 
-// Atualiza o painel silenciosamente a cada 3 segundos
+// Atualiza o painel de pedidos silenciosamente a cada 3 segundos
 setInterval(carregarPedidosAdmin, 3000);

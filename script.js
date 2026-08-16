@@ -145,20 +145,21 @@ async function carregarCardapioDoBanco() {
         }));// (Isso vai dentro da sua função que carrega os produtos no cliente, 
         // logo após receber o json do banco e antes de renderizar os lanches)
         
-        const menuCategorias = document.getElementById("menu-categorias-dinamico");
-        if(menuCategorias) {
-            // Pega as categorias únicas (tirando vazias)
-            const categoriasUnicas = [...new Set(dados.map(p => p.categoria).filter(c => c))];
-            
-            // Refaz o menu sempre com o botão "Todos" primeiro
-            menuCategorias.innerHTML = `<button class="btn-categoria ativo" onclick="filtrarCategoria('Todos', this)">Todos</button>`;
-            
-            // Cria um botão para cada categoria nova
-            categoriasUnicas.forEach(cat => {
-                menuCategorias.innerHTML += `<button class="btn-categoria" onclick="filtrarCategoria('${cat}', this)">${cat}</button>`;
-            });
-        }
-
+        // --- A MÁGICA DAS CATEGORIAS NO CLIENTE ---
+            const menuCategorias = document.getElementById("menu-categorias-dinamico");
+            if(menuCategorias) {
+                // Pega as categorias únicas do banco
+                const categoriasUnicas = [...new Set(dados.map(p => p.categoria).filter(c => c))];
+                
+                // Refaz o menu sempre com o botão "Todos" primeiro
+                menuCategorias.innerHTML = `<button class="btn-categoria ativo" onclick="filtrarCategoria('Todos', this)">Todos</button>`;
+                
+                // Cria um botão para cada categoria que existir no banco
+                categoriasUnicas.forEach(cat => {
+                    menuCategorias.innerHTML += `<button class="btn-categoria" onclick="filtrarCategoria('${cat}', this)">${cat}</button>`;
+                });
+            }
+            // ------------------------------------------
         const resRec = await fetchSupabase(`/rest/v1/receita_produto?select=*`);
         receitasGlobais = await resRec.json();
 

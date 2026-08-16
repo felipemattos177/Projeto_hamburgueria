@@ -7,14 +7,13 @@
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
-
       gtag('config', 'G-430YVLPK9J');
     </script>
     <!-- Fim da Google tag -->
 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vilela Burgers</title>
+    <title>Maths_hub Delivery</title>
     
     <!-- Fontes e Ícones -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -28,7 +27,7 @@
     <style>
         /* === ESTILO DA TARJA INTELIGENTE DE LOJA FECHADA === */
         #aviso-loja-fechada {
-            display: none; /* O aviso nasce invisível. O script.js que manda ele aparecer! */
+            display: none; 
             background: #ff4757;
             color: white;
             text-align: center;
@@ -50,7 +49,7 @@
         ⚠️ Loja Fechada. Voltamos em breve!
     </div>
 
-<!-- Header Fixo -->
+    <!-- Header Fixo -->
     <header class="header">
         <div class="logo">
             <i class="fa-solid fa-fire-flame-curved"></i> <span id="loja-nome">Maths_hub</span>
@@ -60,7 +59,9 @@
     <!-- ========================================== -->
     <!-- TELA 1: CATÁLOGO E CARDÁPIO                -->
     <!-- ========================================== -->
-    <section class="hero" id="banner-fundo">
+    <div id="tela-catalogo">
+        <!-- AQUI ESTÁ O BANNER QUE HAVIA SUMIDO -->
+        <section class="hero" id="banner-fundo">
             <div class="hero-texto">
                 <h2 id="banner-titulo">Bem-vindo(a)!</h2>
                 <p id="banner-subtitulo">Faça o seu pedido abaixo.</p>
@@ -128,7 +129,7 @@
     </div>
 
     <!-- ========================================== -->
-    <!-- TELA 3: MEU PERFIL                         -->
+    <!-- TELA 3: MEU PERFIL (Agora escondido de novo) -->
     <!-- ========================================== -->
     <div id="tela-perfil" class="container escondido" style="margin-top: 80px; margin-bottom: 100px;">
         <h2 style="color: var(--laranja-fogo); margin-bottom: 20px;"><i class="fa-regular fa-user"></i> Meu Perfil</h2>

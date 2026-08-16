@@ -1005,7 +1005,8 @@ function verificarHorarioLoja() {
     } else {
         if (bannerHtml) bannerHtml.style.display = "none";
     }
-}// ==========================================
+}
+// ==========================================
 // IDENTIDADE VISUAL DINÂMICA (WHITE-LABEL)
 // ==========================================
 async function carregarIdentidadeVisual() {
@@ -1028,10 +1029,16 @@ async function carregarIdentidadeVisual() {
             if(elTituloBanner && config.titulo_banner) elTituloBanner.innerText = config.titulo_banner;
             if(elSubtituloBanner && config.subtitulo_banner) elSubtituloBanner.innerText = config.subtitulo_banner;
             
-            // 2. Trocando a Imagem de Fundo (se existir)
+
+           // 2. Trocando a Imagem de Fundo
             const bannerDiv = document.getElementById("banner-fundo");
             if(bannerDiv && config.imagem_banner && config.imagem_banner.trim() !== "") {
-                bannerDiv.style.backgroundImage = `url('${config.imagem_banner}')`;
+                // Colocamos um degradê escuro por cima da foto para o texto dar leitura, 
+                // e forçamos a foto a cobrir e centralizar no espaço.
+                bannerDiv.style.backgroundImage = `linear-gradient(to right, rgba(18, 18, 18, 0.9) 10%, rgba(18, 18, 18, 0.4) 100%), url('${config.imagem_banner}')`;
+                bannerDiv.style.backgroundSize = "cover";
+                bannerDiv.style.backgroundPosition = "center";
+                bannerDiv.style.backgroundRepeat = "no-repeat";
             }
             
             // 3. Trocando a Cor Principal (A Mágica!)

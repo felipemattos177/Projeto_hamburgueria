@@ -249,8 +249,12 @@
                 </div>
 
                 <div>
-                    <label style="color: #aaa; font-size: 14px;">Link da Foto de Fundo:</label>
-                    <input type="text" id="admin-img-banner" placeholder="URL da imagem" style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 5px; border: 1px solid #333; background: #111; color: #fff;">
+                    <label style="color: #aaa; font-size: 14px;">Foto de Fundo (Computador/Celular):</label>
+                    <!-- Novo botão de envio de arquivo -->
+                    <input type="file" id="admin-file-banner" accept="image/*" style="width: 100%; padding: 7px; margin-top: 5px; border-radius: 5px; border: 1px solid #333; background: #111; color: #fff; cursor: pointer;">
+                    
+                    <!-- Campo invisível: ele guarda o link da foto que já está salva para não perder caso você mude só o nome da loja -->
+                    <input type="hidden" id="admin-img-banner">
                 </div>
 
                 <div>

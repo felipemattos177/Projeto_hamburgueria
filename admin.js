@@ -592,63 +592,61 @@ async function atualizarStatusPedido(id, novoStatus) {
 // ==========================================
 // MÓDULO 5: CONFIGURAÇÕES DA LOJA (O Cofre Mestre)
 // ==========================================
-async function carregarConfiguracoesAdmin() {
-    try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracoes?id=eq.1&select=*`, {
-            method: 'GET',
-            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-        });
-        const dados = await res.json();
-        
-        if (dados && dados.length > 0) {
-            const config = dados[0];
-            
-            // Dados da Loja
-            document.getElementById("admin-chave-pix").value = config.chave_pix || "";
-            document.getElementById("admin-nome-pix").value = config.nome_recebedor || "";
-            document.getElementById("admin-cidade-pix").value = config.cidade_recebedor || "";
-            document.getElementById("admin-dias-trabalho").value = config.dias_trabalho || "";
-            document.getElementById("admin-hora-abre").value = config.horario_abertura || "";
-            document.getElementById("admin-hora-fecha").value = config.horario_fechar || "";
-            document.getElementById("admin-whatsapp").value = config.numero_whatsapp || "";
-
-            // Identidade Visual
-            document.getElementById("admin-nome-loja").value = config.nome_loja || "";
-            document.getElementById("admin-titulo-banner").value = config.titulo_banner || "";
-            document.getElementById("admin-subtitulo-banner").value = config.subtitulo_banner || "";
-            document.getElementById("admin-img-banner").value = config.imagem_banner || "";
-            document.getElementById("admin-cor-principal").value = config.cor_principal || "#ff5e00";
-        }
-    } catch (erro) {
-        console.error("Erro ao puxar configurações no Admin:", erro);
-    }
-}
-
 async function salvarConfiguracoesLoja() {
     const btn = document.getElementById("btn-salvar-config");
     const textoOriginal = btn.innerHTML;
-    btn.innerHTML = "⏳ Salvando Configurações...";
+    btn.innerHTML = "⏳ Salvando Dados e Imagem (Aguarde)...";
     btn.disabled = true;
 
-    const corpoDb = {
-        // Dados da Loja
-        chave_pix: document.getElementById("admin-chave-pix").value,
-        nome_recebedor: document.getElementById("admin-nome-pix").value,
-        cidade_recebedor: document.getElementById("admin-cidade-pix").value,
-        dias_trabalho: document.getElementById("admin-dias-trabalho").value,
-        horario_abertura: document.getElementById("admin-hora-abre").value,
-        horario_fechar: document.getElementById("admin-hora-fecha").value,
-        numero_whatsapp: document.getElementById("admin-whatsapp").value,
-        
-        // Identidade Visual
-        nome_loja: document.getElementById("admin-nome-loja").value,
-        titulo_banner: document.getElementById("admin-titulo-banner").value,
-        subtitulo_banner: document.getElementById("admin-subtitulo-banner").value,
-        imagem_banner: document.getElementById("admin-img-banner").value,
-        cor_principal: document.getElementById("admin-cor-principal").value
-    };
+    // Pega o link atual que está escondido (caso o usuário não mande foto nova, a gente mantém a velha)
+    let urlDaImagem = document.getElementById("admin-img-banner").value;
+    const inputArquivo = document.getElementById("admin-file-banner");
 
     try {
+        // 1. SE O USUÁRIO ESCOLHEU UMA FOTO NOVA, FAZ O UPLOAD PRIMEIRO!
+        if (inputArquivo.files.length > 0) {
+            const arquivo = inputArquivo.files[0];
+            // Cria um nome único para o arquivo não substituir outros (ex: banner-1718293.jpg)
+            const nomeUnico = `banner-${Date.now()}-${arquivo.name.replace(/\s+/g, '-')}`;
+
+            // Envia para o "Pen Drive" (Bucket) chamado 'imagens'
+            const resUpload = await fetch(`${SUPABASE_URL}/storage/v1/object/imagens/${nomeUnico}`, {
+                method: 'POST',
+                headers: {
+                    'apikey': SUPABASE_KEY,
+                    'Authorization': `Bearer ${SUPABASE_KEY}`,
+                    'Content-Type': arquivo.type // Avisa o Supabase se é JPG, PNG, etc
+                },
+                body: arquivo
+            });
+
+            if (!resUpload.ok) throw new Error("Falha ao subir a imagem para a nuvem.");
+
+            // Constrói o link público que a internet inteira consegue ver
+            urlDaImagem = `${SUPABASE_URL}/storage/v1/object/public/imagens/${nomeUnico}`;
+            
+            // Já atualiza o campo invisível com o link novo
+            document.getElementById("admin-img-banner").value = urlDaImagem;
+        }
+
+        // 2. COLETA TODOS OS DADOS DA TELA
+        const corpoDb = {
+            chave_pix: document.getElementById("admin-chave-pix").value,
+            nome_recebedor: document.getElementById("admin-nome-pix").value,
+            cidade_recebedor: document.getElementById("admin-cidade-pix").value,
+            dias_trabalho: document.getElementById("admin-dias-trabalho").value,
+            horario_abertura: document.getElementById("admin-hora-abre").value,
+            horario_fechar: document.getElementById("admin-hora-fecha").value,
+            numero_whatsapp: document.getElementById("admin-whatsapp").value,
+            
+            nome_loja: document.getElementById("admin-nome-loja").value,
+            titulo_banner: document.getElementById("admin-titulo-banner").value,
+            subtitulo_banner: document.getElementById("admin-subtitulo-banner").value,
+            cor_principal: document.getElementById("admin-cor-principal").value,
+            imagem_banner: urlDaImagem // Salva o link no Banco de Dados!
+        };
+
+        // 3. SALVA TUDO NA TABELA CONFIGURACOES
         const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracoes?id=eq.1`, {
             method: 'PATCH',
             headers: {
@@ -658,11 +656,13 @@ async function salvarConfiguracoesLoja() {
             body: JSON.stringify(corpoDb)
         });
 
-        if (!res.ok) throw new Error("Falha ao salvar no banco");
+        if (!res.ok) throw new Error("Falha ao salvar no banco de dados.");
         
         alert("✅ Loja e Identidade Visual atualizadas com sucesso!");
+        inputArquivo.value = ""; // Limpa a seleção do arquivo para não subir de novo sem querer
+        
     } catch (erro) {
-        alert("Erro ao salvar configurações. Verifique o console.");
+        alert("Erro ao salvar: " + erro.message);
         console.error(erro);
     } finally {
         btn.innerHTML = textoOriginal;

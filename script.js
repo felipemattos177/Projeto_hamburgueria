@@ -14,14 +14,79 @@ let configLoja = {
 let lojaAberta = true;
 let mensagemFechado = "";
 
+// === FUNÇÃO DE AVISOS PERSONALIZADOS (Adeus alert feio!) ===
+function mostrarAviso(mensagem, titulo = "Ops!", tipo = "aviso") {
+    let caixa = document.getElementById("caixa-aviso-custom");
+    if (!caixa) {
+        caixa = document.createElement("div");
+        caixa.id = "caixa-aviso-custom";
+        caixa.style.cssText = "position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 999999; display: flex; justify-content: center; align-items: center; padding: 20px; opacity: 0; transition: opacity 0.3s; pointer-events: none; backdrop-filter: blur(4px);";
+        caixa.innerHTML = `
+            <div id="caixa-aviso-card" style="background: #1a1a1a; border: 1px solid var(--laranja-fogo, #ff5e00); border-radius: 16px; padding: 30px 20px; max-width: 350px; width: 100%; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.8); transform: scale(0.8); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+                <div id="caixa-aviso-icon-bg" style="width: 70px; height: 70px; border-radius: 50%; display: flex; justify-content: center; align-items: center; margin: 0 auto 20px auto;">
+                    <i id="caixa-aviso-icon" class="fa-solid fa-triangle-exclamation" style="font-size: 35px;"></i>
+                </div>
+                <h3 id="caixa-aviso-titulo" style="color: #fff; margin-bottom: 12px; font-size: 22px;">Aviso</h3>
+                <p id="caixa-aviso-msg" style="color: #bbb; font-size: 15px; margin-bottom: 25px; line-height: 1.5;"></p>
+                <button id="caixa-aviso-btn" onclick="fecharAviso()" style="background: var(--laranja-fogo, #ff5e00); color: #fff; border: none; padding: 14px 25px; border-radius: 10px; font-weight: bold; font-size: 16px; cursor: pointer; width: 100%; transition: 0.2s;">Entendi</button>
+            </div>
+        `;
+        document.body.appendChild(caixa);
+    }
+
+    const msgLimpa = mensagem.replace("⚠️", "").trim();
+    document.getElementById("caixa-aviso-titulo").innerText = titulo;
+    document.getElementById("caixa-aviso-msg").innerText = msgLimpa;
+
+    const iconBg = document.getElementById("caixa-aviso-icon-bg");
+    const icon = document.getElementById("caixa-aviso-icon");
+    const card = document.getElementById("caixa-aviso-card");
+    const btn = document.getElementById("caixa-aviso-btn");
+
+    if (tipo === "sucesso") {
+        const corVerde = "#2ed573";
+        iconBg.style.background = "rgba(46, 213, 115, 0.15)";
+        icon.className = "fa-solid fa-check";
+        icon.style.color = corVerde;
+        card.style.borderColor = "rgba(46, 213, 115, 0.3)";
+        btn.style.background = corVerde;
+        btn.style.color = "#000";
+    } else {
+        const corLaranja = "var(--laranja-fogo, #ff5e00)";
+        iconBg.style.background = "rgba(255, 94, 0, 0.15)";
+        icon.className = "fa-solid fa-triangle-exclamation";
+        icon.style.color = corLaranja;
+        card.style.borderColor = "rgba(255, 94, 0, 0.3)";
+        btn.style.background = corLaranja;
+        btn.style.color = "#fff";
+    }
+
+    caixa.style.pointerEvents = "auto";
+    setTimeout(() => {
+        caixa.style.opacity = "1";
+        card.style.transform = "scale(1)";
+    }, 10);
+}
+
+function fecharAviso() {
+    const caixa = document.getElementById("caixa-aviso-custom");
+    if (caixa) {
+        caixa.style.opacity = "0";
+        document.getElementById("caixa-aviso-card").style.transform = "scale(0.8)";
+        caixa.style.pointerEvents = "none";
+    }
+}
+
 // === FUNÇÃO MÁGICA ANTI-CACHE CORRIGIDA ===
 async function fetchSupabase(endpoint) {
     return await fetch(`${SUPABASE_URL}${endpoint}`, {
         headers: { 
             'apikey': SUPABASE_KEY, 
-            'Authorization': `Bearer ${SUPABASE_KEY}`
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
         },
-        cache: 'no-store' // A forma oficial e segura de proibir o cache do navegador
+        cache: 'no-store' 
     });
 }
 
@@ -128,7 +193,6 @@ async function abrirModalProduto(id) {
 
         const receitaDesteLanche = receitasGlobais.filter(r => r.produto_id == produtoSendoVisto.id);
 
-        // 1. ANÁLISE SE DÁ PARA MONTAR PELO MENOS 1 LANCHE
         let podeMontarBase = true;
         let ingredienteFaltanteBase = "";
 
@@ -153,7 +217,6 @@ async function abrirModalProduto(id) {
             }
         }
 
-        // 2. MONTAGEM DOS ADICIONAIS (Só aparece o que tem estoque)
         let htmlAdicionais = "";
         if (podeMontarBase && adicionaisDoBanco.length > 0 && produtoSendoVisto.categoria !== "Bebidas" && lojaAberta) {
             htmlAdicionais += `<div class="adicionais-lista" style="margin-top:15px; border-top: 1px solid #333; padding-top: 15px;">
@@ -177,7 +240,7 @@ async function abrirModalProduto(id) {
 
                 const estoqueRealDisponivel = Number(add.estoque) - qtdPresaNoCarrinho - qtdGastaNesteLanche;
                 
-                if(estoqueRealDisponivel > 0) {
+                if(estoqueRealDisponivel >= 1) { 
                     htmlAdicionais += `
                         <div class="adicional-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 12px; background: #222; border-radius: 8px; border: 1px solid #333;">
                             <span style="color: #fff; font-weight: 500;">${add.nome} <br><small style="color: #aaa;">+ R$ ${Number(add.preco_adicional).toFixed(2).replace('.', ',')}</small></span>
@@ -193,7 +256,6 @@ async function abrirModalProduto(id) {
             htmlAdicionais += `</div>`;
         }
 
-        // 3. SE NÃO TEM ESTOQUE PARA O LANCHE, NEM MOSTRA OS BOTÕES
         let controleQtdHtml = "";
         let btnAdicionarHtml = "";
 
@@ -262,7 +324,7 @@ async function alterarQtdBase(delta) {
         const receitaDesteLanche = receitasGlobais.filter(r => r.produto_id == produtoSendoVisto.id);
 
         let temEstoqueSuficiente = true;
-        let ingredienteFaltando = "";
+        let limitePossivel = Infinity;
 
         for (let itemReceita of receitaDesteLanche) {
             const ingDb = ingredientesLive.find(i => i.id == itemReceita.ingrediente_id);
@@ -283,20 +345,22 @@ async function alterarQtdBase(delta) {
                 const spanAdicional = document.getElementById(`qtd-add-${ingDb.id}`);
                 if (spanAdicional) extraNesteModal = parseInt(spanAdicional.innerText);
 
-                const consumoParaMaisUmLanche = Number(itemReceita.quantidade) + extraNesteModal;
-                const consumoAtualNaTela = (Number(itemReceita.quantidade) * qtdAtual) + (extraNesteModal * qtdAtual);
-                const livreParaAdicionar = estoqueTotalDB - qtdPresaNoCarrinho - consumoAtualNaTela;
+                const consumoPorLanche = Number(itemReceita.quantidade) + extraNesteModal;
+                const estoqueLivre = estoqueTotalDB - qtdPresaNoCarrinho;
+                const consumoFuturo = consumoPorLanche * (qtdAtual + 1);
 
-                if (consumoParaMaisUmLanche > livreParaAdicionar) {
+                if (consumoFuturo > estoqueLivre) {
                     temEstoqueSuficiente = false;
-                    ingredienteFaltando = ingDb.nome;
-                    break;
+                    const maxDesteIngrediente = Math.floor(estoqueLivre / consumoPorLanche);
+                    if(maxDesteIngrediente < limitePossivel) {
+                        limitePossivel = maxDesteIngrediente;
+                    }
                 }
             }
         }
 
         if (!temEstoqueSuficiente) {
-            alert(`⚠️ Limite atingido! A cozinha não tem "${ingredienteFaltando}" suficiente para montar mais desse lanche.`);
+            mostrarAviso(`Temos apenas ${limitePossivel} lanche(s) disponível(is) com essa configuração atual.`, "Limite Atingido!");
         } else {
             span.innerText = qtdAtual + 1;
         }
@@ -331,7 +395,6 @@ async function alterarQtdAdicional(id, delta) {
 
         if (dadosIng && dadosIng.length > 0) {
             const estoqueLive = Number(dadosIng[0].estoque);
-            const nomeIngrediente = dadosIng[0].nome;
 
             let qtdPresaNoCarrinho = 0;
             carrinho.forEach(itemCart => {
@@ -348,14 +411,16 @@ async function alterarQtdAdicional(id, delta) {
 
             let qtdGastaNesteLancheReceita = 0;
             const usoNeste = receitasGlobais.find(r => r.produto_id == produtoSendoVisto.id && r.ingrediente_id == id);
-            if (usoNeste) qtdGastaNesteLancheReceita = Number(usoNeste.quantidade) * qtdBase;
+            if (usoNeste) qtdGastaNesteLancheReceita = Number(usoNeste.quantidade);
 
+            const estoqueLivreTotal = estoqueLive - qtdPresaNoCarrinho - (qtdGastaNesteLancheReceita * qtdBase);
             const extraJaSelecionadoTotal = qtdAtual * qtdBase;
             const quantidadeParaAdicionar = 1 * qtdBase; 
-            const estoqueLivre = estoqueLive - qtdPresaNoCarrinho - qtdGastaNesteLancheReceita - extraJaSelecionadoTotal;
+            const estoqueLivreParaClique = estoqueLivreTotal - extraJaSelecionadoTotal;
 
-            if (quantidadeParaAdicionar > estoqueLivre) {
-                alert(`⚠️ Estoque indisponível! Resta apenas ${estoqueLivre > 0 ? estoqueLivre : 0} de "${nomeIngrediente}".`);
+            if (quantidadeParaAdicionar > estoqueLivreParaClique) {
+                const porcoesDisponiveis = Math.floor(estoqueLivreTotal / qtdBase);
+                mostrarAviso(`Temos apenas ${porcoesDisponiveis} porção(ões) disponível(is) para adicionar aos seus lanches.`, "Limite Atingido!");
             } else {
                 span.innerText = qtdAtual + 1;
             }
@@ -425,7 +490,7 @@ async function confirmarAdicao() {
 
                 const estoqueLivre = Number(ingDb.estoque) - qtdPresaNoCarrinho;
                 if (necessitaIngredientes[ingId] > estoqueLivre) {
-                    alert(`⚠️ Alguém acabou de pedir a última unidade! Faltou "${ingDb.nome}".`);
+                    mostrarAviso(`Alguém acabou de pedir a última unidade e faltou "${ingDb.nome}".`, "Estoque Esgotado");
                     if(btnConfirmar) { btnConfirmar.innerHTML = `<i class="fa-solid fa-plus"></i> Adicionar ao Pedido`; btnConfirmar.disabled = false; }
                     return; 
                 }
@@ -471,7 +536,7 @@ function atualizarContadorCart() {
 }
 
 function abrirCheckout() {
-    if (carrinho.length === 0) { alert("Seu carrinho está vazio!"); return; }
+    if (carrinho.length === 0) { mostrarAviso("Adicione algo delicioso antes de finalizar.", "Carrinho Vazio"); return; }
     navegarPara('checkout');
     renderizarCheckout();
     carregarPerfilNaTela(); 
@@ -551,7 +616,7 @@ function verificarTroco() {
             }
             areaPix.style.cssText = "background: #333; padding: 15px; border-radius: 8px; margin-top: 15px; border-left: 4px solid #ffa502; text-align: center; color: #ffa502; font-weight: bold;";
             areaPix.style.display = "block";
-            areaPix.innerHTML = `<p style="margin: 0; font-size: 14px;">⚠️ Chave PIX indisponível. Solicite via WhatsApp ao finalizar.</p>`;
+            areaPix.innerHTML = `<p style="margin: 0; font-size: 14px;">Chave PIX indisponível. Solicite via WhatsApp ao finalizar.</p>`;
             return; 
         }
 
@@ -588,12 +653,12 @@ function copiarPixParaAreaDeTransferencia() {
             btn.innerHTML = `<i class="fa-regular fa-copy"></i> Copiar Código PIX`;
             btn.style.background = "#2ed573"; btn.style.color = "#000";
         }, 5000);
-    }).catch(err => alert("Erro ao copiar o PIX."));
+    }).catch(err => mostrarAviso("Ocorreu um erro ao tentar copiar o código PIX.", "Erro"));
 }
 
 async function enviarParaWhatsApp() {
     if(!lojaAberta) {
-        alert("Puxa vida, a loja acabou de fechar! " + mensagemFechado);
+        mostrarAviso("Puxa vida, a loja acabou de fechar! " + mensagemFechado, "Loja Fechada");
         return;
     }
 
@@ -605,7 +670,8 @@ async function enviarParaWhatsApp() {
     const pagamento = document.getElementById("forma-pagamento").value;
 
     if (nome === "" || rua === "" || numero === "" || bairro === "") {
-        alert("Preencha seu Nome, Rua, Número e Bairro para a entrega!"); return;
+        mostrarAviso("Por favor, preencha seu Nome, Rua, Número e Bairro para a entrega!", "Dados Incompletos");
+        return;
     }
 
     const enderecoFormatado = `${rua}, ${numero} - ${bairro} ${complemento ? '(' + complemento + ')' : ''}`;
@@ -636,7 +702,7 @@ async function enviarParaWhatsApp() {
             p_carrinho: carrinho 
         };
 
-        const resSupabase = await fetch(`${SUPABASE_URL}/rest/v1/rpc/registrar_pedido_completo`, {
+        const resSupabase = await fetchSupabase(`/rest/v1/rpc/registrar_pedido_completo`, {
             method: 'POST',
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
             body: JSON.stringify(dadosPedidoCompleto)
@@ -647,9 +713,9 @@ async function enviarParaWhatsApp() {
             if (erroDB.code === "23514" || (erroDB.message && erroDB.message.includes("trava_estoque_positivo"))) {
                 let itemFalho = "algum ingrediente";
                 if (erroDB.details) { const partes = erroDB.details.split(','); if (partes.length > 1) itemFalho = partes[1].trim(); }
-                alert(`⚠️ O estoque de ${itemFalho} esgotou agora! Por favor, volte e ajuste a quantidade no carrinho.`);
+                mostrarAviso(`O estoque de "${itemFalho}" esgotou agora mesmo! Volte e ajuste a quantidade no carrinho.`, "Estoque Esgotado");
             } else {
-                alert("Erro ao registrar o pedido no sistema.");
+                mostrarAviso("Ocorreu um erro ao registrar seu pedido no nosso sistema.", "Erro na Finalização");
             }
             if (btnFinalizar) { btnFinalizar.innerText = textoOriginalBotao; btnFinalizar.disabled = false; }
             return; 
@@ -690,7 +756,7 @@ async function enviarParaWhatsApp() {
         window.open(`https://wa.me/${numeroLimpo}?text=${encodeURIComponent(textoPedido)}`, '_blank');
 
     } catch (erro) {
-        alert("Erro de comunicação ao registrar o pedido.");
+        mostrarAviso("Falha de comunicação ao tentar enviar seu pedido.", "Erro de Conexão");
         if (btnFinalizar) { btnFinalizar.innerText = textoOriginalBotao; btnFinalizar.disabled = false; }
     }
 }
@@ -772,12 +838,16 @@ function navegarPara(aba) {
 
 function salvarPerfil() {
     const perfil = { nome: document.getElementById("perfil-nome").value, telefone: document.getElementById("perfil-telefone").value, rua: document.getElementById("perfil-rua").value, numero: document.getElementById("perfil-numero").value, bairro: document.getElementById("perfil-bairro").value, complemento: document.getElementById("perfil-complemento").value };
-    localStorage.setItem("vilelaburgers_perfil", JSON.stringify(perfil)); alert("Pronto! Seus dados foram salvos."); navegarPara('inicio'); 
+    localStorage.setItem("vilelaburgers_perfil", JSON.stringify(perfil)); 
+    mostrarAviso("Seus dados de entrega foram salvos com sucesso!", "Tudo Certo!", "sucesso"); 
+    navegarPara('inicio'); 
 }
+
 function carregarPerfilNaTela() {
     const salvo = localStorage.getItem("vilelaburgers_perfil");
     if (salvo) { const perfil = JSON.parse(salvo); document.getElementById("perfil-nome").value = perfil.nome || ""; document.getElementById("perfil-telefone").value = perfil.telefone || ""; document.getElementById("perfil-rua").value = perfil.rua || ""; document.getElementById("perfil-numero").value = perfil.numero || ""; document.getElementById("perfil-bairro").value = perfil.bairro || ""; document.getElementById("perfil-complemento").value = perfil.complemento || ""; }
 }
+
 function preencherCheckoutComPerfil() {
     const salvo = localStorage.getItem("vilelaburgers_perfil");
     if (salvo) { const perfil = JSON.parse(salvo); document.getElementById("nome-cliente").value = perfil.nome || ""; document.getElementById("rua-cliente").value = perfil.rua || ""; document.getElementById("numero-cliente").value = perfil.numero || ""; document.getElementById("bairro-cliente").value = perfil.bairro || ""; document.getElementById("complemento-cliente").value = perfil.complemento || ""; }

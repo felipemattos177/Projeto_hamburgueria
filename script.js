@@ -14,17 +14,14 @@ let configLoja = {
 let lojaAberta = true;
 let mensagemFechado = "";
 
-// === FUNÇÃO MÁGICA ANTI-CACHE (Obriga a ler dados ao vivo) ===
+// === FUNÇÃO MÁGICA ANTI-CACHE CORRIGIDA ===
 async function fetchSupabase(endpoint) {
-    const separador = endpoint.includes('?') ? '&' : '?';
-    const urlLive = `${SUPABASE_URL}${endpoint}${separador}_ts=${Date.now()}`;
-    return await fetch(urlLive, {
+    return await fetch(`${SUPABASE_URL}${endpoint}`, {
         headers: { 
             'apikey': SUPABASE_KEY, 
-            'Authorization': `Bearer ${SUPABASE_KEY}`,
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache'
-        }
+            'Authorization': `Bearer ${SUPABASE_KEY}`
+        },
+        cache: 'no-store' // A forma oficial e segura de proibir o cache do navegador
     });
 }
 
@@ -650,7 +647,7 @@ async function enviarParaWhatsApp() {
             if (erroDB.code === "23514" || (erroDB.message && erroDB.message.includes("trava_estoque_positivo"))) {
                 let itemFalho = "algum ingrediente";
                 if (erroDB.details) { const partes = erroDB.details.split(','); if (partes.length > 1) itemFalho = partes[1].trim(); }
-                alert(`⚠️ O estoque de ${itemFalho} esgotou agora! Por favor, volte e ajuste a quantidade.`);
+                alert(`⚠️ O estoque de ${itemFalho} esgotou agora! Por favor, volte e ajuste a quantidade no carrinho.`);
             } else {
                 alert("Erro ao registrar o pedido no sistema.");
             }
@@ -698,7 +695,7 @@ async function enviarParaWhatsApp() {
     }
 }
 
-// === HISTÓRICO, RODAPÉ E EXTRAS ===
+// === HISTÓRICO E EXTRAS ===
 async function carregarHistoricoPedidos() {
     const container = document.getElementById("lista-historico-pedidos");
     if (!container) return;
@@ -770,7 +767,6 @@ function navegarPara(aba) {
         carregarHistoricoPedidos(); 
         window.scrollTo(0, 0); 
     }
-
     atualizarContadorCart();
 }
 

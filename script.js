@@ -5,9 +5,8 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 let cardapio = [];
 let carrinho = [];
 let produtoSendoVisto = null;
-let receitasGlobais = []; // Guarda a ficha técnica em memória para bloqueios em milissegundos
+let receitasGlobais = []; 
 
-// === COFRE DE CONFIGURAÇÕES E ESTADO DA LOJA ===
 let configLoja = { 
     chave_pix: "", nome_recebedor: "", cidade_recebedor: "Arapoti",
     dias_trabalho: "0,1,2,3,4,5,6", horario_abertura: "00:00", horario_fechar: "23:59", numero_whatsapp: ""
@@ -15,7 +14,20 @@ let configLoja = {
 let lojaAberta = true;
 let mensagemFechado = "";
 
-// === GERAÇÃO E PERSISTÊNCIA DO ID DO CLIENTE ===
+// === FUNÇÃO MÁGICA ANTI-CACHE (Obriga a ler dados ao vivo) ===
+async function fetchSupabase(endpoint) {
+    const separador = endpoint.includes('?') ? '&' : '?';
+    const urlLive = `${SUPABASE_URL}${endpoint}${separador}_ts=${Date.now()}`;
+    return await fetch(urlLive, {
+        headers: { 
+            'apikey': SUPABASE_KEY, 
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+        }
+    });
+}
+
 function obterOuCriarClienteId() {
     let id = localStorage.getItem("vilelaburgers_cliente_id");
     if (!id) {
@@ -28,14 +40,10 @@ function obterOuCriarClienteId() {
     return id;
 }
 
-// === 2. EXTRAÇÃO DE DADOS E FICHAS TÉCNICAS (API DO SUPABASE) ===
+// === 2. EXTRAÇÃO DE DADOS AO VIVO ===
 async function carregarCardapioDoBanco() {
     try {
-        // Puxa os lanches
-        const resposta = await fetch(`${SUPABASE_URL}/rest/v1/cardapio_inteligente?select=*&ativo=eq.true`, {
-            method: 'GET',
-            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-        });
+        const resposta = await fetchSupabase(`/rest/v1/cardapio_inteligente?select=*&ativo=eq.true`);
         if (!resposta.ok) throw new Error(`Erro na API: HTTP ${resposta.status}`);
         const dados = await resposta.json();
 
@@ -51,11 +59,7 @@ async function carregarCardapioDoBanco() {
             adicionais: [] 
         }));
 
-        // Puxa as fichas técnicas globalmente para usar nas travas de botão
-        const resRec = await fetch(`${SUPABASE_URL}/rest/v1/receita_produto?select=*`, {
-            method: 'GET',
-            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-        });
+        const resRec = await fetchSupabase(`/rest/v1/receita_produto?select=*`);
         receitasGlobais = await resRec.json();
 
         renderizarCardapio();
@@ -65,7 +69,7 @@ async function carregarCardapioDoBanco() {
     }
 }
 
-// === 3. RENDERIZAÇÃO DO LAYOUT MODERNO ===
+// === 3. RENDERIZAÇÃO DO LAYOUT ===
 function renderizarCardapio(categoriaFiltro = "Todos") {
     const lista = document.getElementById("lista-produtos"); 
     if(!lista) return;
@@ -105,35 +109,56 @@ function filtrarCategoria(categoria, elementoBotao) {
     renderizarCardapio(categoria);
 }
 
-// === 4. LÓGICA DO MODAL (OCULTAÇÃO DE ESGOTADOS E RENDERIZAÇÃO) ===
+// === 4. LÓGICA DO MODAL (ESTOQUE TRAVADO DESDE A ABERTURA) ===
 async function abrirModalProduto(id) {
     document.body.classList.add("modal-aberto"); 
     produtoSendoVisto = cardapio.find(p => p.id == id);
     const modal = document.getElementById("modal-produto");
     const detalhes = document.getElementById("detalhes-produto-modal");
 
-    detalhes.innerHTML = `<p style="text-align: center; padding: 20px; color: #fff;">Calculando estoque em tempo real...</p>`;
+    detalhes.innerHTML = `<p style="text-align: center; padding: 20px; color: #fff;"><i class="fa-solid fa-spinner fa-spin"></i> Checando ingredientes na cozinha...</p>`;
     modal.classList.remove("escondido");
 
     try {
-        const resExtras = await fetch(`${SUPABASE_URL}/rest/v1/ingredientes?select=id,nome,preco_adicional,estoque&preco_adicional=gt.0&estoque=gt.0`, {
-            method: 'GET',
-            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-        });
+        const resExtras = await fetchSupabase(`/rest/v1/ingredientes?select=id,nome,preco_adicional,estoque&preco_adicional=gt.0&estoque=gt.0`);
         const adicionaisDoBanco = await resExtras.json();
 
-        // Atualiza a ficha técnica para ter os dados mais frescos ao abrir o modal
-        const resRec = await fetch(`${SUPABASE_URL}/rest/v1/receita_produto?select=*`, {
-            method: 'GET',
-            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-        });
+        const resRec = await fetchSupabase(`/rest/v1/receita_produto?select=*`);
         receitasGlobais = await resRec.json();
+
+        const resIngTodos = await fetchSupabase(`/rest/v1/ingredientes?select=id,nome,estoque`);
+        const todosIngredientes = await resIngTodos.json();
 
         const receitaDesteLanche = receitasGlobais.filter(r => r.produto_id == produtoSendoVisto.id);
 
+        // 1. ANÁLISE SE DÁ PARA MONTAR PELO MENOS 1 LANCHE
+        let podeMontarBase = true;
+        let ingredienteFaltanteBase = "";
+
+        for (let itemRec of receitaDesteLanche) {
+            const ingDb = todosIngredientes.find(i => i.id == itemRec.ingrediente_id);
+            if (ingDb) {
+                let presa = 0;
+                carrinho.forEach(cartItem => {
+                   const rc = receitasGlobais.filter(r => r.produto_id == cartItem.produtoBase.id);
+                   const u = rc.find(r => r.ingrediente_id == ingDb.id);
+                   if (u) presa += Number(u.quantidade);
+                   cartItem.adicionais.forEach(ex => {
+                       if (ex.id == ingDb.id) presa += Number(ex.quantidade);
+                   });
+                });
+                const livre = Number(ingDb.estoque) - presa;
+                if (Number(itemRec.quantidade) > livre) {
+                    podeMontarBase = false;
+                    ingredienteFaltanteBase = ingDb.nome;
+                    break;
+                }
+            }
+        }
+
+        // 2. MONTAGEM DOS ADICIONAIS (Só aparece o que tem estoque)
         let htmlAdicionais = "";
-        
-        if (adicionaisDoBanco.length > 0 && produtoSendoVisto.categoria !== "Bebidas" && lojaAberta) {
+        if (podeMontarBase && adicionaisDoBanco.length > 0 && produtoSendoVisto.categoria !== "Bebidas" && lojaAberta) {
             htmlAdicionais += `<div class="adicionais-lista" style="margin-top:15px; border-top: 1px solid #333; padding-top: 15px;">
                 <h4 style="margin-bottom: 10px; color: #fff;">Turbine seu lanche:</h4>`;
             
@@ -155,12 +180,10 @@ async function abrirModalProduto(id) {
 
                 const estoqueRealDisponivel = Number(add.estoque) - qtdPresaNoCarrinho - qtdGastaNesteLanche;
                 
-                // Só mostra o adicional se o estoque real for maior que zero
                 if(estoqueRealDisponivel > 0) {
                     htmlAdicionais += `
                         <div class="adicional-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 12px; background: #222; border-radius: 8px; border: 1px solid #333;">
                             <span style="color: #fff; font-weight: 500;">${add.nome} <br><small style="color: #aaa;">+ R$ ${Number(add.preco_adicional).toFixed(2).replace('.', ',')}</small></span>
-                            
                             <div style="display: flex; align-items: center; gap: 12px;">
                                 <button type="button" onclick="alterarQtdAdicional('${add.id}', -1)" style="width: 32px; height: 32px; border-radius: 6px; background: #444; color: white; border: none; font-weight: bold; cursor: pointer; font-size: 18px;">-</button>
                                 <span class="qtd-adicional-span" id="qtd-add-${add.id}" data-id="${add.id}" data-nome="${add.nome}" data-preco="${add.preco_adicional}" style="font-weight: bold; color: #fff; width: 15px; text-align: center; font-size: 16px;">0</span>
@@ -173,17 +196,36 @@ async function abrirModalProduto(id) {
             htmlAdicionais += `</div>`;
         }
 
+        // 3. SE NÃO TEM ESTOQUE PARA O LANCHE, NEM MOSTRA OS BOTÕES
+        let controleQtdHtml = "";
         let btnAdicionarHtml = "";
-        if (lojaAberta) {
-            btnAdicionarHtml = `<button class="btn-add-carrinho" onclick="confirmarAdicao()" style="width: 100%; padding: 15px; background: #2ed573; color: #000; border: none; border-radius: 8px; font-weight: bold; font-size: 16px; margin-top: 15px; cursor: pointer;"><i class="fa-solid fa-plus"></i> Adicionar ao Pedido</button>`;
-        } else {
+
+        if (!lojaAberta) {
             btnAdicionarHtml = `
                 <div style="background: #333; color: #aaa; text-align: center; padding: 15px; border-radius: 8px; margin-top: 15px; border: 1px solid #444;">
                     <i class="fa-solid fa-lock" style="font-size: 20px; margin-bottom: 5px; color: #ff4757;"></i><br>
-                    <strong>Loja Fechada no Momento</strong><br>
-                    <span style="font-size: 13px;">${mensagemFechado}</span>
+                    <strong>Loja Fechada no Momento</strong><br><span style="font-size: 13px;">${mensagemFechado}</span>
                 </div>
             `;
+        } else if (!podeMontarBase) {
+            btnAdicionarHtml = `
+                <div style="background: #333; color: #ff4757; text-align: center; padding: 15px; border-radius: 8px; margin-top: 15px; border: 1px solid #444;">
+                    <i class="fa-solid fa-triangle-exclamation" style="font-size: 20px; margin-bottom: 5px;"></i><br>
+                    <strong>Estoque Insuficiente</strong><br><span style="font-size: 13px;">Falta ${ingredienteFaltanteBase} para finalizar a montagem.</span>
+                </div>
+            `;
+        } else {
+            controleQtdHtml = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; padding: 15px; background: #222; border-radius: 8px;">
+                    <span style="color: #fff; font-weight: bold; font-size: 16px;">Quantidade:</span>
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <button type="button" onclick="alterarQtdBase(-1)" style="width: 40px; height: 40px; border-radius: 8px; background: #444; color: white; border: none; font-weight: bold; cursor: pointer; font-size: 20px;">-</button>
+                        <span id="qtd-produto-base" style="font-weight: bold; color: #fff; font-size: 18px;">1</span>
+                        <button type="button" onclick="alterarQtdBase(1)" style="width: 40px; height: 40px; border-radius: 8px; background: var(--laranja-fogo, #ff5e00); color: white; border: none; font-weight: bold; cursor: pointer; font-size: 20px;">+</button>
+                    </div>
+                </div>
+            `;
+            btnAdicionarHtml = `<button class="btn-add-carrinho" onclick="confirmarAdicao()" style="width: 100%; padding: 15px; background: #2ed573; color: #000; border: none; border-radius: 8px; font-weight: bold; font-size: 16px; margin-top: 15px; cursor: pointer;"><i class="fa-solid fa-plus"></i> Adicionar ao Pedido</button>`;
         }
 
         detalhes.innerHTML = `
@@ -191,27 +233,17 @@ async function abrirModalProduto(id) {
             <h2 style="color: #fff; font-size: 22px;">${produtoSendoVisto.nome}</h2>
             <p style="color: #aaa; font-size: 14px; margin-bottom: 10px;">${produtoSendoVisto.descricao}</p>
             <h3 style="color: var(--laranja-fogo, #ff5e00); font-size: 22px;">R$ ${produtoSendoVisto.preco.toFixed(2).replace('.', ',')}</h3>
-            
             ${htmlAdicionais}
-            
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; padding: 15px; background: #222; border-radius: 8px;">
-                <span style="color: #fff; font-weight: bold; font-size: 16px;">Quantidade:</span>
-                <div style="display: flex; align-items: center; gap: 15px;">
-                    <button type="button" onclick="alterarQtdBase(-1)" style="width: 40px; height: 40px; border-radius: 8px; background: #444; color: white; border: none; font-weight: bold; cursor: pointer; font-size: 20px;">-</button>
-                    <span id="qtd-produto-base" style="font-weight: bold; color: #fff; font-size: 18px;">1</span>
-                    <button type="button" onclick="alterarQtdBase(1)" style="width: 40px; height: 40px; border-radius: 8px; background: var(--laranja-fogo, #ff5e00); color: white; border: none; font-weight: bold; cursor: pointer; font-size: 20px;">+</button>
-                </div>
-            </div>
-
+            ${controleQtdHtml}
             ${btnAdicionarHtml}
         `;
 
     } catch (erro) {
-        detalhes.innerHTML = `<p style="color: red;">Erro ao carregar. Tente novamente.</p>`;
+        detalhes.innerHTML = `<p style="color: red;">Erro ao carregar os dados. Tente novamente.</p>`;
     }
 }
 
-// === VERIFICAÇÃO EM TEMPO REAL: LIMITA O BOTÃO '+' DO LANCHE BASE PELOS INGREDIENTES ===
+// === VERIFICAÇÃO EM MILISSEGUNDOS AO CLICAR NO "+" DO LANCHE ===
 async function alterarQtdBase(delta) {
     if(!lojaAberta) return;
     const span = document.getElementById("qtd-produto-base");
@@ -222,68 +254,52 @@ async function alterarQtdBase(delta) {
         return;
     }
 
-    // Congela visualmente o botão por milissegundos enquanto cruza os dados
     const btn = span.nextElementSibling;
     const textoBotaoOrig = btn.innerHTML;
     btn.innerHTML = "...";
     btn.disabled = true;
 
     try {
-        // Puxa o estoque real de TODOS os ingredientes ao vivo
-        const resIng = await fetch(`${SUPABASE_URL}/rest/v1/ingredientes?select=id,nome,estoque`, {
-            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-        });
+        const resIng = await fetchSupabase(`/rest/v1/ingredientes?select=id,nome,estoque`);
         const ingredientesLive = await resIng.json();
-
-        // Puxa a receita apenas deste lanche
         const receitaDesteLanche = receitasGlobais.filter(r => r.produto_id == produtoSendoVisto.id);
 
         let temEstoqueSuficiente = true;
         let ingredienteFaltando = "";
 
-        // Analisa ingrediente por ingrediente da receita para ver qual vai acabar primeiro
         for (let itemReceita of receitaDesteLanche) {
             const ingDb = ingredientesLive.find(i => i.id == itemReceita.ingrediente_id);
             if (ingDb) {
                 const estoqueTotalDB = Number(ingDb.estoque);
 
-                // 1. Quanto de estoque já está reservado no carrinho inteiro?
                 let qtdPresaNoCarrinho = 0;
                 carrinho.forEach(itemCart => {
                     const recCart = receitasGlobais.filter(r => r.produto_id == itemCart.produtoBase.id);
                     const usoRec = recCart.find(r => r.ingrediente_id == ingDb.id);
                     if (usoRec) qtdPresaNoCarrinho += Number(usoRec.quantidade);
-
                     itemCart.adicionais.forEach(extra => {
                         if (extra.id == ingDb.id) qtdPresaNoCarrinho += Number(extra.quantidade);
                     });
                 });
 
-                // 2. Quanto do Adicional já está marcado NA TELA deste modal agora?
                 let extraNesteModal = 0;
                 const spanAdicional = document.getElementById(`qtd-add-${ingDb.id}`);
-                if (spanAdicional) {
-                    extraNesteModal = parseInt(spanAdicional.innerText);
-                }
+                if (spanAdicional) extraNesteModal = parseInt(spanAdicional.innerText);
 
-                // O consumo para adicionar MAIS UM lanche = Receita Base + O que já pediu de extra para ele
                 const consumoParaMaisUmLanche = Number(itemReceita.quantidade) + extraNesteModal;
-
-                // O que já está sendo consumido pelos lanches que já estão no número do modal
                 const consumoAtualNaTela = (Number(itemReceita.quantidade) * qtdAtual) + (extraNesteModal * qtdAtual);
-
                 const livreParaAdicionar = estoqueTotalDB - qtdPresaNoCarrinho - consumoAtualNaTela;
 
                 if (consumoParaMaisUmLanche > livreParaAdicionar) {
                     temEstoqueSuficiente = false;
                     ingredienteFaltando = ingDb.nome;
-                    break; // Trava o loop imediatamente no primeiro ingrediente que zerou
+                    break;
                 }
             }
         }
 
         if (!temEstoqueSuficiente) {
-            alert(`⚠️ Limite atingido! O estoque de "${ingredienteFaltando}" acabou e não é possível montar mais lanches.`);
+            alert(`⚠️ Limite atingido! A cozinha não tem "${ingredienteFaltando}" suficiente para montar mais desse lanche.`);
         } else {
             span.innerText = qtdAtual + 1;
         }
@@ -296,7 +312,7 @@ async function alterarQtdBase(delta) {
     }
 }
 
-// === VERIFICAÇÃO EM TEMPO REAL: LIMITA O BOTÃO '+' DO ADICIONAL (Ex: Bacon) ===
+// === VERIFICAÇÃO EM MILISSEGUNDOS AO CLICAR NO "+" DO ADICIONAL ===
 async function alterarQtdAdicional(id, delta) {
     if(!lojaAberta) return;
     const span = document.getElementById(`qtd-add-${id}`);
@@ -313,9 +329,7 @@ async function alterarQtdAdicional(id, delta) {
     btn.disabled = true;
 
     try {
-        const resIng = await fetch(`${SUPABASE_URL}/rest/v1/ingredientes?select=nome,estoque&id=eq.${id}`, {
-            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-        });
+        const resIng = await fetchSupabase(`/rest/v1/ingredientes?select=nome,estoque&id=eq.${id}`);
         const dadosIng = await resIng.json();
 
         if (dadosIng && dadosIng.length > 0) {
@@ -327,7 +341,6 @@ async function alterarQtdAdicional(id, delta) {
                 const recCart = receitasGlobais.filter(r => r.produto_id == itemCart.produtoBase.id);
                 const usoReceita = recCart.find(r => r.ingrediente_id == id);
                 if (usoReceita) qtdPresaNoCarrinho += Number(usoReceita.quantidade);
-
                 itemCart.adicionais.forEach(extra => {
                     if (extra.id == id) qtdPresaNoCarrinho += Number(extra.quantidade);
                 });
@@ -338,16 +351,14 @@ async function alterarQtdAdicional(id, delta) {
 
             let qtdGastaNesteLancheReceita = 0;
             const usoNeste = receitasGlobais.find(r => r.produto_id == produtoSendoVisto.id && r.ingrediente_id == id);
-            if (usoNeste) {
-                qtdGastaNesteLancheReceita = Number(usoNeste.quantidade) * qtdBase;
-            }
+            if (usoNeste) qtdGastaNesteLancheReceita = Number(usoNeste.quantidade) * qtdBase;
 
             const extraJaSelecionadoTotal = qtdAtual * qtdBase;
-            const quantidadeParaAdicionar = 1 * qtdBase; // Se tem 2 lanches selecionados, +1 extra gasta 2 ingredientes
+            const quantidadeParaAdicionar = 1 * qtdBase; 
             const estoqueLivre = estoqueLive - qtdPresaNoCarrinho - qtdGastaNesteLancheReceita - extraJaSelecionadoTotal;
 
             if (quantidadeParaAdicionar > estoqueLivre) {
-                alert(`⚠️ Estoque indisponível! Você não pode adicionar mais "${nomeIngrediente}" no momento.`);
+                alert(`⚠️ Estoque indisponível! Resta apenas ${estoqueLivre > 0 ? estoqueLivre : 0} de "${nomeIngrediente}".`);
             } else {
                 span.innerText = qtdAtual + 1;
             }
@@ -360,36 +371,33 @@ async function alterarQtdAdicional(id, delta) {
     }
 }
 
-// === CONFIRMAÇÃO FINAL: IMPEDE DE ADICIONAR SE ALGUÉM BURLOU OS CLIQUES ===
+// === CONFIRMAÇÃO E ENVIO PRO CARRINHO ===
 async function confirmarAdicao() {
     const spanQtdBase = document.getElementById("qtd-produto-base");
     const qtdBaseEscolhida = spanQtdBase ? parseInt(spanQtdBase.innerText) : 1;
 
     const btnConfirmar = document.querySelector(".btn-add-carrinho");
     if(btnConfirmar) {
-        btnConfirmar.innerHTML = "Adicionando...";
+        btnConfirmar.innerHTML = "Validando Estoque...";
         btnConfirmar.disabled = true;
     }
 
     try {
-        const resIng = await fetch(`${SUPABASE_URL}/rest/v1/ingredientes?select=id,nome,estoque`, {
-            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-        });
+        const resIng = await fetchSupabase(`/rest/v1/ingredientes?select=id,nome,estoque`);
         const ingredientesLive = await resIng.json();
 
         const receitaDesteLanche = receitasGlobais.filter(r => r.produto_id == produtoSendoVisto.id);
         let necessitaIngredientes = {};
         
-        // Soma as quantidades da receita base
         receitaDesteLanche.forEach(r => {
             if(!necessitaIngredientes[r.ingrediente_id]) necessitaIngredientes[r.ingrediente_id] = 0;
             necessitaIngredientes[r.ingrediente_id] += Number(r.quantidade) * qtdBaseEscolhida;
         });
 
-        // Soma as quantidades dos adicionais marcados
         const adicionaisEscolhidos = [];
         let totalAdicionais = 0;
         const spansQtd = document.querySelectorAll(".qtd-adicional-span");
+        
         for (const span of spansQtd) {
             const qtdPorLanche = parseInt(span.innerText);
             if (qtdPorLanche > 0) { 
@@ -405,7 +413,6 @@ async function confirmarAdicao() {
             }
         }
 
-        // Faz o cross-check final com o banco
         for (let ingId in necessitaIngredientes) {
             const ingDb = ingredientesLive.find(i => i.id == ingId);
             if (ingDb) {
@@ -421,14 +428,13 @@ async function confirmarAdicao() {
 
                 const estoqueLivre = Number(ingDb.estoque) - qtdPresaNoCarrinho;
                 if (necessitaIngredientes[ingId] > estoqueLivre) {
-                    alert(`⚠️ Estoque indisponível! O ingrediente "${ingDb.nome}" não tem quantidade suficiente para finalizar essa adição.`);
+                    alert(`⚠️ Alguém acabou de pedir a última unidade! Faltou "${ingDb.nome}".`);
                     if(btnConfirmar) { btnConfirmar.innerHTML = `<i class="fa-solid fa-plus"></i> Adicionar ao Pedido`; btnConfirmar.disabled = false; }
-                    return; // Aborta e não deixa colocar no carrinho
+                    return; 
                 }
             }
         }
 
-        // TUDO CERTO! Envia pro carrinho
         for (let i = 0; i < qtdBaseEscolhida; i++) {
             const itemParaCarrinho = {
                 produtoBase: produtoSendoVisto,
@@ -449,7 +455,7 @@ async function confirmarAdicao() {
     }
 }
 
-// === 5. LÓGICA DO CARRINHO E CHECKOUT ===
+// === LÓGICA DO CARRINHO, CHECKOUT E WHATSAPP ===
 function atualizarContadorCart() {
     const qtdItens = carrinho.length;
     const barraSacola = document.getElementById("barra-sacola");
@@ -527,7 +533,6 @@ function removerDoCarrinho(index) {
     else renderizarCheckout();
 }
 
-// === 6. FINALIZAÇÃO E WHATSAPP COM SALVAMENTO NO BANCO ===
 function verificarTroco() {
     const selectPagamento = document.getElementById("forma-pagamento");
     if (!selectPagamento) return;
@@ -591,7 +596,7 @@ function copiarPixParaAreaDeTransferencia() {
 
 async function enviarParaWhatsApp() {
     if(!lojaAberta) {
-        alert("Puxa vida, a loja acabou de fechar! Não poderemos preparar seu pedido agora. " + mensagemFechado);
+        alert("Puxa vida, a loja acabou de fechar! " + mensagemFechado);
         return;
     }
 
@@ -636,35 +641,23 @@ async function enviarParaWhatsApp() {
 
         const resSupabase = await fetch(`${SUPABASE_URL}/rest/v1/rpc/registrar_pedido_completo`, {
             method: 'POST',
-            headers: {
-                'apikey': SUPABASE_KEY,
-                'Authorization': `Bearer ${SUPABASE_KEY}`,
-                'Content-Type': 'application/json'
-            },
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
             body: JSON.stringify(dadosPedidoCompleto)
         });
 
-        // O SEGUNDO ESCUDO (Garante que nada fure o estoque na hora de pagar)
         if (!resSupabase.ok) {
             const erroDB = await resSupabase.json();
-            console.error("Erro no Supabase:", erroDB);
-            
             if (erroDB.code === "23514" || (erroDB.message && erroDB.message.includes("trava_estoque_positivo"))) {
                 let itemFalho = "algum ingrediente";
-                if (erroDB.details) {
-                    const partes = erroDB.details.split(',');
-                    if (partes.length > 1) itemFalho = partes[1].trim(); 
-                }
-                alert(`⚠️ Ops! O estoque de ${itemFalho} acabou agorinha mesmo ou é insuficiente para o total pedido. Por favor, remova ou diminua a quantidade no carrinho.`);
+                if (erroDB.details) { const partes = erroDB.details.split(','); if (partes.length > 1) itemFalho = partes[1].trim(); }
+                alert(`⚠️ O estoque de ${itemFalho} esgotou agora! Por favor, volte e ajuste a quantidade.`);
             } else {
-                alert("Erro ao registrar o pedido no sistema. Tente novamente.");
+                alert("Erro ao registrar o pedido no sistema.");
             }
-            
             if (btnFinalizar) { btnFinalizar.innerText = textoOriginalBotao; btnFinalizar.disabled = false; }
             return; 
         }
 
-        // MONTAGEM DA MENSAGEM DO WHATSAPP
         let textoPedido = `🔥 *NOVO PEDIDO - VILELA BURGERS* 🔥\n\n`;
         textoPedido += `👤 *Cliente:* ${nome}\n📍 *Endereço:* ${enderecoFormatado}\n`;
         
@@ -705,7 +698,7 @@ async function enviarParaWhatsApp() {
     }
 }
 
-// === BUSCAR E RENDERIZAR O HISTÓRICO DE PEDIDOS ===
+// === HISTÓRICO, RODAPÉ E EXTRAS ===
 async function carregarHistoricoPedidos() {
     const container = document.getElementById("lista-historico-pedidos");
     if (!container) return;
@@ -717,18 +710,12 @@ async function carregarHistoricoPedidos() {
     container.innerHTML = `<p style="color: #aaa; text-align: center; padding: 20px;">Carregando seus pedidos...</p>`;
 
     try {
-        let queryUrl = `${SUPABASE_URL}/rest/v1/pedidos?select=*&or=(cliente_id.eq.${clienteId}`;
-        if (telefoneCliente) {
-            queryUrl += `,telefone_cliente.eq.${telefoneCliente}`;
-        }
+        let queryUrl = `/rest/v1/pedidos?select=*&or=(cliente_id.eq.${clienteId}`;
+        if (telefoneCliente) queryUrl += `,telefone_cliente.eq.${telefoneCliente}`;
         queryUrl += `)&order=data_pedido.desc`;
 
-        const resposta = await fetch(queryUrl, {
-            method: 'GET',
-            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-        });
-
-        if (!resposta.ok) throw new Error("Erro ao carregar histórico");
+        const resposta = await fetchSupabase(queryUrl);
+        if (!resposta.ok) throw new Error("Erro histórico");
         const pedidos = await resposta.json();
 
         if (pedidos.length === 0) {
@@ -758,7 +745,6 @@ async function carregarHistoricoPedidos() {
     }
 }
 
-// === 7 a 14: SECUNDÁRIAS MANTIDAS E RODAPÉ DE VOLTA ===
 function fecharModal() { document.getElementById("modal-produto").classList.add("escondido"); document.body.classList.remove("modal-aberto"); }
 window.addEventListener('click', function(event) { const modal = document.getElementById("modal-produto"); if (event.target === modal) { fecharModal(); }});
 
@@ -801,16 +787,6 @@ function preencherCheckoutComPerfil() {
     if (salvo) { const perfil = JSON.parse(salvo); document.getElementById("nome-cliente").value = perfil.nome || ""; document.getElementById("rua-cliente").value = perfil.rua || ""; document.getElementById("numero-cliente").value = perfil.numero || ""; document.getElementById("bairro-cliente").value = perfil.bairro || ""; document.getElementById("complemento-cliente").value = perfil.complemento || ""; }
 }
 
-function gerarPixCopiaECola(valorPix) {
-    const formatarTamanho = (id, valor) => `${id}${String(valor.length).padStart(2, '0')}${valor}`;
-    const chaveLimpa = (configLoja.chave_pix || "").trim();
-    let payload = "000201" + formatarTamanho("26", formatarTamanho("00", "br.gov.bcb.pix") + formatarTamanho("01", chaveLimpa)) + "520400005303986" + formatarTamanho("54", valorPix.toFixed(2)) + "5802BR" + formatarTamanho("59", (configLoja.nome_recebedor || "Hamburgueria").normalize("NFD").replace(/[\u0300-\u036f]/g, "").substring(0, 25)) + formatarTamanho("60", (configLoja.cidade_recebedor || "Arapoti").normalize("NFD").replace(/[\u0300-\u036f]/g, "").substring(0, 15)) + formatarTamanho("62", formatarTamanho("05", "***")) + "6304";
-    let polynomial = 0x1021; let result = 0xFFFF;
-    for (let i = 0; i < payload.length; i++) { result ^= payload.charCodeAt(i) << 8; for (let j = 0; j < 8; j++) { if ((result & 0x8000) !== 0) result = (result << 1) ^ polynomial; else result <<= 1; result &= 0xFFFF; } }
-    return payload + result.toString(16).toUpperCase().padStart(4, '0'); 
-}
-
-// === RENDERIZAR O RODAPÉ AUTOMÁTICO ===
 async function renderizarRodape() {
     const dataAtual = new Date(); const ano = dataAtual.getFullYear(); 
     const footer = document.createElement("footer"); 
@@ -836,18 +812,11 @@ async function renderizarRodape() {
     }
 }
 
-// === 15. CARREGAR CONFIGURAÇÕES DO COFRE ===
 async function carregarConfiguracoes() {
     try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracoes?select=*&limit=1`, {
-            method: 'GET',
-            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-        });
+        const res = await fetchSupabase(`/rest/v1/configuracoes?select=*&limit=1`);
         const dados = await res.json();
-        
-        if (dados && dados.length > 0) {
-            configLoja = dados[0];
-        }
+        if (dados && dados.length > 0) configLoja = dados[0];
     } catch (erro) {
         console.error("Erro ao puxar configurações da loja.", erro);
     } finally {
@@ -856,12 +825,10 @@ async function carregarConfiguracoes() {
     }
 }
 
-// === 16. O RELÓGIO INTELIGENTE ===
 function verificarHorarioLoja() {
     const agora = new Date();
     const diaSemanaAtual = agora.getDay(); 
     const horaAtualMinutos = agora.getHours() * 60 + agora.getMinutes();
-
     const diasTrabalhoStr = configLoja.dias_trabalho || "0,1,2,3,4,5,6";
     const diasAbertosArray = diasTrabalhoStr.split(',').map(d => parseInt(d.trim()));
 
@@ -871,19 +838,15 @@ function verificarHorarioLoja() {
     const tempoFechaMinutos = hFecha * 60 + mFecha;
     
     const viraNoite = tempoFechaMinutos < tempoAbreMinutos;
-
-    let noDiaCerto = false;
-    let naHoraCerta = false;
+    let noDiaCerto = false, naHoraCerta = false;
 
     if (viraNoite) {
         if (horaAtualMinutos >= tempoAbreMinutos) {
             naHoraCerta = diasAbertosArray.includes(diaSemanaAtual);
             noDiaCerto = naHoraCerta;
         } else if (horaAtualMinutos <= tempoFechaMinutos) {
-            let ontem = diaSemanaAtual - 1;
-            if (ontem < 0) ontem = 6;
-            naHoraCerta = diasAbertosArray.includes(ontem);
-            noDiaCerto = naHoraCerta; 
+            let ontem = diaSemanaAtual - 1; if (ontem < 0) ontem = 6;
+            naHoraCerta = diasAbertosArray.includes(ontem); noDiaCerto = naHoraCerta; 
         }
     } else {
         noDiaCerto = diasAbertosArray.includes(diaSemanaAtual);
@@ -891,57 +854,28 @@ function verificarHorarioLoja() {
     }
 
     lojaAberta = noDiaCerto && naHoraCerta;
-
     const bannerHtml = document.getElementById("aviso-loja-fechada");
 
     if (!lojaAberta) {
         const nomesDias = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
-        
-        let diasPraFrente = 0;
-        let diaEncontrado = -1;
+        let diasPraFrente = 0, diaEncontrado = -1;
 
         for (let i = 0; i <= 7; i++) {
             let diaAlvo = (diaSemanaAtual + i) % 7;
-            
             if (diasAbertosArray.includes(diaAlvo)) {
                 if (i === 0) { 
-                    if (viraNoite) {
-                        if (horaAtualMinutos < tempoAbreMinutos && horaAtualMinutos > tempoFechaMinutos) {
-                            diasPraFrente = i; diaEncontrado = diaAlvo; break;
-                        }
-                    } else {
-                        if (horaAtualMinutos < tempoAbreMinutos) {
-                            diasPraFrente = i; diaEncontrado = diaAlvo; break;
-                        }
-                    }
-                } else {
-                    diasPraFrente = i; diaEncontrado = diaAlvo; break;
-                }
+                    if (viraNoite) { if (horaAtualMinutos < tempoAbreMinutos && horaAtualMinutos > tempoFechaMinutos) { diasPraFrente = i; diaEncontrado = diaAlvo; break; } } 
+                    else { if (horaAtualMinutos < tempoAbreMinutos) { diasPraFrente = i; diaEncontrado = diaAlvo; break; } }
+                } else { diasPraFrente = i; diaEncontrado = diaAlvo; break; }
             }
         }
 
-        let txtDia = "";
-        if (diaEncontrado === -1) {
-            txtDia = "em breve"; 
-        } else if (diasPraFrente === 0) {
-            txtDia = "hoje";
-        } else if (diasPraFrente === 1) {
-            txtDia = "amanhã";
-        } else {
-            txtDia = nomesDias[diaEncontrado];
-        }
-
+        let txtDia = (diaEncontrado === -1) ? "em breve" : (diasPraFrente === 0) ? "hoje" : (diasPraFrente === 1) ? "amanhã" : nomesDias[diaEncontrado];
         mensagemFechado = `Voltamos ${txtDia} às ${configLoja.horario_abertura}.`;
         
-        if (bannerHtml) {
-            bannerHtml.innerHTML = `⚠️ Loja Fechada no momento. ${mensagemFechado}`;
-            bannerHtml.style.display = "block";
-        }
-        
+        if (bannerHtml) { bannerHtml.innerHTML = `⚠️ Loja Fechada no momento. ${mensagemFechado}`; bannerHtml.style.display = "block"; }
         const detalhes = document.getElementById("detalhes-produto-modal");
-        if (detalhes && !detalhes.innerHTML.includes("Loja Fechada no Momento") && produtoSendoVisto) {
-             abrirModalProduto(produtoSendoVisto.id);
-        }
+        if (detalhes && !detalhes.innerHTML.includes("Loja Fechada no Momento") && produtoSendoVisto) { abrirModalProduto(produtoSendoVisto.id); }
     } else {
         if (bannerHtml) bannerHtml.style.display = "none";
     }

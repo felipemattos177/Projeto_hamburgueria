@@ -119,25 +119,62 @@ async function salvarNovoProduto() {
     const descricao = document.getElementById("novo-descricao").value;
     const preco = parseFloat(document.getElementById("novo-preco").value);
     const categoria = document.getElementById("novo-categoria").value;
-    const imagem = document.getElementById("novo-imagem").value;
-
+    
     if(!nome || isNaN(preco)) {
         alert("Preencha ao menos o Nome e um Preço válido!");
         return;
     }
 
-    const payload = { nome, descricao, preco, categoria, imagem };
-    
-    let url = `${SUPABASE_URL}/rest/v1/produtos`;
-    let metodo = 'POST'; // POST = Inserir Novo
+    // Pega o botão para mostrar que está carregando
+    const btnSalvar = document.querySelector(".btn-novo");
+    const textoOriginal = btnSalvar.innerHTML;
+    btnSalvar.innerHTML = "⏳ Salvando...";
+    btnSalvar.disabled = true;
 
-    // Se a variável não estiver vazia, significa que estamos EDITANDO!
-    if (produtoEdicaoId !== null) {
-        url = `${url}?id=eq.${produtoEdicaoId}`;
-        metodo = 'PATCH'; // PATCH = Atualizar Existente
-    }
+    // Lida com a imagem
+    let urlDaImagem = document.getElementById("novo-imagem").value; // Link que já estava lá ou vazio
+    const inputArquivo = document.getElementById("novo-file-imagem");
 
     try {
+        // 1. FAZ O UPLOAD DA IMAGEM (SE O USUÁRIO SELECIONOU UMA NOVA)
+        if (inputArquivo && inputArquivo.files.length > 0) {
+            const arquivo = inputArquivo.files[0];
+            const nomeUnico = `produto-${Date.now()}-${arquivo.name.replace(/\s+/g, '-')}`;
+
+            const resUpload = await fetch(`${SUPABASE_URL}/storage/v1/object/imagens/${nomeUnico}`, {
+                method: 'POST',
+                headers: {
+                    'apikey': SUPABASE_KEY,
+                    'Authorization': `Bearer ${SUPABASE_KEY}`,
+                    'Content-Type': arquivo.type 
+                },
+                body: arquivo
+            });
+
+            if (!resUpload.ok) throw new Error("Falha ao subir a imagem do lanche.");
+
+            // Pega o link público da foto gerada e atualiza a variável
+            urlDaImagem = `${SUPABASE_URL}/storage/v1/object/public/imagens/${nomeUnico}`;
+        }
+
+        // 2. MONTA OS DADOS PARA O BANCO DE DADOS
+        const payload = { 
+            nome, 
+            descricao, 
+            preco, 
+            categoria, 
+            imagem: urlDaImagem 
+        };
+        
+        let url = `${SUPABASE_URL}/rest/v1/produtos`;
+        let metodo = 'POST'; // POST = Inserir Novo
+
+        if (produtoEdicaoId !== null) {
+            url = `${url}?id=eq.${produtoEdicaoId}`;
+            metodo = 'PATCH'; // PATCH = Atualizar Existente
+        }
+
+        // 3. ENVIA OS DADOS FINAIS
         const res = await fetch(url, {
             method: metodo,
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
@@ -146,15 +183,21 @@ async function salvarNovoProduto() {
 
         if(!res.ok) throw new Error("Erro do Supabase ao salvar.");
         
+        // Limpa o campo de arquivo para não dar problema no próximo cadastro
+        if(inputArquivo) inputArquivo.value = "";
+        
         fecharModalAdmin();
         carregarProdutos(); // Recarrega a tabela para mostrar as mudanças
+        
     } catch(erro) {
         alert("Erro ao salvar produto. Verifique o console.");
         console.error(erro);
+    } finally {
+        // Volta o botão ao normal mesmo se der erro
+        btnSalvar.innerHTML = textoOriginal;
+        btnSalvar.disabled = false;
     }
-}
-
-// === EXCLUIR PRODUTO (COM PROTEÇÃO DE DADOS) ===
+}// === EXCLUIR PRODUTO (COM PROTEÇÃO DE DADOS) ===
 async function excluirProduto(id) {
     if(!confirm("⚠️ Tem certeza que deseja excluir este produto do cardápio?")) return;
     
@@ -592,6 +635,41 @@ async function atualizarStatusPedido(id, novoStatus) {
 // ==========================================
 // MÓDULO 5: CONFIGURAÇÕES DA LOJA (O Cofre Mestre)
 // ==========================================
+
+async function carregarConfiguracoesAdmin() {
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracoes?id=eq.1&select=*`, {
+            method: 'GET',
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+        });
+        const dados = await res.json();
+        
+        if (dados && dados.length > 0) {
+            const config = dados[0];
+            
+            // 1. Preenche os Dados da Loja (PIX, Horários, WhatsApp)
+            document.getElementById("admin-chave-pix").value = config.chave_pix || "";
+            document.getElementById("admin-nome-pix").value = config.nome_recebedor || "";
+            document.getElementById("admin-cidade-pix").value = config.cidade_recebedor || "";
+            document.getElementById("admin-dias-trabalho").value = config.dias_trabalho || "";
+            document.getElementById("admin-hora-abre").value = config.horario_abertura || "";
+            document.getElementById("admin-hora-fecha").value = config.horario_fechar || "";
+            document.getElementById("admin-whatsapp").value = config.numero_whatsapp || "";
+
+            // 2. Preenche os Dados da Identidade Visual (White-Label)
+            document.getElementById("admin-nome-loja").value = config.nome_loja || "";
+            document.getElementById("admin-titulo-banner").value = config.titulo_banner || "";
+            document.getElementById("admin-subtitulo-banner").value = config.subtitulo_banner || "";
+            document.getElementById("admin-cor-principal").value = config.cor_principal || "#ff5e00";
+
+            // Salva o link da imagem atual no campo invisível
+            document.getElementById("admin-img-banner").value = config.imagem_banner || "";
+        }
+    } catch (erro) {
+        console.error("Erro ao puxar configurações no Admin:", erro);
+    }
+}
+
 async function salvarConfiguracoesLoja() {
     const btn = document.getElementById("btn-salvar-config");
     const textoOriginal = btn.innerHTML;
@@ -604,7 +682,7 @@ async function salvarConfiguracoesLoja() {
 
     try {
         // 1. SE O USUÁRIO ESCOLHEU UMA FOTO NOVA, FAZ O UPLOAD PRIMEIRO!
-        if (inputArquivo.files.length > 0) {
+        if (inputArquivo && inputArquivo.files.length > 0) {
             const arquivo = inputArquivo.files[0];
             // Cria um nome único para o arquivo não substituir outros (ex: banner-1718293.jpg)
             const nomeUnico = `banner-${Date.now()}-${arquivo.name.replace(/\s+/g, '-')}`;
@@ -659,7 +737,7 @@ async function salvarConfiguracoesLoja() {
         if (!res.ok) throw new Error("Falha ao salvar no banco de dados.");
         
         alert("✅ Loja e Identidade Visual atualizadas com sucesso!");
-        inputArquivo.value = ""; // Limpa a seleção do arquivo para não subir de novo sem querer
+        if(inputArquivo) inputArquivo.value = ""; // Limpa a seleção do arquivo para não subir de novo sem querer
         
     } catch (erro) {
         alert("Erro ao salvar: " + erro.message);

@@ -279,7 +279,11 @@
                 <option value="Smash">Smash</option>
                 <option value="Bebidas">Bebidas</option>
             </select>
-            <input type="text" id="novo-imagem" placeholder="Link da Imagem (URL)">
+            
+            <label style="font-size: 13px; color: #555; margin-top: 10px; display: block;">Foto do Lanche (Opcional):</label>
+            <input type="file" id="novo-file-imagem" accept="image/*" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px; margin-top: 5px; cursor: pointer;">
+            <input type="hidden" id="novo-imagem">
+            
             <div class="modal-botoes">
                 <button class="btn-cancelar" onclick="fecharModalAdmin()">Cancelar</button>
                 <button class="btn-novo" onclick="salvarNovoProduto()">Salvar Produto</button>

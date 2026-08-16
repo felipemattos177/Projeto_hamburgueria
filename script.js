@@ -141,7 +141,7 @@ async function abrirModalProduto(id) {
                             <div style="display: flex; align-items: center; gap: 12px;">
                                 <button type="button" onclick="alterarQtdAdicional('${add.id}', -1)" style="width: 32px; height: 32px; border-radius: 6px; background: #444; color: white; border: none; font-weight: bold; cursor: pointer; font-size: 18px;">-</button>
                                 <span class="qtd-adicional-span" id="qtd-add-${add.id}" data-id="${add.id}" data-nome="${add.nome}" data-preco="${add.preco_adicional}" data-estoquereal="${estoqueRealDisponivel}" style="font-weight: bold; color: #fff; width: 15px; text-align: center; font-size: 16px;">0</span>
-                                <button type="button" onclick="alterarQtdAdicional('${add.id}', 1)" style="width: 32px; height: 32px; border-radius: 6px; background: var(--laranja-fogo); color: white; border: none; font-weight: bold; cursor: pointer; font-size: 18px;">+</button>
+                                <button type="button" onclick="alterarQtdAdicional('${add.id}', 1)" style="width: 32px; height: 32px; border-radius: 6px; background: var(--laranja-fogo, #ff5e00); color: white; border: none; font-weight: bold; cursor: pointer; font-size: 18px;">+</button>
                             </div>
                         </div>
                     `;
@@ -167,7 +167,7 @@ async function abrirModalProduto(id) {
             <div class="produto-imagem" style="background-image: url('${produtoSendoVisto.imagem}'); height: 200px; background-size: cover; background-position: center; border-radius: 10px; margin-bottom: 15px; width: 100%;"></div>
             <h2 style="color: #fff; font-size: 22px;">${produtoSendoVisto.nome}</h2>
             <p style="color: #aaa; font-size: 14px; margin-bottom: 10px;">${produtoSendoVisto.descricao}</p>
-            <h3 style="color: var(--laranja-fogo); font-size: 22px;">R$ ${produtoSendoVisto.preco.toFixed(2).replace('.', ',')}</h3>
+            <h3 style="color: var(--laranja-fogo, #ff5e00); font-size: 22px;">R$ ${produtoSendoVisto.preco.toFixed(2).replace('.', ',')}</h3>
             
             ${htmlAdicionais}
             
@@ -176,7 +176,7 @@ async function abrirModalProduto(id) {
                 <div style="display: flex; align-items: center; gap: 15px;">
                     <button type="button" onclick="alterarQtdBase(-1)" style="width: 40px; height: 40px; border-radius: 8px; background: #444; color: white; border: none; font-weight: bold; cursor: pointer; font-size: 20px;">-</button>
                     <span id="qtd-produto-base" style="font-weight: bold; color: #fff; font-size: 18px;">1</span>
-                    <button type="button" onclick="alterarQtdBase(1)" style="width: 40px; height: 40px; border-radius: 8px; background: var(--laranja-fogo); color: white; border: none; font-weight: bold; cursor: pointer; font-size: 20px;">+</button>
+                    <button type="button" onclick="alterarQtdBase(1)" style="width: 40px; height: 40px; border-radius: 8px; background: var(--laranja-fogo, #ff5e00); color: white; border: none; font-weight: bold; cursor: pointer; font-size: 20px;">+</button>
                 </div>
             </div>
 
@@ -254,17 +254,23 @@ function confirmarAdicao() {
     fecharModal();
 }
 
-// === 5. LÓGICA DO CARRINHO E CHECKOUT ===
+// === 5. LÓGICA DO CARRINHO E CHECKOUT (CORRIGIDA) ===
 function atualizarContadorCart() {
     const qtdItens = carrinho.length;
     const barraSacola = document.getElementById("barra-sacola");
+    const telaCheckout = document.getElementById("tela-checkout");
     
-    if (qtdItens > 0) {
+    // Descobre se a pessoa está agora mesmo na tela do Checkout
+    const estaNoCheckout = telaCheckout && !telaCheckout.classList.contains("escondido");
+    
+    // Só mostra a barra flutuante se tiver itens E se a pessoa NÃO estiver no checkout
+    if (qtdItens > 0 && !estaNoCheckout) {
         barraSacola.classList.remove("escondido");
         document.getElementById("contador-sacola").innerText = qtdItens;
         const somaTotal = carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0);
         document.getElementById("total-sacola").innerText = `R$ ${somaTotal.toFixed(2).replace('.', ',')}`;
     } else {
+        // Se ela entrou no checkout, esconde a barra pra não atrapalhar
         barraSacola.classList.add("escondido");
     }
 }
@@ -301,7 +307,7 @@ function renderizarCheckout() {
                 <div>
                     <strong>1x ${item.produtoBase.nome} <span style="color: #aaa; font-size: 13px;">(R$ ${item.produtoBase.preco.toFixed(2).replace('.', ',')})</span></strong>
                     ${listaAddsHtml}
-                    <div style="color: var(--laranja-fogo); margin-top: 5px; font-weight: bold; font-size: 15px;">
+                    <div style="color: var(--laranja-fogo, #ff5e00); margin-top: 5px; font-weight: bold; font-size: 15px;">
                         Subtotal: R$ ${item.precoTotalItem.toFixed(2).replace('.', ',')}
                     </div>
                 </div>
@@ -309,6 +315,13 @@ function renderizarCheckout() {
             </div>
         `;
     });
+
+    // MÁGICA AQUI: Adiciona o botão de voltar ao cardápio no fim da lista
+    divItens.innerHTML += `
+        <button onclick="navegarPara('inicio')" style="width: 100%; background: transparent; color: var(--laranja-fogo, #ff5e00); border: 2px dashed var(--laranja-fogo, #ff5e00); padding: 15px; border-radius: 8px; font-weight: bold; font-size: 16px; margin-top: 10px; cursor: pointer; transition: 0.3s;">
+            <i class="fa-solid fa-plus"></i> Adicionar mais lanches
+        </button>
+    `;
 
     document.getElementById("valor-total").innerText = `R$ ${somaTotal.toFixed(2).replace('.', ',')}`;
     verificarTroco(); 
@@ -455,7 +468,7 @@ async function enviarParaWhatsApp() {
     }
 }
 
-// === 7 a 14: FUNÇÕES SECUNDÁRIAS MANTIDAS INTACTAS ===
+// === 7 a 14: SECUNDÁRIAS MANTIDAS E RODAPÉ DE VOLTA ===
 function fecharModal() { document.getElementById("modal-produto").classList.add("escondido"); document.body.classList.remove("modal-aberto"); }
 window.addEventListener('click', function(event) { const modal = document.getElementById("modal-produto"); if (event.target === modal) { fecharModal(); }});
 
@@ -480,6 +493,9 @@ function navegarPara(aba) {
         const b = document.getElementById("btn-nav-pedidos"); if(b) b.classList.add("ativo"); 
         window.scrollTo(0, 0); 
     }
+
+    // Garante que a barra some se fomos pro checkout, ou volta se voltamos pro cardápio
+    atualizarContadorCart();
 }
 
 function salvarPerfil() {
@@ -504,6 +520,32 @@ function gerarPixCopiaECola(valorPix) {
     return payload + result.toString(16).toUpperCase().padStart(4, '0'); 
 }
 
+// === RENDERIZAR O RODAPÉ AUTOMÁTICO (RECUPERADO) ===
+async function renderizarRodape() {
+    const dataAtual = new Date(); const ano = dataAtual.getFullYear(); 
+    const footer = document.createElement("footer"); 
+    footer.style.cssText = "text-align: center; padding: 30px 15px; background: transparent; color: #777; font-size: 13px; margin-top: 40px; width: 100%; padding-bottom: 100px;"; 
+    footer.innerHTML = `
+        <div style="margin-bottom: 8px;">&copy; ${ano} Vilela Burgers. Identidade e conteúdo reservados.</div>
+        <div style="margin-bottom: 8px;">Tecnologia por <a href="https://mathshub.com.br" target="_blank" style="color: var(--laranja-fogo, #ff5e00); text-decoration: none; font-weight: bold;">Maths Labs</a> 🚀</div>
+        <div id="versao-app" style="font-size: 11px; color: #555; margin-top: 10px;">Sincronizando versão...</div>
+    `;
+    document.body.appendChild(footer);
+    
+    try {
+        const resposta = await fetch(`https://api.github.com/repos/felipemattos177/Projeto_hamburgueria/commits/main`);
+        const dados = await resposta.json(); const hashAtualizacao = dados.sha.substring(0, 7);
+        const dataCommit = new Date(dados.commit.author.date); 
+        const dia = String(dataCommit.getDate()).padStart(2, '0'); 
+        const mes = String(dataCommit.getMonth() + 1).padStart(2, '0'); 
+        const hora = String(dataCommit.getHours()).padStart(2, '0'); 
+        const minuto = String(dataCommit.getMinutes()).padStart(2, '0');
+        document.getElementById("versao-app").innerText = `Versão: ${hashAtualizacao} (${dia}/${mes} às ${hora}:${minuto})`;
+    } catch (erro) { 
+        document.getElementById("versao-app").innerText = `Versão do Sistema v1.${ano}`; 
+    }
+}
+
 // === 15. CARREGAR CONFIGURAÇÕES DO COFRE ===
 async function carregarConfiguracoes() {
     try {
@@ -524,7 +566,7 @@ async function carregarConfiguracoes() {
     }
 }
 
-// === 16. O NOVO RELÓGIO INTELIGENTE (COM CÁLCULO DE DIAS) ===
+// === 16. O RELÓGIO INTELIGENTE ===
 function verificarHorarioLoja() {
     const agora = new Date();
     const diaSemanaAtual = agora.getDay(); 
@@ -538,7 +580,6 @@ function verificarHorarioLoja() {
     const tempoAbreMinutos = hAbre * 60 + mAbre;
     const tempoFechaMinutos = hFecha * 60 + mFecha;
     
-    // Verifica se a loja vara a madrugada (ex: fecha às 02h)
     const viraNoite = tempoFechaMinutos < tempoAbreMinutos;
 
     let noDiaCerto = false;
@@ -569,12 +610,11 @@ function verificarHorarioLoja() {
         let diasPraFrente = 0;
         let diaEncontrado = -1;
 
-        // O sistema simula até 7 dias pra frente procurando quando é o próximo dia de abrir
         for (let i = 0; i <= 7; i++) {
             let diaAlvo = (diaSemanaAtual + i) % 7;
             
             if (diasAbertosArray.includes(diaAlvo)) {
-                if (i === 0) { // Se for hoje, ele checa se ainda dá tempo de abrir hoje
+                if (i === 0) { 
                     if (viraNoite) {
                         if (horaAtualMinutos < tempoAbreMinutos && horaAtualMinutos > tempoFechaMinutos) {
                             diasPraFrente = i; diaEncontrado = diaAlvo; break;
@@ -590,10 +630,9 @@ function verificarHorarioLoja() {
             }
         }
 
-        // Transforma o número de dias em um texto amigável
         let txtDia = "";
         if (diaEncontrado === -1) {
-            txtDia = "em breve"; // Trava de segurança (caso o dono apague todos os dias)
+            txtDia = "em breve"; 
         } else if (diasPraFrente === 0) {
             txtDia = "hoje";
         } else if (diasPraFrente === 1) {
@@ -609,7 +648,6 @@ function verificarHorarioLoja() {
             bannerHtml.style.display = "block";
         }
         
-        // Esconde o botão de compra se o modal estiver aberto na hora que der o horário de fechar
         const detalhes = document.getElementById("detalhes-produto-modal");
         if (detalhes && !detalhes.innerHTML.includes("Loja Fechada no Momento") && produtoSendoVisto) {
              abrirModalProduto(produtoSendoVisto.id);
@@ -621,4 +659,5 @@ function verificarHorarioLoja() {
 
 // === INICIALIZAÇÃO DO SISTEMA ===
 carregarConfiguracoes(); 
-carregarCardapioDoBanco();
+carregarCardapioDoBanco(); 
+renderizarRodape();

@@ -4,8 +4,9 @@
 const SUPABASE_URL = "https://tjievzloufqptabbvumz.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqaWV2emxvdWZxcHRhYmJ2dW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY3NTY1NjIsImV4cCI6MjEwMjMzMjU2Mn0.HAIHej243RMeLMBueFjcN0-99y41BEbb3v4PgCj1Vs4";
 
-let produtoAtualParaReceita = null;
-let listaDeIngredientesGlobal = [];
+let listaDeIngredientesGlobal = []; // Essa já existe
+let listaDeProdutosGlobal = []; // GUARDA OS LANCHES PARA A EDIÇÃO
+let produtoEdicaoId = null; // CONTROLA SE ESTAMOS CRIANDO (null) OU EDITANDO (id);
 
 // ==========================================
 // MÓDULO 0: NAVEGAÇÃO DE ABAS ADMIN
@@ -31,6 +32,7 @@ async function carregarProdutos() {
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
         });
         const dados = await resposta.json();
+        listaDeProdutosGlobal = dados; // Salva na memória para podermos editar depois
         renderizarTabelaProdutos(dados);
     } catch (erro) { console.error(erro); }
 }
@@ -56,7 +58,13 @@ function renderizarTabelaProdutos(produtos) {
                         ${botaoTexto}
                     </button>
                     <button class="btn-acao btn-receita" onclick="abrirModalReceita(${produto.id}, '${produto.nome}')">
-                        📋 Ficha Técnica
+                        📋 Ficha
+                    </button>
+                    <button class="btn-acao" style="background-color: #3498db; color: white; margin-left: 5px;" onclick="editarProduto(${produto.id})">
+                        ✏️ Editar
+                    </button>
+                    <button class="btn-acao btn-excluir" style="margin-left: 5px;" onclick="excluirProduto(${produto.id})">
+                        🗑️ Excluir
                     </button>
                 </td>
             </tr>
@@ -73,12 +81,118 @@ async function mudarStatusProduto(id, novoStatus) {
     carregarProdutos();
 }
 
-function abrirModalAdmin() { document.getElementById("modal-novo-produto").style.display = "flex"; }
+// === ABRIR MODAL VAZIO (NOVO PRODUTO) ===
+function abrirModalAdmin() { 
+    produtoEdicaoId = null; // Avisa o sistema que é um cadastro novo
+    document.querySelector("#modal-novo-produto h2").innerText = "Cadastrar Lanche";
+    document.getElementById("novo-nome").value = "";
+    document.getElementById("novo-descricao").value = "";
+    document.getElementById("novo-preco").value = "";
+    document.getElementById("novo-categoria").value = "Artesanal";
+    document.getElementById("novo-imagem").value = "";
+    document.getElementById("modal-novo-produto").style.display = "flex"; 
+}
+
 function fecharModalAdmin() { document.getElementById("modal-novo-produto").style.display = "none"; }
 
+// === ABRIR MODAL PREENCHIDO (EDITAR PRODUTO) ===
+function editarProduto(id) {
+    const produto = listaDeProdutosGlobal.find(p => p.id === id);
+    if(!produto) return;
+
+    produtoEdicaoId = id; // Avisa o sistema que estamos EDITANDO este ID
+    document.querySelector("#modal-novo-produto h2").innerText = "✏️ Editar Lanche";
+    
+    // Preenche os campos com os dados do banco
+    document.getElementById("novo-nome").value = produto.nome || "";
+    document.getElementById("novo-descricao").value = produto.descricao || "";
+    document.getElementById("novo-preco").value = produto.preco || "";
+    document.getElementById("novo-categoria").value = produto.categoria || "Artesanal";
+    document.getElementById("novo-imagem").value = produto.imagem || "";
+
+    document.getElementById("modal-novo-produto").style.display = "flex";
+}
+
+// === SALVAR (CRIA OU ATUALIZA) ===
+async function salvarNovoProduto() {
+    const nome = document.getElementById("novo-nome").value;
+    const descricao = document.getElementById("novo-descricao").value;
+    const preco = parseFloat(document.getElementById("novo-preco").value);
+    const categoria = document.getElementById("novo-categoria").value;
+    const imagem = document.getElementById("novo-imagem").value;
+
+    if(!nome || isNaN(preco)) {
+        alert("Preencha ao menos o Nome e um Preço válido!");
+        return;
+    }
+
+    const payload = { nome, descricao, preco, categoria, imagem };
+    
+    let url = `${SUPABASE_URL}/rest/v1/produtos`;
+    let metodo = 'POST'; // POST = Inserir Novo
+
+    // Se a variável não estiver vazia, significa que estamos EDITANDO!
+    if (produtoEdicaoId !== null) {
+        url = `${url}?id=eq.${produtoEdicaoId}`;
+        metodo = 'PATCH'; // PATCH = Atualizar Existente
+    }
+
+    try {
+        const res = await fetch(url, {
+            method: metodo,
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if(!res.ok) throw new Error("Erro do Supabase ao salvar.");
+        
+        fecharModalAdmin();
+        carregarProdutos(); // Recarrega a tabela para mostrar as mudanças
+    } catch(erro) {
+        alert("Erro ao salvar produto. Verifique o console.");
+        console.error(erro);
+    }
+}
+
+// === EXCLUIR PRODUTO (COM PROTEÇÃO DE DADOS) ===
+async function excluirProduto(id) {
+    if(!confirm("⚠️ Tem certeza que deseja excluir este produto do cardápio?")) return;
+    
+    try {
+        // Passo 1: Excluir a receita amarrada ao lanche primeiro (para não dar erro de Chave Estrangeira)
+        await fetch(`${SUPABASE_URL}/rest/v1/receita_produto?produto_id=eq.${id}`, {
+            method: 'DELETE',
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+        });
+
+        // Passo 2: Deletar o Produto
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/produtos?id=eq.${id}`, {
+            method: 'DELETE',
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+        });
+
+        if(!res.ok) {
+            const erroDb = await res.json();
+            // Trava de segurança crucial para sistemas estruturados:
+            if(erroDb.code === "23503") {
+                alert("❌ ERRO: Este lanche já possui um histórico de vendas (está amarrado a pedidos antigos). Para não corromper o banco de dados, você não pode excluí-lo. O correto é apenas clicar em PAUSAR.");
+                return;
+            }
+            throw new Error(erroDb.message);
+        }
+        
+        carregarProdutos();
+    } catch(erro) {
+        alert("Erro ao tentar excluir produto.");
+        console.error(erro);
+    }
+}
+
 // ==========================================
-// MÓDULO 2: CONTROLE DE ESTOQUE
+// MÓDULO 2: CONTROLE DE ESTOQUE E INGREDIENTES
 // ==========================================
+let ingredienteEdicaoId = null; // Memória para saber se estamos editando um ingrediente
+
 async function carregarEstoque() {
     try {
         const resposta = await fetch(`${SUPABASE_URL}/rest/v1/ingredientes?select=*&order=id.asc`, {
@@ -100,12 +214,21 @@ function renderizarTabelaEstoque(ingredientes) {
         tbody.innerHTML += `
             <tr>
                 <td>#${ing.id}</td>
-                <td><strong>${ing.nome}</strong></td>
+                <td>
+                    <strong>${ing.nome}</strong><br>
+                    <small style="color:#aaa;">Extra: R$ ${Number(ing.preco_adicional).toFixed(2).replace('.', ',')}</small>
+                </td>
                 <td>${ing.unidade}</td>
                 <td class="${classeAlerta}">${ing.estoque}</td>
                 <td>
                     <button class="btn-acao btn-toggle" onclick="ajustarSaldo(${ing.id}, '${ing.nome}', ${ing.estoque})">
-                        Atualizar Saldo
+                        🔄 Saldo
+                    </button>
+                    <button class="btn-acao" style="background-color: #3498db; color: white; margin-left: 5px;" onclick="editarIngrediente(${ing.id})">
+                        ✏️ Editar
+                    </button>
+                    <button class="btn-acao btn-excluir" style="margin-left: 5px;" onclick="excluirIngrediente(${ing.id})">
+                        🗑️ Excluir
                     </button>
                 </td>
             </tr>
@@ -113,6 +236,7 @@ function renderizarTabelaEstoque(ingredientes) {
     });
 }
 
+// === SALDO RÁPIDO (MANTIDO DO ORIGINAL) ===
 async function ajustarSaldo(id, nome, saldoAtual) {
     const novoValorTexto = prompt(`Atualizar saldo de: ${nome}\nSaldo atual: ${saldoAtual}\n\nDigite o NOVO SALDO TOTAL:`, saldoAtual);
     if (novoValorTexto === null || novoValorTexto === "") return;
@@ -126,6 +250,99 @@ async function ajustarSaldo(id, nome, saldoAtual) {
     } catch (erro) { console.error(erro); }
 }
 
+// === ABRIR MODAL VAZIO (NOVO INGREDIENTE) ===
+function abrirModalIngrediente() {
+    ingredienteEdicaoId = null;
+    document.getElementById("titulo-modal-ingrediente").innerText = "Cadastrar Matéria-Prima";
+    document.getElementById("ingred-nome").value = "";
+    document.getElementById("ingred-unidade").value = "unidade";
+    document.getElementById("ingred-estoque").value = "";
+    document.getElementById("ingred-preco-add").value = "0.00";
+    document.getElementById("modal-novo-ingrediente").style.display = "flex";
+}
+
+function fecharModalIngrediente() {
+    document.getElementById("modal-novo-ingrediente").style.display = "none";
+}
+
+// === ABRIR MODAL PREENCHIDO (EDITAR INGREDIENTE) ===
+function editarIngrediente(id) {
+    const ingrediente = listaDeIngredientesGlobal.find(i => i.id === id);
+    if(!ingrediente) return;
+
+    ingredienteEdicaoId = id;
+    document.getElementById("titulo-modal-ingrediente").innerText = "✏️ Editar Matéria-Prima";
+    document.getElementById("ingred-nome").value = ingrediente.nome || "";
+    document.getElementById("ingred-unidade").value = ingrediente.unidade || "unidade";
+    document.getElementById("ingred-estoque").value = ingrediente.estoque || 0;
+    document.getElementById("ingred-preco-add").value = ingrediente.preco_adicional || 0;
+
+    document.getElementById("modal-novo-ingrediente").style.display = "flex";
+}
+
+// === SALVAR (CRIA OU ATUALIZA) ===
+async function salvarNovoIngrediente() {
+    const nome = document.getElementById("ingred-nome").value;
+    const unidade = document.getElementById("ingred-unidade").value;
+    const estoque = parseFloat(document.getElementById("ingred-estoque").value);
+    const preco_adicional = parseFloat(document.getElementById("ingred-preco-add").value);
+
+    if(!nome || isNaN(estoque)) {
+        alert("Preencha o Nome e o Estoque Inicial!");
+        return;
+    }
+
+    const payload = { nome, unidade, estoque, preco_adicional };
+    let url = `${SUPABASE_URL}/rest/v1/ingredientes`;
+    let metodo = 'POST';
+
+    if (ingredienteEdicaoId !== null) {
+        url = `${url}?id=eq.${ingredienteEdicaoId}`;
+        metodo = 'PATCH';
+    }
+
+    try {
+        const res = await fetch(url, {
+            method: metodo,
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if(!res.ok) throw new Error("Erro do Supabase ao salvar ingrediente.");
+        
+        fecharModalIngrediente();
+        carregarEstoque(); 
+    } catch(erro) {
+        alert("Erro ao salvar matéria-prima. Verifique o console.");
+        console.error(erro);
+    }
+}
+
+// === EXCLUIR INGREDIENTE (COM PROTEÇÃO) ===
+async function excluirIngrediente(id) {
+    if(!confirm("⚠️ Tem certeza que deseja excluir esta matéria-prima?")) return;
+    
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/ingredientes?id=eq.${id}`, {
+            method: 'DELETE',
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+        });
+
+        if(!res.ok) {
+            const erroDb = await res.json();
+            if(erroDb.code === "23503") {
+                alert("❌ ERRO: Este ingrediente está sendo usado na Ficha Técnica de algum lanche ou em um pedido antigo! Remova ele das receitas antes de tentar excluir, ou apenas zere o estoque usando o botão Saldo.");
+                return;
+            }
+            throw new Error(erroDb.message);
+        }
+        
+        carregarEstoque();
+    } catch(erro) {
+        alert("Erro ao tentar excluir matéria-prima.");
+        console.error(erro);
+    }
+}
 // ==========================================
 // MÓDULO 3: GESTÃO DE FICHAS TÉCNICAS
 // ==========================================
@@ -449,3 +666,9 @@ carregarConfiguracoesAdmin(); // Carrega os dados da loja ao abrir o painel
 
 // Atualiza o painel de pedidos silenciosamente a cada 3 segundos
 setInterval(carregarPedidosAdmin, 3000);
+
+// Atualiza o cardápio e o estoque a cada 15 segundos (Atualização Real-Time)
+setInterval(() => {
+    carregarProdutos();
+    carregarEstoque();
+}, 5000);

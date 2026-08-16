@@ -5,6 +5,7 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 let cardapio = [];
 let carrinho = [];
 let produtoSendoVisto = null;
+let receitasGlobais = []; // Guarda a receita em memória para cálculos em milissegundos
 
 // === COFRE DE CONFIGURAÇÕES E ESTADO DA LOJA ===
 let configLoja = { 
@@ -118,9 +119,9 @@ async function abrirModalProduto(id) {
             method: 'GET',
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
         });
-        const receitasAtualizadas = await resRec.json();
+        receitasGlobais = await resRec.json(); // Salva globalmente para checagem rápida depois
 
-        const receitaDesteLanche = receitasAtualizadas.filter(r => r.produto_id == produtoSendoVisto.id);
+        const receitaDesteLanche = receitasGlobais.filter(r => r.produto_id == produtoSendoVisto.id);
 
         let htmlAdicionais = "";
         
@@ -131,7 +132,7 @@ async function abrirModalProduto(id) {
             adicionaisDoBanco.forEach(add => {
                 let qtdPresaNoCarrinho = 0;
                 carrinho.forEach(itemCart => {
-                    const recCart = receitasAtualizadas.filter(r => r.produto_id == itemCart.produtoBase.id);
+                    const recCart = receitasGlobais.filter(r => r.produto_id == itemCart.produtoBase.id);
                     const usoReceita = recCart.find(r => r.ingrediente_id == add.id);
                     if (usoReceita) qtdPresaNoCarrinho += Number(usoReceita.quantidade);
 
@@ -146,6 +147,7 @@ async function abrirModalProduto(id) {
 
                 const estoqueRealDisponivel = Number(add.estoque) - qtdPresaNoCarrinho - qtdGastaNesteLanche;
                 
+                // SE NÃO TEM ESTOQUE LIVRE, ELE NEM APARECE NA LISTA (Ocultação automática)
                 if(estoqueRealDisponivel > 0) {
                     htmlAdicionais += `
                         <div class="adicional-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 12px; background: #222; border-radius: 8px; border: 1px solid #333;">
@@ -153,7 +155,7 @@ async function abrirModalProduto(id) {
                             
                             <div style="display: flex; align-items: center; gap: 12px;">
                                 <button type="button" onclick="alterarQtdAdicional('${add.id}', -1)" style="width: 32px; height: 32px; border-radius: 6px; background: #444; color: white; border: none; font-weight: bold; cursor: pointer; font-size: 18px;">-</button>
-                                <span class="qtd-adicional-span" id="qtd-add-${add.id}" data-id="${add.id}" data-nome="${add.nome}" data-preco="${add.preco_adicional}" data-estoquereal="${estoqueRealDisponivel}" style="font-weight: bold; color: #fff; width: 15px; text-align: center; font-size: 16px;">0</span>
+                                <span class="qtd-adicional-span" id="qtd-add-${add.id}" data-id="${add.id}" data-nome="${add.nome}" data-preco="${add.preco_adicional}" style="font-weight: bold; color: #fff; width: 15px; text-align: center; font-size: 16px;">0</span>
                                 <button type="button" onclick="alterarQtdAdicional('${add.id}', 1)" style="width: 32px; height: 32px; border-radius: 6px; background: var(--laranja-fogo, #ff5e00); color: white; border: none; font-weight: bold; cursor: pointer; font-size: 18px;">+</button>
                             </div>
                         </div>
@@ -201,44 +203,118 @@ async function abrirModalProduto(id) {
     }
 }
 
-function alterarQtdBase(delta) {
+// === VERIFICAÇÃO EM TEMPO REAL AO ADICIONAR LANCHE BASE ===
+async function alterarQtdBase(delta) {
     if(!lojaAberta) return;
     const span = document.getElementById("qtd-produto-base");
-    let qtd = parseInt(span.innerText) + delta;
-    if (qtd < 1) qtd = 1; 
+    let qtdAtual = parseInt(span.innerText);
 
-    // NOVO: Trava que não deixa passar do estoque máximo logo no clique do botão +
-    const qtdJaNoCarrinho = carrinho.filter(item => item.produtoBase.id == produtoSendoVisto.id).length;
-    const limiteDisponivel = produtoSendoVisto.estoque_maximo - qtdJaNoCarrinho;
-    
-    if (qtd > limiteDisponivel) {
-        alert(`Limite atingido! Temos ingredientes para apenas mais ${limiteDisponivel} unidade(s) deste lanche.`);
+    if (delta < 0) {
+        if (qtdAtual > 1) span.innerText = qtdAtual - 1;
         return;
     }
 
-    span.innerText = qtd;
+    // Trava visual enquanto checa o banco de dados em milissegundos
+    const btn = span.nextElementSibling;
+    const textoBotaoOrig = btn.innerHTML;
+    btn.innerHTML = "...";
+    btn.disabled = true;
+
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/cardapio_inteligente?select=estoque_maximo,tem_estoque&id=eq.${produtoSendoVisto.id}`, {
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+        });
+        const dados = await res.json();
+
+        if (dados && dados.length > 0) {
+            const estoqueMaxAtualizado = dados[0].estoque_maximo;
+            const temEstoqueAtualizado = dados[0].tem_estoque;
+
+            const qtdJaNoCarrinho = carrinho.filter(item => item.produtoBase.id == produtoSendoVisto.id).length;
+            const limiteDisponivel = estoqueMaxAtualizado - qtdJaNoCarrinho;
+
+            if (!temEstoqueAtualizado || qtdAtual + 1 > limiteDisponivel) {
+                alert(`⚠️ Limite atingido! Alguém acabou de comprar ou temos estoque para apenas mais ${limiteDisponivel > 0 ? limiteDisponivel : 0} unidade(s) deste lanche.`);
+            } else {
+                span.innerText = qtdAtual + 1;
+            }
+        }
+    } catch(e) {
+        console.error("Falha ao consultar estoque ao vivo:", e);
+    } finally {
+        btn.innerHTML = textoBotaoOrig;
+        btn.disabled = false;
+    }
 }
 
-function alterarQtdAdicional(id, delta) {
+// === VERIFICAÇÃO EM TEMPO REAL AO ADICIONAR INGREDIENTE EXTRA ===
+async function alterarQtdAdicional(id, delta) {
     if(!lojaAberta) return;
     const span = document.getElementById(`qtd-add-${id}`);
-    const estoqueReal = parseInt(span.getAttribute("data-estoquereal")); 
-    
-    let qtd = parseInt(span.innerText) + delta;
-    if (qtd < 0) qtd = 0;
-    if (qtd > estoqueReal) { qtd = estoqueReal; alert(`Limite! Temos apenas ${estoqueReal} disponível.`); }
-    span.innerText = qtd;
+    let qtdAtual = parseInt(span.innerText);
+
+    if (delta < 0) {
+        if (qtdAtual > 0) span.innerText = qtdAtual - 1;
+        return;
+    }
+
+    // Trava visual enquanto checa o banco de dados em milissegundos
+    const btn = span.nextElementSibling;
+    const textoBotaoOrig = btn.innerHTML;
+    btn.innerHTML = "...";
+    btn.disabled = true;
+
+    try {
+        const resIng = await fetch(`${SUPABASE_URL}/rest/v1/ingredientes?select=nome,estoque&id=eq.${id}`, {
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+        });
+        const dadosIng = await resIng.json();
+
+        if (dadosIng && dadosIng.length > 0) {
+            const estoqueLive = Number(dadosIng[0].estoque);
+            const nomeIngrediente = dadosIng[0].nome;
+
+            // Calcula o que já está comprometido no carrinho do cliente
+            let qtdPresaNoCarrinho = 0;
+            carrinho.forEach(itemCart => {
+                const recCart = receitasGlobais.filter(r => r.produto_id == itemCart.produtoBase.id);
+                const usoReceita = recCart.find(r => r.ingrediente_id == id);
+                if (usoReceita) qtdPresaNoCarrinho += Number(usoReceita.quantidade);
+
+                itemCart.adicionais.forEach(extra => {
+                    if (extra.id == id) qtdPresaNoCarrinho += Number(extra.quantidade);
+                });
+            });
+
+            // Calcula o gasto da receita base do lanche atual
+            let qtdGastaNesteLanche = 0;
+            const usoNeste = receitasGlobais.find(r => r.produto_id == produtoSendoVisto.id && r.ingrediente_id == id);
+            if (usoNeste) {
+                const spanQtdBase = document.getElementById("qtd-produto-base");
+                const qtdBase = spanQtdBase ? parseInt(spanQtdBase.innerText) : 1;
+                qtdGastaNesteLanche = Number(usoNeste.quantidade) * qtdBase;
+            }
+
+            // O Estoque Perfeito e Real:
+            const estoqueLivre = estoqueLive - qtdPresaNoCarrinho - qtdGastaNesteLanche;
+
+            if (qtdAtual + 1 > estoqueLivre) {
+                alert(`⚠️ Estoque indisponível! Outro pedido puxou o estoque ou temos apenas mais ${estoqueLivre > 0 ? estoqueLivre : 0} de ${nomeIngrediente} no momento.`);
+            } else {
+                span.innerText = qtdAtual + 1;
+            }
+        }
+    } catch (e) {
+        console.error("Falha ao consultar adicional ao vivo:", e);
+    } finally {
+        btn.innerHTML = textoBotaoOrig;
+        btn.disabled = false;
+    }
 }
 
 function confirmarAdicao() {
     const spanQtdBase = document.getElementById("qtd-produto-base");
     const qtdBaseEscolhida = spanQtdBase ? parseInt(spanQtdBase.innerText) : 1;
-
-    const qtdJaNoCarrinho = carrinho.filter(item => item.produtoBase.id == produtoSendoVisto.id).length;
-    if (qtdJaNoCarrinho + qtdBaseEscolhida > produtoSendoVisto.estoque_maximo) {
-        alert(`Estoque atingido! Podemos adicionar no máximo mais ${produtoSendoVisto.estoque_maximo - qtdJaNoCarrinho} unidade(s).`);
-        return; 
-    }
 
     const adicionaisEscolhidos = [];
     let totalAdicionais = 0;
@@ -247,13 +323,6 @@ function confirmarAdicao() {
     for (const span of spansQtd) {
         const qtdPorLanche = parseInt(span.innerText);
         if (qtdPorLanche > 0) { 
-            const estoqueReal = parseInt(span.getAttribute("data-estoquereal"));
-            const totalRequerido = qtdPorLanche * qtdBaseEscolhida; 
-
-            if (totalRequerido > estoqueReal) {
-                alert(`Estoque insuficiente de ${span.getAttribute("data-nome")}.`);
-                return; 
-            }
             const idAdd = span.getAttribute("data-id");
             const nomeAdd = span.getAttribute("data-nome");
             const precoAdd = parseFloat(span.getAttribute("data-preco"));
@@ -451,7 +520,6 @@ async function enviarParaWhatsApp() {
         const telefoneCliente = perfilSalvo.telefone ? String(perfilSalvo.telefone).replace(/\D/g, '') : "";
         const clienteId = obterOuCriarClienteId();
 
-        // 1. SALVA NO SUPABASE (MANDANDO O CARRINHO COMPLETO)
         const dadosPedidoCompleto = {
             p_nome_cliente: nome,
             p_forma_pagamento: pagamento,
@@ -473,11 +541,11 @@ async function enviarParaWhatsApp() {
             body: JSON.stringify(dadosPedidoCompleto)
         });
 
+        // O SEGUNDO ESCUDO (Garante que nada fure o estoque se o milissegundo não for suficiente)
         if (!resSupabase.ok) {
             const erroDB = await resSupabase.json();
             console.error("Erro no Supabase:", erroDB);
             
-            // NOVO: Lê a trava do banco de dados e avisa o usuário sem quebrar a tela
             if (erroDB.code === "23514" || (erroDB.message && erroDB.message.includes("trava_estoque_positivo"))) {
                 let itemFalho = "algum ingrediente";
                 if (erroDB.details) {
@@ -490,10 +558,10 @@ async function enviarParaWhatsApp() {
             }
             
             if (btnFinalizar) { btnFinalizar.innerText = textoOriginalBotao; btnFinalizar.disabled = false; }
-            return; // PARA A EXECUÇÃO AQUI! O pedido não vai pro WhatsApp e a venda não fura o estoque.
+            return; 
         }
 
-        // 2. MONTAGEM DA MENSAGEM DO WHATSAPP
+        // MONTAGEM DA MENSAGEM DO WHATSAPP
         let textoPedido = `🔥 *NOVO PEDIDO - VILELA BURGERS* 🔥\n\n`;
         textoPedido += `👤 *Cliente:* ${nome}\n📍 *Endereço:* ${enderecoFormatado}\n`;
         

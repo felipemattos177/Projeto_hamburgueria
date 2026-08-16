@@ -77,7 +77,7 @@ function fecharAviso() {
     }
 }
 
-// === FUNÇÃO MÁGICA ANTI-CACHE CORRIGIDA (AGORA ACEITA GET E POST) ===
+// === FUNÇÃO MÁGICA ANTI-CACHE ===
 async function fetchSupabase(endpoint, options = {}) {
     const configuracao = {
         ...options,
@@ -87,7 +87,7 @@ async function fetchSupabase(endpoint, options = {}) {
             'Authorization': `Bearer ${SUPABASE_KEY}`,
             'Cache-Control': 'no-cache, no-store, must-revalidate',
             'Pragma': 'no-cache',
-            ...(options.headers || {}) // Se tiver Content-Type (no caso do POST), ele mescla aqui
+            ...(options.headers || {}) 
         },
         cache: 'no-store' 
     };
@@ -104,6 +104,25 @@ function obterOuCriarClienteId() {
         localStorage.setItem("vilelaburgers_cliente_id", id);
     }
     return id;
+}
+
+// === NOVO: CALCULADORA UNIVERSAL DE CONSUMO (BASE + EXTRAS EM GRAMAS OU UNIDADES) ===
+function calcularUsoIngredienteNoCarrinho(ingredienteId) {
+    let usoTotal = 0;
+    carrinho.forEach(itemCart => {
+        // Consumo do lanche base
+        const recCart = receitasGlobais.filter(r => r.produto_id == itemCart.produtoBase.id);
+        const usoRec = recCart.find(r => r.ingrediente_id == ingredienteId);
+        if (usoRec) usoTotal += Number(usoRec.quantidade);
+        
+        // Consumo real (em gramas/unidades) dos extras
+        itemCart.adicionais.forEach(extra => {
+            if (extra.id == ingredienteId) {
+                usoTotal += Number(extra.consumo_real || extra.quantidade); 
+            }
+        });
+    });
+    return usoTotal;
 }
 
 // === 2. EXTRAÇÃO DE DADOS AO VIVO ===
@@ -129,7 +148,6 @@ async function carregarCardapioDoBanco() {
         receitasGlobais = await resRec.json();
 
         renderizarCardapio();
-
     } catch (erro) {
         console.error("Falha na extração dos dados:", erro);
     }
@@ -151,7 +169,6 @@ function renderizarCardapio(categoriaFiltro = "Todos") {
             const eventoClique = isEsgotado ? "" : `onclick="abrirModalProduto(${produto.id})"`;
             const badgeEsgotado = isEsgotado ? `<div class="selo-esgotado">Esgotado</div>` : "";
 
-            // TRATATIVA DO ERRO 404 DE IMAGEM NULL 
             const imgSegura = (produto.imagem && produto.imagem !== "null") ? `background-image: url('${produto.imagem}');` : `background-color: #2a2a2a;`;
 
             htmlAcumulado += `
@@ -203,18 +220,11 @@ async function abrirModalProduto(id) {
         let podeMontarBase = true;
         let ingredienteFaltanteBase = "";
 
+        // 1. DÁ PRA MONTAR O LANCHE BASE?
         for (let itemRec of receitaDesteLanche) {
             const ingDb = todosIngredientes.find(i => i.id == itemRec.ingrediente_id);
             if (ingDb) {
-                let presa = 0;
-                carrinho.forEach(cartItem => {
-                   const rc = receitasGlobais.filter(r => r.produto_id == cartItem.produtoBase.id);
-                   const u = rc.find(r => r.ingrediente_id == ingDb.id);
-                   if (u) presa += Number(u.quantidade);
-                   cartItem.adicionais.forEach(ex => {
-                       if (ex.id == ingDb.id) presa += Number(ex.quantidade);
-                   });
-                });
+                const presa = calcularUsoIngredienteNoCarrinho(ingDb.id);
                 const livre = Number(ingDb.estoque) - presa;
                 if (Number(itemRec.quantidade) > livre) {
                     podeMontarBase = false;
@@ -224,30 +234,29 @@ async function abrirModalProduto(id) {
             }
         }
 
+        // 2. MONTAGEM DOS ADICIONAIS
         let htmlAdicionais = "";
         if (podeMontarBase && adicionaisDoBanco.length > 0 && produtoSendoVisto.categoria !== "Bebidas" && lojaAberta) {
             htmlAdicionais += `<div class="adicionais-lista" style="margin-top:15px; border-top: 1px solid #333; padding-top: 15px;">
                 <h4 style="margin-bottom: 10px; color: #fff;">Turbine seu lanche:</h4>`;
             
             adicionaisDoBanco.forEach(add => {
-                let qtdPresaNoCarrinho = 0;
-                carrinho.forEach(itemCart => {
-                    const recCart = receitasGlobais.filter(r => r.produto_id == itemCart.produtoBase.id);
-                    const usoReceita = recCart.find(r => r.ingrediente_id == add.id);
-                    if (usoReceita) qtdPresaNoCarrinho += Number(usoReceita.quantidade);
-
-                    itemCart.adicionais.forEach(extra => {
-                        if (extra.id == add.id) qtdPresaNoCarrinho += Number(extra.quantidade);
-                    });
-                });
+                const qtdPresaNoCarrinho = calcularUsoIngredienteNoCarrinho(add.id);
                 
-                let qtdGastaNesteLanche = 0;
+                let consumoBaseDoIngrediente = 1;
+                let consumidoPelaBaseAtual = 0;
+                
+                // Se o extra faz parte da receita (ex: Bacon), sabemos exatamente o peso dele
                 const usoNeste = receitaDesteLanche.find(r => r.ingrediente_id == add.id);
-                if (usoNeste) qtdGastaNesteLanche = Number(usoNeste.quantidade);
+                if (usoNeste) {
+                    consumoBaseDoIngrediente = Number(usoNeste.quantidade);
+                    consumidoPelaBaseAtual = Number(usoNeste.quantidade);
+                }
 
-                const estoqueRealDisponivel = Number(add.estoque) - qtdPresaNoCarrinho - qtdGastaNesteLanche;
+                const estoqueRealDisponivel = Number(add.estoque) - qtdPresaNoCarrinho - consumidoPelaBaseAtual;
                 
-                if(estoqueRealDisponivel >= 1) { 
+                // Só mostra se der para servir pelo menos 1 porção real desse extra
+                if(estoqueRealDisponivel >= consumoBaseDoIngrediente) { 
                     htmlAdicionais += `
                         <div class="adicional-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 12px; background: #222; border-radius: 8px; border: 1px solid #333;">
                             <span style="color: #fff; font-weight: 500;">${add.nome} <br><small style="color: #aaa;">+ R$ ${Number(add.preco_adicional).toFixed(2).replace('.', ',')}</small></span>
@@ -335,34 +344,58 @@ async function alterarQtdBase(delta) {
         let temEstoqueSuficiente = true;
         let limitePossivel = Infinity;
 
+        // 1. Checa todos os ingredientes da BASE do lanche
         for (let itemReceita of receitaDesteLanche) {
             const ingDb = ingredientesLive.find(i => i.id == itemReceita.ingrediente_id);
             if (ingDb) {
                 const estoqueTotalDB = Number(ingDb.estoque);
+                const qtdPresa = calcularUsoIngredienteNoCarrinho(ingDb.id);
 
-                let qtdPresaNoCarrinho = 0;
-                carrinho.forEach(itemCart => {
-                    const recCart = receitasGlobais.filter(r => r.produto_id == itemCart.produtoBase.id);
-                    const usoRec = recCart.find(r => r.ingrediente_id == ingDb.id);
-                    if (usoRec) qtdPresaNoCarrinho += Number(usoRec.quantidade);
-                    itemCart.adicionais.forEach(extra => {
-                        if (extra.id == ingDb.id) qtdPresaNoCarrinho += Number(extra.quantidade);
-                    });
-                });
-
-                let extraNesteModal = 0;
+                let extraNesteModalCliques = 0; 
                 const spanAdicional = document.getElementById(`qtd-add-${ingDb.id}`);
-                if (spanAdicional) extraNesteModal = parseInt(spanAdicional.innerText);
+                if (spanAdicional) extraNesteModalCliques = parseInt(spanAdicional.innerText);
 
-                const consumoPorLanche = Number(itemReceita.quantidade) + extraNesteModal;
-                const estoqueLivre = estoqueTotalDB - qtdPresaNoCarrinho;
-                const consumoFuturo = consumoPorLanche * (qtdAtual + 1);
+                const consumoBaseIngrediente = Number(itemReceita.quantidade);
+                
+                // Ex: Se o lanche usa 500g, e o cara marcou +2 Extras, ele consome 500 + 1000 = 1500g POR lanche
+                const consumoTotalPorLanche = consumoBaseIngrediente + (extraNesteModalCliques * consumoBaseIngrediente);
 
-                if (consumoFuturo > estoqueLivre) {
+                const estoqueLivre = estoqueTotalDB - qtdPresa;
+                const consumoFuturoTotal = consumoTotalPorLanche * (qtdAtual + 1);
+
+                if (consumoFuturoTotal > estoqueLivre) {
                     temEstoqueSuficiente = false;
-                    const maxDesteIngrediente = Math.floor(estoqueLivre / consumoPorLanche);
+                    const maxDesteIngrediente = Math.floor(estoqueLivre / consumoTotalPorLanche);
                     if(maxDesteIngrediente < limitePossivel) {
                         limitePossivel = maxDesteIngrediente;
+                    }
+                }
+            }
+        }
+
+        // 2. Checa EXTRAS marcados que não fazem parte da receita base (Ex: Abacaxi num lanche normal)
+        const spansQtd = document.querySelectorAll(".qtd-adicional-span");
+        for (const spanAdd of spansQtd) {
+            const qtdCliques = parseInt(spanAdd.innerText);
+            if (qtdCliques > 0) {
+                const idAdd = spanAdd.getAttribute("data-id");
+                
+                if (!receitaDesteLanche.find(r => r.ingrediente_id == idAdd)) {
+                    const ingDb = ingredientesLive.find(i => i.id == idAdd);
+                    if(ingDb) {
+                        const estoqueLivre = Number(ingDb.estoque) - calcularUsoIngredienteNoCarrinho(idAdd);
+                        const consumoBaseIngrediente = 1; // Extra fora da receita conta como 1 unidade/grama
+                        const consumoTotalPorLanche = qtdCliques * consumoBaseIngrediente;
+                        
+                        const consumoFuturoTotal = consumoTotalPorLanche * (qtdAtual + 1);
+
+                        if (consumoFuturoTotal > estoqueLivre) {
+                            temEstoqueSuficiente = false;
+                            const maxDesteIngrediente = Math.floor(estoqueLivre / consumoTotalPorLanche);
+                            if(maxDesteIngrediente < limitePossivel) {
+                                limitePossivel = maxDesteIngrediente;
+                            }
+                        }
                     }
                 }
             }
@@ -405,31 +438,31 @@ async function alterarQtdAdicional(id, delta) {
         if (dadosIng && dadosIng.length > 0) {
             const estoqueLive = Number(dadosIng[0].estoque);
 
-            let qtdPresaNoCarrinho = 0;
-            carrinho.forEach(itemCart => {
-                const recCart = receitasGlobais.filter(r => r.produto_id == itemCart.produtoBase.id);
-                const usoReceita = recCart.find(r => r.ingrediente_id == id);
-                if (usoReceita) qtdPresaNoCarrinho += Number(usoReceita.quantidade);
-                itemCart.adicionais.forEach(extra => {
-                    if (extra.id == id) qtdPresaNoCarrinho += Number(extra.quantidade);
-                });
-            });
+            let consumoDaPorcaoExtra = 1;
+            let consumidoPelaBaseAtualUnitaria = 0;
+            const usoNeste = receitasGlobais.find(r => r.produto_id == produtoSendoVisto.id && r.ingrediente_id == id);
+            
+            // O Segredo: O peso do extra é o mesmo peso da receita!
+            if (usoNeste) {
+                consumoDaPorcaoExtra = Number(usoNeste.quantidade);
+                consumidoPelaBaseAtualUnitaria = Number(usoNeste.quantidade);
+            }
 
             const spanQtdBase = document.getElementById("qtd-produto-base");
             const qtdBase = spanQtdBase ? parseInt(spanQtdBase.innerText) : 1;
+            const qtdPresaCarrinho = calcularUsoIngredienteNoCarrinho(id);
 
-            let qtdGastaNesteLancheReceita = 0;
-            const usoNeste = receitasGlobais.find(r => r.produto_id == produtoSendoVisto.id && r.ingrediente_id == id);
-            if (usoNeste) qtdGastaNesteLancheReceita = Number(usoNeste.quantidade);
+            const consumoBaseNaTela = consumidoPelaBaseAtualUnitaria * qtdBase;
+            const estoqueLivreTotal = estoqueLive - qtdPresaCarrinho - consumoBaseNaTela;
+            
+            const consumoExtraJaSelecionado = qtdAtual * consumoDaPorcaoExtra * qtdBase;
+            const quantidadeParaAdicionarNesteClique = 1 * consumoDaPorcaoExtra * qtdBase; 
+            
+            const estoqueLivreParaClique = estoqueLivreTotal - consumoExtraJaSelecionado;
 
-            const estoqueLivreTotal = estoqueLive - qtdPresaNoCarrinho - (qtdGastaNesteLancheReceita * qtdBase);
-            const extraJaSelecionadoTotal = qtdAtual * qtdBase;
-            const quantidadeParaAdicionar = 1 * qtdBase; 
-            const estoqueLivreParaClique = estoqueLivreTotal - extraJaSelecionadoTotal;
-
-            if (quantidadeParaAdicionar > estoqueLivreParaClique) {
-                const porcoesDisponiveis = Math.floor(estoqueLivreTotal / qtdBase);
-                mostrarAviso(`Temos apenas ${porcoesDisponiveis} porção(ões) disponível(is) para adicionar aos seus lanches.`, "Limite Atingido!");
+            if (quantidadeParaAdicionarNesteClique > estoqueLivreParaClique) {
+                const porcoesDisponiveis = Math.floor(estoqueLivreTotal / (consumoDaPorcaoExtra * qtdBase));
+                mostrarAviso(`Temos apenas ${porcoesDisponiveis} porção(ões) de ${dadosIng[0].nome} disponível(is) para adicionar.`, "Limite Atingido!");
             } else {
                 span.innerText = qtdAtual + 1;
             }
@@ -442,7 +475,7 @@ async function alterarQtdAdicional(id, delta) {
     }
 }
 
-// === CONFIRMAÇÃO E ENVIO PRO CARRINHO ===
+// === CONFIRMAÇÃO E ENVIO PRO CARRINHO (O VERDADEIRO DUPLO-CHECK) ===
 async function confirmarAdicao() {
     const spanQtdBase = document.getElementById("qtd-produto-base");
     const qtdBaseEscolhida = spanQtdBase ? parseInt(spanQtdBase.innerText) : 1;
@@ -460,52 +493,61 @@ async function confirmarAdicao() {
         const receitaDesteLanche = receitasGlobais.filter(r => r.produto_id == produtoSendoVisto.id);
         let necessitaIngredientes = {};
         
+        // 1. Soma consumos da Base
         receitaDesteLanche.forEach(r => {
             if(!necessitaIngredientes[r.ingrediente_id]) necessitaIngredientes[r.ingrediente_id] = 0;
             necessitaIngredientes[r.ingrediente_id] += Number(r.quantidade) * qtdBaseEscolhida;
         });
 
+        // 2. Soma consumos PESADOS dos extras
         const adicionaisEscolhidos = [];
         let totalAdicionais = 0;
         const spansQtd = document.querySelectorAll(".qtd-adicional-span");
         
         for (const span of spansQtd) {
-            const qtdPorLanche = parseInt(span.innerText);
-            if (qtdPorLanche > 0) { 
+            const qtdCliques = parseInt(span.innerText);
+            if (qtdCliques > 0) { 
                 const idAdd = span.getAttribute("data-id");
                 const nomeAdd = span.getAttribute("data-nome");
                 const precoAdd = parseFloat(span.getAttribute("data-preco"));
 
-                if(!necessitaIngredientes[idAdd]) necessitaIngredientes[idAdd] = 0;
-                necessitaIngredientes[idAdd] += qtdPorLanche * qtdBaseEscolhida;
+                let pesoDaPorcao = 1;
+                const rBase = receitaDesteLanche.find(r => r.ingrediente_id == idAdd);
+                if(rBase) pesoDaPorcao = Number(rBase.quantidade);
 
-                adicionaisEscolhidos.push({ id: idAdd, nome: nomeAdd, preco: precoAdd, quantidade: qtdPorLanche });
-                totalAdicionais += (precoAdd * qtdPorLanche);
+                // O consumo real considera os gramas (pesoDaPorcao) e não apenas o "clique"
+                const consumoRealExtraPorLanche = qtdCliques * pesoDaPorcao;
+
+                if(!necessitaIngredientes[idAdd]) necessitaIngredientes[idAdd] = 0;
+                necessitaIngredientes[idAdd] += consumoRealExtraPorLanche * qtdBaseEscolhida;
+
+                adicionaisEscolhidos.push({ 
+                    id: idAdd, 
+                    nome: nomeAdd, 
+                    preco: precoAdd, 
+                    quantidade: qtdCliques, // Fica guardado pro WhatsApp mostrar bonito
+                    consumo_real: consumoRealExtraPorLanche // Fica guardado pro banco de dados descontar o grama
+                });
+                totalAdicionais += (precoAdd * qtdCliques);
             }
         }
 
+        // 3. Checagem final cruzada com o Carrinho real
         for (let ingId in necessitaIngredientes) {
             const ingDb = ingredientesLive.find(i => i.id == ingId);
             if (ingDb) {
-                let qtdPresaNoCarrinho = 0;
-                carrinho.forEach(itemCart => {
-                    const recCart = receitasGlobais.filter(r => r.produto_id == itemCart.produtoBase.id);
-                    const usoRec = recCart.find(r => r.ingrediente_id == ingId);
-                    if (usoRec) qtdPresaNoCarrinho += Number(usoRec.quantidade);
-                    itemCart.adicionais.forEach(extra => {
-                        if (extra.id == ingId) qtdPresaNoCarrinho += Number(extra.quantidade);
-                    });
-                });
-
-                const estoqueLivre = Number(ingDb.estoque) - qtdPresaNoCarrinho;
+                const qtdPresa = calcularUsoIngredienteNoCarrinho(ingId);
+                const estoqueLivre = Number(ingDb.estoque) - qtdPresa;
+                
                 if (necessitaIngredientes[ingId] > estoqueLivre) {
-                    mostrarAviso(`Alguém acabou de pedir a última unidade e faltou "${ingDb.nome}".`, "Estoque Esgotado");
+                    mostrarAviso(`Alguém acabou de pedir e faltou "${ingDb.nome}" na cozinha.`, "Estoque Esgotado");
                     if(btnConfirmar) { btnConfirmar.innerHTML = `<i class="fa-solid fa-plus"></i> Adicionar ao Pedido`; btnConfirmar.disabled = false; }
                     return; 
                 }
             }
         }
 
+        // TUDO CERTO! Envia pro carrinho
         for (let i = 0; i < qtdBaseEscolhida; i++) {
             const itemParaCarrinho = {
                 produtoBase: produtoSendoVisto,
@@ -650,7 +692,6 @@ function verificarTroco() {
     }
 }
 
-// === FUNÇÃO DO PIX DEVOLVIDA PRO LUGAR! ===
 function gerarPixCopiaECola(valorPix) {
     const formatarTamanho = (id, valor) => `${id}${String(valor.length).padStart(2, '0')}${valor}`;
     const chaveLimpa = (configLoja.chave_pix || "").trim();
@@ -721,7 +762,6 @@ async function enviarParaWhatsApp() {
             p_carrinho: carrinho 
         };
 
-        // O SEGREDO DO ERRO 404 ESTAVA AQUI: Agora passamos method: 'POST' 
         const resSupabase = await fetchSupabase(`/rest/v1/rpc/registrar_pedido_completo`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

@@ -14,6 +14,19 @@ let configLoja = {
 let lojaAberta = true;
 let mensagemFechado = "";
 
+// === GERAÇÃO E PERSISTÊNCIA DO ID DO CLIENTE ===
+function obterOuCriarClienteId() {
+    let id = localStorage.getItem("vilelaburgers_cliente_id");
+    if (!id) {
+        id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+        localStorage.setItem("vilelaburgers_cliente_id", id);
+    }
+    return id;
+}
+
 // === 2. EXTRAÇÃO DE DADOS (API DO SUPABASE) ===
 async function carregarCardapioDoBanco() {
     try {
@@ -254,23 +267,20 @@ function confirmarAdicao() {
     fecharModal();
 }
 
-// === 5. LÓGICA DO CARRINHO E CHECKOUT (CORRIGIDA) ===
+// === 5. LÓGICA DO CARRINHO E CHECKOUT ===
 function atualizarContadorCart() {
     const qtdItens = carrinho.length;
     const barraSacola = document.getElementById("barra-sacola");
     const telaCheckout = document.getElementById("tela-checkout");
     
-    // Descobre se a pessoa está agora mesmo na tela do Checkout
     const estaNoCheckout = telaCheckout && !telaCheckout.classList.contains("escondido");
     
-    // Só mostra a barra flutuante se tiver itens E se a pessoa NÃO estiver no checkout
     if (qtdItens > 0 && !estaNoCheckout) {
         barraSacola.classList.remove("escondido");
         document.getElementById("contador-sacola").innerText = qtdItens;
         const somaTotal = carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0);
         document.getElementById("total-sacola").innerText = `R$ ${somaTotal.toFixed(2).replace('.', ',')}`;
     } else {
-        // Se ela entrou no checkout, esconde a barra pra não atrapalhar
         barraSacola.classList.add("escondido");
     }
 }
@@ -316,7 +326,6 @@ function renderizarCheckout() {
         `;
     });
 
-    // MÁGICA AQUI: Adiciona o botão de voltar ao cardápio no fim da lista
     divItens.innerHTML += `
         <button onclick="navegarPara('inicio')" style="width: 100%; background: transparent; color: var(--laranja-fogo, #ff5e00); border: 2px dashed var(--laranja-fogo, #ff5e00); padding: 15px; border-radius: 8px; font-weight: bold; font-size: 16px; margin-top: 10px; cursor: pointer; transition: 0.3s;">
             <i class="fa-solid fa-plus"></i> Adicionar mais lanches
@@ -336,7 +345,7 @@ function removerDoCarrinho(index) {
     else renderizarCheckout();
 }
 
-// === 6. FINALIZAÇÃO E WHATSAPP ===
+// === 6. FINALIZAÇÃO E WHATSAPP COM SALVAMENTO NO BANCO ===
 function verificarTroco() {
     const selectPagamento = document.getElementById("forma-pagamento");
     if (!selectPagamento) return;
@@ -423,11 +432,42 @@ async function enviarParaWhatsApp() {
 
     if (btnFinalizar) {
         textoOriginalBotao = btnFinalizar.innerText;
-        btnFinalizar.innerText = "Processando...";
+        btnFinalizar.innerText = "Salvando pedido...";
         btnFinalizar.disabled = true;
     }
 
     try {
+        const perfilSalvo = JSON.parse(localStorage.getItem("vilelaburgers_perfil") || "{}");
+        const telefoneCliente = perfilSalvo.telefone ? String(perfilSalvo.telefone).replace(/\D/g, '') : "";
+        const clienteId = obterOuCriarClienteId();
+
+        // 1. SALVA NO SUPABASE
+        const dadosPedido = {
+            nome_cliente: nome,
+            forma_pagamento: pagamento,
+            total: totalCalculado,
+            cliente_id: clienteId,
+            telefone_cliente: telefoneCliente,
+            status: "Pendente",
+            previsao_entrega: "Em até 50 minutos"
+        };
+
+        const resSupabase = await fetch(`${SUPABASE_URL}/rest/v1/pedidos`, {
+            method: 'POST',
+            headers: {
+                'apikey': SUPABASE_KEY,
+                'Authorization': `Bearer ${SUPABASE_KEY}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify(dadosPedido)
+        });
+
+        if (!resSupabase.ok) {
+            console.error("Erro ao inserir no Supabase:", await resSupabase.text());
+        }
+
+        // 2. MONTAGEM DA MENSAGEM DO WHATSAPP
         let textoPedido = `🔥 *NOVO PEDIDO - VILELA BURGERS* 🔥\n\n`;
         textoPedido += `👤 *Cliente:* ${nome}\n📍 *Endereço:* ${enderecoFormatado}\n`;
         
@@ -463,8 +503,61 @@ async function enviarParaWhatsApp() {
         window.open(`https://wa.me/${numeroLimpo}?text=${encodeURIComponent(textoPedido)}`, '_blank');
 
     } catch (erro) {
-        alert("Erro de comunicação com o WhatsApp.");
+        alert("Erro de comunicação ao registrar o pedido.");
         if (btnFinalizar) { btnFinalizar.innerText = textoOriginalBotao; btnFinalizar.disabled = false; }
+    }
+}
+
+// === BUSCAR E RENDERIZAR O HISTÓRICO DE PEDIDOS ===
+async function carregarHistoricoPedidos() {
+    const container = document.getElementById("lista-historico-pedidos");
+    if (!container) return;
+
+    const clienteId = obterOuCriarClienteId();
+    const perfilSalvo = JSON.parse(localStorage.getItem("vilelaburgers_perfil") || "{}");
+    const telefoneCliente = perfilSalvo.telefone ? String(perfilSalvo.telefone).replace(/\D/g, '') : "";
+
+    container.innerHTML = `<p style="color: #aaa; text-align: center; padding: 20px;">Carregando seus pedidos...</p>`;
+
+    try {
+        let queryUrl = `${SUPABASE_URL}/rest/v1/pedidos?select=*&or=(cliente_id.eq.${clienteId}`;
+        if (telefoneCliente) {
+            queryUrl += `,telefone_cliente.eq.${telefoneCliente}`;
+        }
+        queryUrl += `)&order=data_pedido.desc`;
+
+        const resposta = await fetch(queryUrl, {
+            method: 'GET',
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+        });
+
+        if (!resposta.ok) throw new Error("Erro ao carregar histórico");
+        const pedidos = await resposta.json();
+
+        if (pedidos.length === 0) {
+            container.innerHTML = `<p style="color: #aaa; text-align: center; padding: 20px;">Você ainda não possui pedidos registrados.</p>`;
+            return;
+        }
+
+        let html = "";
+        pedidos.forEach(p => {
+            const dataFormatada = new Date(p.data_pedido).toLocaleString('pt-BR');
+            html += `
+                <div style="background: #222; border-radius: 8px; padding: 15px; margin-bottom: 12px; border: 1px solid #333;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                        <strong style="color: var(--laranja-fogo, #ff5e00);">Pedido #${p.id}</strong>
+                        <span style="color: #aaa; font-size: 12px;">${dataFormatada}</span>
+                    </div>
+                    <div style="color: #fff; font-size: 14px; margin-bottom: 5px;">Status: <strong>${p.status || 'Pendente'}</strong></div>
+                    <div style="color: #fff; font-size: 14px; margin-bottom: 5px;">Pagamento: ${p.forma_pagamento}</div>
+                    <div style="color: #2ed573; font-weight: bold; font-size: 15px;">Total: R$ ${Number(p.total).toFixed(2).replace('.', ',')}</div>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+
+    } catch (err) {
+        container.innerHTML = `<p style="color: #ff4757; text-align: center;">Erro ao carregar histórico de pedidos.</p>`;
     }
 }
 
@@ -491,10 +584,10 @@ function navegarPara(aba) {
     } else if (aba === 'pedidos') { 
         document.getElementById("tela-pedidos").classList.remove("escondido"); 
         const b = document.getElementById("btn-nav-pedidos"); if(b) b.classList.add("ativo"); 
+        carregarHistoricoPedidos(); 
         window.scrollTo(0, 0); 
     }
 
-    // Garante que a barra some se fomos pro checkout, ou volta se voltamos pro cardápio
     atualizarContadorCart();
 }
 
@@ -520,7 +613,7 @@ function gerarPixCopiaECola(valorPix) {
     return payload + result.toString(16).toUpperCase().padStart(4, '0'); 
 }
 
-// === RENDERIZAR O RODAPÉ AUTOMÁTICO (RECUPERADO) ===
+// === RENDERIZAR O RODAPÉ AUTOMÁTICO ===
 async function renderizarRodape() {
     const dataAtual = new Date(); const ano = dataAtual.getFullYear(); 
     const footer = document.createElement("footer"); 

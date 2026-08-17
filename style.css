@@ -587,3 +587,62 @@ body.modo-checkout .bottom-nav {
 #barra-sacola {
     bottom: 85px; 
 }
+/* --- EFEITO DE FOGO NO CHECKOUT --- */
+#fogo-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(15, 0, 0, 0.95); /* Fundo quase preto com um tom avermelhado */
+    z-index: 99999; /* Fica por cima de tudo no ecrã */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    overflow: hidden;
+    animation: fadeInFogo 0.5s ease-in-out;
+}
+
+.fogo-texto h2 {
+    color: #ffaa00;
+    font-size: 2rem;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    animation: pulsarFogo 0.8s infinite alternate;
+}
+
+.fogo-texto p {
+    color: #ffffff;
+    font-size: 1.2rem;
+    font-weight: bold;
+    z-index: 2;
+}
+
+/* Animação do texto a brilhar como brasa */
+@keyframes pulsarFogo {
+    from { text-shadow: 0 0 10px #ff0000, 0 0 20px #ff5500; transform: scale(1); }
+    to { text-shadow: 0 0 20px #ff0000, 0 0 40px #ffaa00, 0 0 60px #ffff00; transform: scale(1.05); }
+}
+
+/* Animação de entrada do ecrã escuro */
+@keyframes fadeInFogo {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Estilo de cada chama individual */
+.chama-animada {
+    position: absolute;
+    bottom: -100px;
+    font-size: 3rem;
+    z-index: 1;
+    animation: subirFogo linear forwards;
+}
+
+/* O movimento de subir e desaparecer */
+@keyframes subirFogo {
+    0% { transform: translateY(0) scale(1); opacity: 1; }
+    100% { transform: translateY(-120vh) scale(2); opacity: 0; }
+}

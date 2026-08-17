@@ -797,43 +797,66 @@ async function enviarParaWhatsApp() {
             return; 
         }
 
-        let textoPedido = `🔥 *NOVO PEDIDO - VILELA BURGERS* 🔥\n\n`;
-        textoPedido += `👤 *Cliente:* ${nome}\n📍 *Endereço:* ${enderecoFormatado}\n`;
-        
-        if (pagamento === "Dinheiro") {
-            const troco = document.getElementById("troco-dinheiro").value;
-            textoPedido += `💳 *Pagamento:* Dinheiro (Troco para R$ ${troco})\n\n`;
-        } else {
-            textoPedido += `💳 *Pagamento:* ${pagamento}\n\n`;
+        // =========================================================
+        // ATIVAÇÃO DO FOGO (O pedido foi salvo com sucesso no banco!)
+        // =========================================================
+        const fogoOverlay = document.getElementById("fogo-overlay");
+        if (fogoOverlay) {
+            fogoOverlay.style.display = "flex"; // Transforma o 'none' em 'flex' para exibir a animação
         }
 
-        textoPedido += "🛒 *ITENS DO PEDIDO:*\n";
-        carrinho.forEach(item => {
-            textoPedido += `\n*1x ${item.produtoBase.nome}* (R$ ${item.produtoBase.preco.toFixed(2).replace('.', ',')})\n`;
-            item.adicionais.forEach(add => {
-                const subtotalExtra = add.preco * add.quantidade;
-                textoPedido += `   + ${add.quantidade}x ${add.nome} (R$ ${subtotalExtra.toFixed(2).replace('.', ',')})\n`;
+        // Criamos o atraso de 2.5 segundos para o cliente ver o efeito visual na tela
+        setTimeout(() => {
+            let textoPedido = `🔥 *NOVO PEDIDO - VILELA BURGERS* 🔥\n\n`;
+            textoPedido += `👤 *Cliente:* ${nome}\n📍 *Endereço:* ${enderecoFormatado}\n`;
+            
+            if (pagamento === "Dinheiro") {
+                const troco = document.getElementById("troco-dinheiro").value;
+                textoPedido += `💳 *Pagamento:* Dinheiro (Troco para R$ ${troco})\n\n`;
+            } else {
+                textoPedido += `💳 *Pagamento:* ${pagamento}\n\n`;
+            }
+
+            textoPedido += "🛒 *ITENS DO PEDIDO:*\n";
+            carrinho.forEach(item => {
+                textoPedido += `\n*1x ${item.produtoBase.nome}* (R$ ${item.produtoBase.preco.toFixed(2).replace('.', ',')})\n`;
+                item.adicionais.forEach(add => {
+                    const subtotalExtra = add.preco * add.quantidade;
+                    textoPedido += `   + ${add.quantidade}x ${add.nome} (R$ ${subtotalExtra.toFixed(2).replace('.', ',')})\n`;
+                });
+                textoPedido += `   *Subtotal do item: R$ ${item.precoTotalItem.toFixed(2).replace('.', ',')}*\n`;
             });
-            textoPedido += `   *Subtotal do item: R$ ${item.precoTotalItem.toFixed(2).replace('.', ',')}*\n`;
-        });
 
-        textoPedido += `\n💰 *TOTAL DO PEDIDO: R$ ${totalCalculado.toFixed(2).replace('.', ',')}*`;
+            textoPedido += `\n💰 *TOTAL DO PEDIDO: R$ ${totalCalculado.toFixed(2).replace('.', ',')}*`;
 
-        if (btnFinalizar) { btnFinalizar.innerText = textoOriginalBotao; btnFinalizar.disabled = false; }
-        
-        carrinho = [];
-        atualizarContadorCart();
-        renderizarCardapio(); 
-        navegarPara('inicio');
-        
-        let numeroLimpo = configLoja.numero_whatsapp ? String(configLoja.numero_whatsapp).replace(/\D/g, '') : "5543996150221";
-        if(numeroLimpo === "") numeroLimpo = "5543996150221";
-        
-        window.open(`https://wa.me/${numeroLimpo}?text=${encodeURIComponent(textoPedido)}`, '_blank');
+            if (btnFinalizar) { btnFinalizar.innerText = textoOriginalBotao; btnFinalizar.disabled = false; }
+            
+            // Limpa o carrinho e reseta a interface interna
+            carrinho = [];
+            atualizarContadorCart();
+            renderizarCardapio(); 
+            navegarPara('inicio');
+            
+            // Oculta o fogo novamente para o próximo pedido
+            if (fogoOverlay) {
+                fogoOverlay.style.display = "none";
+            }
+            
+            let numeroLimpo = configLoja.numero_whatsapp ? String(configLoja.numero_whatsapp).replace(/\D/g, '') : "5543996150221";
+            if(numeroLimpo === "") numeroLimpo = "5543996150221";
+            
+            // Redireciona para o WhatsApp
+            window.open(`https://wa.me/${numeroLimpo}?text=${encodeURIComponent(textoPedido)}`, '_blank');
+
+        }, 2500); // 2500 milissegundos (2.5 segundos) rodando o fogo na tela
 
     } catch (erro) {
         mostrarAviso("Falha de comunicação ao tentar enviar seu pedido.", "Erro de Conexão");
         if (btnFinalizar) { btnFinalizar.innerText = textoOriginalBotao; btnFinalizar.disabled = false; }
+        
+        // Em caso de erro na requisição, garante que o fogo não fique travado na tela
+        const fogoOverlay = document.getElementById("fogo-overlay");
+        if (fogoOverlay) fogoOverlay.style.display = "none";
     }
 }
 

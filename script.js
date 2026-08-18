@@ -1098,6 +1098,25 @@ async function carregarIdentidadeVisual() {
             if(config.cor_principal) {
                 document.documentElement.style.setProperty('--laranja-fogo', config.cor_principal);
             }
+
+            // ==========================================================
+            // 4. CARREGAR O ÁUDIO DO BANCO (NOVO)
+            // ==========================================================
+            if (config.audio_fogo && config.audio_fogo.trim() !== "") {
+                const somFogo = document.getElementById("som-fogo");
+                if (somFogo) {
+                    somFogo.src = config.audio_fogo; // Puxa do Supabase
+                    somFogo.load(); // Atualiza o áudio na memória
+                }
+            } else {
+                // Se não tiver áudio no banco, tenta tocar um local de garantia
+                const somFogo = document.getElementById("som-fogo");
+                if (somFogo) {
+                    somFogo.src = "fogo.mp3"; 
+                    somFogo.load();
+                }
+            }
+            // ==========================================================
         }
     } catch (erro) {
         console.error("Erro ao carregar a identidade visual da loja:", erro);

@@ -1269,7 +1269,63 @@ function checarRetornoLoginGoogle() {
 }
 
 // Executa o detector de retorno toda vez que a página inicia
-checarRetornoLoginGoogle();
+// 2. Checa se o cliente acabou de voltar do login do Google e captura os dados dele
+function checarRetornoLoginGoogle() {
+    // Pegamos a URL inteira para extrair o token, mesmo que o navegador mude o hash de lugar
+    const urlAtual = window.location.href;
+    
+    if (urlAtual.includes("access_token=")) {
+        try {
+            // Extrai o token de acesso direto da URL gigante
+            const tokenCompleto = urlAtual.split("access_token=")[1].split("&")[0];
+
+            // Limpa a URL imediatamente removendo os códigos gigantes para o link ficar limpo (localhost:3000)
+            window.history.replaceState({}, document.title, window.location.pathname);
+
+            // Aguardamos 1 segundo para garantir que o resto do sistema (cardápio/configurações) já iniciou
+            setTimeout(async () => {
+                try {
+                    const resUser = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+                        method: 'GET',
+                        headers: {
+                            'apikey': SUPABASE_KEY,
+                            'Authorization': `Bearer ${tokenCompleto}`
+                        }
+                    });
+
+                    if (resUser.ok) {
+                        const usuarioGoogle = await resUser.json();
+                        
+                        // Captura o nome completo vindo do Google
+                        const nomeGoogle = usuarioGoogle.user_metadata.full_name || usuarioGoogle.user_metadata.name || "Cliente Google";
+
+                        // Puxa o perfil atual se houver, ou cria um novo
+                        let perfilExistente = JSON.parse(localStorage.getItem("vilelaburgers_perfil") || "{}");
+
+                        // Salva o nome importado do Google
+                        perfilExistente.nome = nomeGoogle;
+
+                        // Guarda de volta no localStorage do navegador do cliente
+                        localStorage.setItem("vilelaburgers_perfil", JSON.stringify(perfilExistente));
+
+                        // Força a atualização dos inputs na tela
+                        carregarPerfilNaTela();
+                        preencherCheckoutComPerfil();
+
+                        // Dispara o aviso verde de sucesso e joga o cliente para a aba de Perfil!
+                        mostrarAviso(`Olá, ${nomeGoogle}! Seu perfil foi conectado com o Google com sucesso.`, "Login Concluído!", "sucesso");
+                        navegarPara('perfil');
+                    }
+                } catch (erroInterno) {
+                    console.error("Erro ao consultar dados do usuário no Supabase:", erroInterno);
+                }
+            }, 1000); // 1 segundo de folga para o sistema carregar redondo
+
+        } catch (e) {
+            console.error("Erro ao processar URL de retorno do Google:", e);
+        }
+    }
+}
 
 // Roda a função assim que o cliente abre o site
 carregarIdentidadeVisual();

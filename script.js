@@ -860,7 +860,7 @@ async function enviarParaWhatsApp() {
             // Abre o aplicativo/janela do WhatsApp
             window.open(`https://wa.me/${numeroLimpo}?text=${encodeURIComponent(textoPedido)}`, '_blank');
 
-        }, 2500);
+        }, 5000);
 
     } catch (erro) {
         mostrarAviso("Falha de comunicação ao tentar enviar seu pedido.", "Erro de Conexão");

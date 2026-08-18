@@ -1084,52 +1084,57 @@ function verificarHorarioLoja() {
 // ==========================================
 // RASTREADOR DE ENTREGAS AO VIVO (NOTIFICAÇÃO)
 // ==========================================
-let memoriaStatusPedidos = {}; // O celular lembra os status aqui
+let memoriaStatusPedidos = {}; 
 
 async function rastrearPedidosEmAndamento() {
     const clienteId = obterOuCriarClienteId();
     if (!clienteId) return;
 
     try {
-        // Busca apenas os pedidos desse cliente que ainda não foram entregues ou cancelados
-        const res = await fetchSupabase(`/rest/v1/pedidos?select=id,status&cliente_id=eq.${clienteId}&status=in.(Pendente,Em Preparo,Saiu para Entrega)`);
+        // Puxamos os pedidos recentes do cliente. Removemos o filtro de status da URL 
+        // para garantir que o Supabase não barre a resposta por erro de sintaxe.
+        const res = await fetchSupabase(`/rest/v1/pedidos?select=id,status&cliente_id=eq.${clienteId}&order=data_pedido.desc&limit=5`);
         
         if (!res.ok) return;
         const pedidosAoVivo = await res.json();
 
         pedidosAoVivo.forEach(pedidoDb => {
+            // Se o pedido não tem status ou já foi finalizado/entregue antes, pula
+            if (!pedidoDb.status) return;
+
             const statusAntigo = memoriaStatusPedidos[pedidoDb.id];
             
-            // Padroniza o texto para minúsculo para evitar o erro do 'E' maiúsculo
-            const statusNovoLimpo = String(pedidoDb.status).trim().toLowerCase();
+            // Transformamos o status do banco em minúsculo e removemos espaços extras
+            const statusNovoLimpo = String(pedidoDb.status).toLowerCase().trim();
             
-            // SE O STATUS MUDOU E AGORA É "SAIU PARA ENTREGA"
-            if (statusAntigo && statusAntigo !== pedidoDb.status && statusNovoLimpo === 'saiu para entrega') {
+            // CHECAGEM BLINDADA: Se o status antigo existia, mudou, e o novo contém a palavra "entrega"
+            if (statusAntigo && statusAntigo !== pedidoDb.status && statusNovoLimpo.includes("entrega")) {
                 
-                // 1. Toca o som!
+                // 1. Toca o som da entrega
                 const somEntrega = document.getElementById("som-entrega");
                 if (somEntrega) {
                     somEntrega.volume = 1;
-                    somEntrega.play().catch(e => console.log("Som bloqueado pelo navegador"));
+                    somEntrega.currentTime = 0;
+                    somEntrega.play().catch(e => console.log("Navegador barrou o som automático:", e));
                 }
 
-                // 2. Mostra o Aviso na Tela
+                // 2. Dispara o Alerta Visual na Tela do Cliente
                 mostrarAviso(`Seu pedido #${pedidoDb.id} acabou de sair para entrega! 🛵 Prepare-se para receber.`, "Saiu para Entrega!", "sucesso");
                 
-                // 3. Atualiza a aba de histórico caso ele esteja lá
+                // 3. Atualiza o histórico do cliente na tela
                 carregarHistoricoPedidos();
             }
 
-            // Salva o status novo na memória para comparar na próxima rodada
+            // Guarda o status atual para comparar na próxima checagem daqui a 10 segundos
             memoriaStatusPedidos[pedidoDb.id] = pedidoDb.status;
         });
 
     } catch (erro) {
-        console.log("Aguardando conexão para rastreio...");
+        console.error("Erro no radar de rastreamento:", erro);
     }
 }
 
-// Inicia o radar: Ele vai checar o banco de dados a cada 10 segundos
+// Ativa o radar para rodar a cada 10 segundos
 setInterval(rastrearPedidosEmAndamento, 10000);
 
 // ==========================================

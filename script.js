@@ -1092,8 +1092,7 @@ async function rastrearPedidosEmAndamento() {
 
     try {
         // Busca apenas os pedidos desse cliente que ainda não foram entregues ou cancelados
-        // Isso economiza internet do cliente e processamento do banco
-        const res = await fetchSupabase(`/rest/v1/pedidos?select=id,status&cliente_id=eq.${clienteId}&status=in.(Pendente,Preparando,Saiu para entrega)`);
+        const res = await fetchSupabase(`/rest/v1/pedidos?select=id,status&cliente_id=eq.${clienteId}&status=in.(Pendente,Em Preparo,Saiu para Entrega)`);
         
         if (!res.ok) return;
         const pedidosAoVivo = await res.json();
@@ -1101,8 +1100,11 @@ async function rastrearPedidosEmAndamento() {
         pedidosAoVivo.forEach(pedidoDb => {
             const statusAntigo = memoriaStatusPedidos[pedidoDb.id];
             
+            // Padroniza o texto para minúsculo para evitar o erro do 'E' maiúsculo
+            const statusNovoLimpo = String(pedidoDb.status).trim().toLowerCase();
+            
             // SE O STATUS MUDOU E AGORA É "SAIU PARA ENTREGA"
-            if (statusAntigo && statusAntigo !== pedidoDb.status && pedidoDb.status === 'Saiu para entrega') {
+            if (statusAntigo && statusAntigo !== pedidoDb.status && statusNovoLimpo === 'saiu para entrega') {
                 
                 // 1. Toca o som!
                 const somEntrega = document.getElementById("som-entrega");
@@ -1127,7 +1129,7 @@ async function rastrearPedidosEmAndamento() {
     }
 }
 
-// Inicia o radar: Ele vai checar o banco de dados a cada 10 segundos (10000 milissegundos)
+// Inicia o radar: Ele vai checar o banco de dados a cada 10 segundos
 setInterval(rastrearPedidosEmAndamento, 10000);
 
 // ==========================================

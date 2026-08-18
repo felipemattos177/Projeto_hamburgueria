@@ -791,21 +791,30 @@ async function enviarParaWhatsApp() {
                 if (erroDB.details) { const partes = erroDB.details.split(','); if (partes.length > 1) itemFalho = partes[1].trim(); }
                 mostrarAviso(`O estoque de "${itemFalho}" esgotou agora mesmo! Volte e ajuste a quantidade no carrinho.`, "Estoque Esgotado");
             } else {
-                mostrarAviso("Ocorreu um erro ao registrar seu pedido no nosso sistema.", "Erro na Finalização");
+                mostrarAviso("Ocorreu um erro ao registrar seu pedido no nosso system.", "Erro na Finalização");
             }
             if (btnFinalizar) { btnFinalizar.innerText = textoOriginalBotao; btnFinalizar.disabled = false; }
             return; 
         }
 
         // =========================================================
-        // ATIVAÇÃO DO FOGO (O pedido foi salvo com sucesso no banco!)
+        // EFECTOS VISUAIS E SONOROS (Pedido salvo com sucesso!)
         // =========================================================
         const fogoOverlay = document.getElementById("fogo-overlay");
+        const somFogo = document.getElementById("som-fogo");
+
+        // Liga a animação na tela
         if (fogoOverlay) {
-            fogoOverlay.style.display = "flex"; // Transforma o 'none' em 'flex' para exibir a animação
+            fogoOverlay.style.display = "flex";
+        }
+        
+        // Inicia o áudio estralando do começo
+        if (somFogo) {
+            somFogo.currentTime = 0;
+            somFogo.play().catch(erroAudio => console.log("Navegador aguardando interação ou bloqueou áudio:", erroAudio));
         }
 
-        // Criamos o atraso de 2.5 segundos para o cliente ver o efeito visual na tela
+        // Aguarda 2,5 segundos com o fogo estralando antes de ir para o WhatsApp
         setTimeout(() => {
             let textoPedido = `🔥 *NOVO PEDIDO - VILELA BURGERS* 🔥\n\n`;
             textoPedido += `👤 *Cliente:* ${nome}\n📍 *Endereço:* ${enderecoFormatado}\n`;
@@ -831,32 +840,37 @@ async function enviarParaWhatsApp() {
 
             if (btnFinalizar) { btnFinalizar.innerText = textoOriginalBotao; btnFinalizar.disabled = false; }
             
-            // Limpa o carrinho e reseta a interface interna
+            // Limpa os dados do carrinho local e atualiza as telas de fundo
             carrinho = [];
             atualizarContadorCart();
             renderizarCardapio(); 
             navegarPara('inicio');
             
-            // Oculta o fogo novamente para o próximo pedido
+            // Remove o fogo e pausa o áudio
             if (fogoOverlay) {
                 fogoOverlay.style.display = "none";
+            }
+            if (somFogo) {
+                somFogo.pause();
             }
             
             let numeroLimpo = configLoja.numero_whatsapp ? String(configLoja.numero_whatsapp).replace(/\D/g, '') : "5543996150221";
             if(numeroLimpo === "") numeroLimpo = "5543996150221";
             
-            // Redireciona para o WhatsApp
+            // Abre o aplicativo/janela do WhatsApp
             window.open(`https://wa.me/${numeroLimpo}?text=${encodeURIComponent(textoPedido)}`, '_blank');
 
-        }, 2500); // 2500 milissegundos (2.5 segundos) rodando o fogo na tela
+        }, 2500);
 
     } catch (erro) {
         mostrarAviso("Falha de comunicação ao tentar enviar seu pedido.", "Erro de Conexão");
         if (btnFinalizar) { btnFinalizar.innerText = textoOriginalBotao; btnFinalizar.disabled = false; }
         
-        // Em caso de erro na requisição, garante que o fogo não fique travado na tela
+        // Garante a limpeza da tela e do som caso ocorra falha crítica na conexão
         const fogoOverlay = document.getElementById("fogo-overlay");
+        const somFogo = document.getElementById("som-fogo");
         if (fogoOverlay) fogoOverlay.style.display = "none";
+        if (somFogo) somFogo.pause();
     }
 }
 

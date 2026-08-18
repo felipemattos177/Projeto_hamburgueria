@@ -740,41 +740,69 @@ async function carregarConfiguracoesAdmin() {
 async function salvarConfiguracoesLoja() {
     const btn = document.getElementById("btn-salvar-config");
     const textoOriginal = btn.innerHTML;
-    btn.innerHTML = "⏳ Salvando Dados e Imagem (Aguarde)...";
+    btn.innerHTML = "⏳ Salvando Dados, Imagem e Áudio (Aguarde)...";
     btn.disabled = true;
 
-    // Pega o link atual que está escondido (caso o usuário não mande foto nova, a gente mantém a velha)
     let urlDaImagem = document.getElementById("admin-img-banner").value;
     const inputArquivo = document.getElementById("admin-file-banner");
+    
+    const inputAudio = document.getElementById("admin-file-audio-fogo");
+    let urlDoAudio = null;
 
     try {
-        // 1. SE O USUÁRIO ESCOLHEU UMA FOTO NOVA, FAZ O UPLOAD PRIMEIRO!
+        // ==========================================================
+        // 1. UPLOAD DA IMAGEM (Vai para o bucket 'imagens')
+        // ==========================================================
         if (inputArquivo && inputArquivo.files.length > 0) {
             const arquivo = inputArquivo.files[0];
-            // Cria um nome único para o arquivo não substituir outros (ex: banner-1718293.jpg)
             const nomeUnico = `banner-${Date.now()}-${arquivo.name.replace(/\s+/g, '-')}`;
 
-            // Envia para o "Pen Drive" (Bucket) chamado 'imagens'
             const resUpload = await fetch(`${SUPABASE_URL}/storage/v1/object/imagens/${nomeUnico}`, {
                 method: 'POST',
                 headers: {
                     'apikey': SUPABASE_KEY,
                     'Authorization': `Bearer ${SUPABASE_KEY}`,
-                    'Content-Type': arquivo.type // Avisa o Supabase se é JPG, PNG, etc
+                    'Content-Type': arquivo.type 
                 },
                 body: arquivo
             });
 
             if (!resUpload.ok) throw new Error("Falha ao subir a imagem para a nuvem.");
 
-            // Constrói o link público que a internet inteira consegue ver
             urlDaImagem = `${SUPABASE_URL}/storage/v1/object/public/imagens/${nomeUnico}`;
-            
-            // Já atualiza o campo invisível com o link novo
             document.getElementById("admin-img-banner").value = urlDaImagem;
         }
 
-        // 2. COLETA TODOS OS DADOS DA TELA
+        // ==========================================================
+        // 1.5. UPLOAD DO ÁUDIO (Vai para o bucket separado 'audios')
+        // ==========================================================
+        if (inputAudio && inputAudio.files.length > 0) {
+            const arquivoAudio = inputAudio.files[0];
+            const nomeUnicoAudio = `som_fogo-${Date.now()}.mp3`;
+
+            // Agora envia corretamente para o bucket 'audios'
+            const resUploadAudio = await fetch(`${SUPABASE_URL}/storage/v1/object/audios/${nomeUnicoAudio}`, {
+                method: 'POST',
+                headers: {
+                    'apikey': SUPABASE_KEY,
+                    'Authorization': `Bearer ${SUPABASE_KEY}`,
+                    'Content-Type': arquivoAudio.type
+                },
+                body: arquivoAudio
+            });
+
+            if (!resUploadAudio.ok) {
+                const erroSupabase = await resUploadAudio.text();
+                console.error("Erro no áudio:", erroSupabase);
+                throw new Error("Falha ao subir o áudio. Verifique as Políticas do Storage (Passo 2).");
+            }
+
+            urlDoAudio = `${SUPABASE_URL}/storage/v1/object/public/audios/${nomeUnicoAudio}`;
+        }
+
+        // ==========================================================
+        // 2. SALVANDO NA TABELA 'CONFIGURACOES'
+        // ==========================================================
         const corpoDb = {
             chave_pix: document.getElementById("admin-chave-pix").value,
             nome_recebedor: document.getElementById("admin-nome-pix").value,
@@ -788,10 +816,13 @@ async function salvarConfiguracoesLoja() {
             titulo_banner: document.getElementById("admin-titulo-banner").value,
             subtitulo_banner: document.getElementById("admin-subtitulo-banner").value,
             cor_principal: document.getElementById("admin-cor-principal").value,
-            imagem_banner: urlDaImagem // Salva o link no Banco de Dados!
+            imagem_banner: urlDaImagem 
         };
 
-        // 3. SALVA TUDO NA TABELA CONFIGURACOES
+        if (urlDoAudio) {
+            corpoDb.audio_fogo = urlDoAudio;
+        }
+
         const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracoes?id=eq.1`, {
             method: 'PATCH',
             headers: {
@@ -803,8 +834,10 @@ async function salvarConfiguracoesLoja() {
 
         if (!res.ok) throw new Error("Falha ao salvar no banco de dados.");
         
-        alert("✅ Loja e Identidade Visual atualizadas com sucesso!");
-        if(inputArquivo) inputArquivo.value = ""; // Limpa a seleção do arquivo para não subir de novo sem querer
+        alert("✅ Configurações salvas com sucesso! Áudio e Imagem separados.");
+        
+        if(inputArquivo) inputArquivo.value = ""; 
+        if(inputAudio) inputAudio.value = ""; 
         
     } catch (erro) {
         alert("Erro ao salvar: " + erro.message);

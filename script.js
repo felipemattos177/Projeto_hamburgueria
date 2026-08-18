@@ -1208,10 +1208,7 @@ async function carregarIdentidadeVisual() {
 // 1. Redireciona o cliente para a tela de login do Google
 async function loginComGoogle() {
     try {
-        // O Supabase cuida de criar o link de autenticação e avisa para onde o cliente deve voltar
-        // Usamos o window.location.origin para ele voltar exatamente para o link atual do seu site
         const redirecionarPara = window.location.origin;
-
         window.location.href = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirecionarPara)}`;
     } catch (erro) {
         console.error("Erro ao iniciar login com Google:", erro);
@@ -1221,57 +1218,6 @@ async function loginComGoogle() {
 
 // 2. Checa se o cliente acabou de voltar do login do Google e captura os dados dele
 function checarRetornoLoginGoogle() {
-    // Quando o Supabase faz o login, ele devolve os dados escondidos na URL (atrás de um #access_token)
-    const hash = window.location.hash;
-    
-    if (hash && hash.includes("access_token=")) {
-        // Limpa a URL para o cliente não ver aquele link gigante cheio de códigos
-        window.location.hash = "";
-
-        // Fazemos uma chamada rápida para ler o token que o Supabase injetou e descobrir quem é o cliente
-        setTimeout(async () => {
-            try {
-                const resUser = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-                    method: 'GET',
-                    headers: {
-                        'apikey': SUPABASE_KEY,
-                        'Authorization': `Bearer ${hash.split("access_token=")[1].split("&")[0]}`
-                    }
-                });
-
-                if (resUser.ok) {
-                    const usuarioGoogle = await resUser.json();
-                    
-                    // Pegamos o nome completo que está cadastrado na conta do Google dele
-                    const nomeGoogle = usuarioGoogle.user_metadata.full_name || usuarioGoogle.user_metadata.name || "";
-
-                    // Puxamos o perfil atual do localStorage se já existir algo guardado
-                    let perfilExistente = JSON.parse(localStorage.getItem("vilelaburgers_perfil") || "{}");
-
-                    // Atualizamos o perfil local com o Nome vindo diretamente do Google!
-                    perfilExistente.nome = nomeGoogle;
-
-                    // Salvamos de volta no localStorage do navegador dele
-                    localStorage.setItem("vilelaburgers_perfil", JSON.stringify(perfilExistente));
-
-                    // Atualiza os campos na tela do cliente imediatamente
-                    carregarPerfilNaTela();
-                    preencherCheckoutComPerfil();
-
-                    mostrarAviso(`Olá, ${nomeGoogle}! Seu nome foi importado do Google com sucesso.`, "Login Concluído!", "sucesso");
-                    navegarPara('perfil');
-                }
-            } catch (e) {
-                console.error("Erro ao processar dados do usuário Google:", e);
-            }
-        }, 500);
-    }
-}
-
-// Executa o detector de retorno toda vez que a página inicia
-// 2. Checa se o cliente acabou de voltar do login do Google e captura os dados dele
-function checarRetornoLoginGoogle() {
-    // Pegamos a URL inteira para extrair o token, mesmo que o navegador mude o hash de lugar
     const urlAtual = window.location.href;
     
     if (urlAtual.includes("access_token=")) {
@@ -1279,10 +1225,10 @@ function checarRetornoLoginGoogle() {
             // Extrai o token de acesso direto da URL gigante
             const tokenCompleto = urlAtual.split("access_token=")[1].split("&")[0];
 
-            // Limpa a URL imediatamente removendo os códigos gigantes para o link ficar limpo (localhost:3000)
+            // Limpa a URL imediatamente removendo os códigos gigantes
             window.history.replaceState({}, document.title, window.location.pathname);
 
-            // Aguardamos 1 segundo para garantir que o resto do sistema (cardápio/configurações) já iniciou
+            // Aguarda 1 segundo para garantir que o resto do sistema (cardápio) já iniciou
             setTimeout(async () => {
                 try {
                     const resUser = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
@@ -1319,7 +1265,7 @@ function checarRetornoLoginGoogle() {
                 } catch (erroInterno) {
                     console.error("Erro ao consultar dados do usuário no Supabase:", erroInterno);
                 }
-            }, 1000); // 1 segundo de folga para o sistema carregar redondo
+            }, 1000); 
 
         } catch (e) {
             console.error("Erro ao processar URL de retorno do Google:", e);
@@ -1327,6 +1273,12 @@ function checarRetornoLoginGoogle() {
     }
 }
 
+// Executa o detector de retorno toda vez que a página inicia
+checarRetornoLoginGoogle();
+
+// ==========================================
+// IDENTIDADE VISUAL DINÂMICA E INICIALIZAÇÃO
+// ==========================================
 // Roda a função assim que o cliente abre o site
 carregarIdentidadeVisual();
 

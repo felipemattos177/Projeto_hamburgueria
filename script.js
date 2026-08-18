@@ -1080,6 +1080,56 @@ function verificarHorarioLoja() {
         if (bannerHtml) bannerHtml.style.display = "none";
     }
 }
+
+// ==========================================
+// RASTREADOR DE ENTREGAS AO VIVO (NOTIFICAÇÃO)
+// ==========================================
+let memoriaStatusPedidos = {}; // O celular lembra os status aqui
+
+async function rastrearPedidosEmAndamento() {
+    const clienteId = obterOuCriarClienteId();
+    if (!clienteId) return;
+
+    try {
+        // Busca apenas os pedidos desse cliente que ainda não foram entregues ou cancelados
+        // Isso economiza internet do cliente e processamento do banco
+        const res = await fetchSupabase(`/rest/v1/pedidos?select=id,status&cliente_id=eq.${clienteId}&status=in.(Pendente,Preparando,Saiu para entrega)`);
+        
+        if (!res.ok) return;
+        const pedidosAoVivo = await res.json();
+
+        pedidosAoVivo.forEach(pedidoDb => {
+            const statusAntigo = memoriaStatusPedidos[pedidoDb.id];
+            
+            // SE O STATUS MUDOU E AGORA É "SAIU PARA ENTREGA"
+            if (statusAntigo && statusAntigo !== pedidoDb.status && pedidoDb.status === 'Saiu para entrega') {
+                
+                // 1. Toca o som!
+                const somEntrega = document.getElementById("som-entrega");
+                if (somEntrega) {
+                    somEntrega.volume = 1;
+                    somEntrega.play().catch(e => console.log("Som bloqueado pelo navegador"));
+                }
+
+                // 2. Mostra o Aviso na Tela
+                mostrarAviso(`Seu pedido #${pedidoDb.id} acabou de sair para entrega! 🛵 Prepare-se para receber.`, "Saiu para Entrega!", "sucesso");
+                
+                // 3. Atualiza a aba de histórico caso ele esteja lá
+                carregarHistoricoPedidos();
+            }
+
+            // Salva o status novo na memória para comparar na próxima rodada
+            memoriaStatusPedidos[pedidoDb.id] = pedidoDb.status;
+        });
+
+    } catch (erro) {
+        console.log("Aguardando conexão para rastreio...");
+    }
+}
+
+// Inicia o radar: Ele vai checar o banco de dados a cada 10 segundos (10000 milissegundos)
+setInterval(rastrearPedidosEmAndamento, 10000);
+
 // ==========================================
 // IDENTIDADE VISUAL DINÂMICA (WHITE-LABEL)
 // ==========================================

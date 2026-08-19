@@ -181,25 +181,32 @@ async function verificarSessaoAoAbrirSuper() {
 // ==========================================
 // GESTÃO DE LOJAS
 // ==========================================
+let adminsPorLoja = {}; // loja_id -> array de { user_id, ativo, email }
+let lojaGerenciarAtual = null; // loja cujo modal "Gerenciar Admins" está aberto
+
 async function carregarLojas() {
     if (!(await garantirSessaoOuRelogarSuper())) return;
     try {
         const [resLojas, resVinculos] = await Promise.all([
             fetch(`${SUPABASE_URL}/rest/v1/lojas?select=*&order=id.asc`, { headers: headersAutenticados() }),
-            fetch(`${SUPABASE_URL}/rest/v1/admin_lojas?select=loja_id,ativo`, { headers: headersAutenticados() })
+            fetch(`${SUPABASE_URL}/rest/v1/admin_lojas?select=user_id,loja_id,ativo,email`, { headers: headersAutenticados() })
         ]);
         listaDeLojasGlobal = await resLojas.json();
         const vinculos = await resVinculos.json();
-        const vinculoPorLoja = {};
-        vinculos.forEach(v => { vinculoPorLoja[v.loja_id] = v.ativo; });
 
-        renderizarTabelaLojas(listaDeLojasGlobal, vinculoPorLoja);
+        adminsPorLoja = {};
+        vinculos.forEach(v => {
+            if (!adminsPorLoja[v.loja_id]) adminsPorLoja[v.loja_id] = [];
+            adminsPorLoja[v.loja_id].push(v);
+        });
+
+        renderizarTabelaLojas(listaDeLojasGlobal);
     } catch (erro) {
         console.error(erro);
     }
 }
 
-function renderizarTabelaLojas(lojas, vinculoPorLoja) {
+function renderizarTabelaLojas(lojas) {
     const tbody = document.getElementById("tabela-lojas");
     if (!tbody) return;
     tbody.innerHTML = "";
@@ -214,19 +221,14 @@ function renderizarTabelaLojas(lojas, vinculoPorLoja) {
         const badgeTexto = loja.ativo ? "Ativa" : "Inativa";
         const botaoTexto = loja.ativo ? "Desativar" : "Ativar";
 
-        const temVinculo = Object.prototype.hasOwnProperty.call(vinculoPorLoja, loja.id);
-        const acessoAtivo = temVinculo && vinculoPorLoja[loja.id] !== false;
+        const admins = adminsPorLoja[loja.id] || [];
+        const qtdAtivos = admins.filter(a => a.ativo !== false).length;
 
         let colunaAdmin;
-        let botaoAcesso = "";
-        if (!temVinculo) {
+        if (admins.length === 0) {
             colunaAdmin = '<span style="color:#ff4757;">Sem admin</span>';
-        } else if (acessoAtivo) {
-            colunaAdmin = '<span style="color:#2ed573;">✔ Ativo</span>';
-            botaoAcesso = `<button class="btn-acao btn-toggle" onclick="alternarAcessoAdmin(${loja.id}, false)">Desativar acesso</button>`;
         } else {
-            colunaAdmin = '<span style="color:#ffa502;">⏸ Desativado</span>';
-            botaoAcesso = `<button class="btn-acao btn-toggle" onclick="alternarAcessoAdmin(${loja.id}, true)">Reativar acesso</button>`;
+            colunaAdmin = `<span style="color:${qtdAtivos > 0 ? '#2ed573' : '#ffa502'};">${admins.length} admin${admins.length > 1 ? 's' : ''} (${qtdAtivos} ativo${qtdAtivos !== 1 ? 's' : ''})</span>`;
         }
 
         tbody.innerHTML += `
@@ -238,22 +240,76 @@ function renderizarTabelaLojas(lojas, vinculoPorLoja) {
                 <td>${colunaAdmin}</td>
                 <td>
                     <button class="btn-acao btn-toggle" onclick="mudarStatusLoja(${loja.id}, ${!loja.ativo})">${botaoTexto}</button>
-                    ${botaoAcesso}
-                    <button class="btn-acao btn-vincular" onclick="abrirModalVincular(${loja.id}, '${escaparHtml(loja.nome)}')">Vincular Admin</button>
+                    <button class="btn-acao btn-vincular" onclick="abrirModalGerenciarAdmins(${loja.id}, '${escaparHtml(loja.nome)}')">Gerenciar Admins</button>
                 </td>
             </tr>
         `;
     });
 }
 
-async function alternarAcessoAdmin(lojaId, novoAtivo) {
+function abrirModalGerenciarAdmins(lojaId, lojaNome) {
+    lojaGerenciarAtual = { id: lojaId, nome: lojaNome };
+    document.getElementById("titulo-modal-gerenciar").innerText = `Admins: ${lojaNome}`;
+    renderizarListaAdminsModal();
+    document.getElementById("modal-gerenciar-admins").style.display = "flex";
+}
+
+function fecharModalGerenciarAdmins() {
+    document.getElementById("modal-gerenciar-admins").style.display = "none";
+    lojaGerenciarAtual = null;
+}
+
+function renderizarListaAdminsModal() {
+    const container = document.getElementById("lista-admins-loja");
+    if (!lojaGerenciarAtual) return;
+    const admins = adminsPorLoja[lojaGerenciarAtual.id] || [];
+
+    if (admins.length === 0) {
+        container.innerHTML = '<p style="color: var(--texto-claro); font-size: 13.5px;">Nenhum admin vinculado ainda.</p>';
+        return;
+    }
+
+    container.innerHTML = admins.map(a => {
+        const ativo = a.ativo !== false;
+        const email = a.email || a.user_id;
+        return `
+            <div class="linha-admin-loja">
+                <span class="email-admin">${escaparHtml(email)}${ativo ? '' : ' <br><small style="color: var(--vermelho);">Desativado</small>'}</span>
+                <div class="acoes-admin">
+                    <button class="btn-acao btn-toggle" onclick="alternarAcessoAdmin('${a.user_id}', ${!ativo})">${ativo ? 'Desativar' : 'Reativar'}</button>
+                    <button class="btn-acao btn-remover-admin" onclick="removerAdmin('${a.user_id}')">Remover</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+async function alternarAcessoAdmin(userId, novoAtivo) {
     if (!(await garantirSessaoOuRelogarSuper())) return;
-    await fetch(`${SUPABASE_URL}/rest/v1/admin_lojas?loja_id=eq.${lojaId}`, {
+    await fetch(`${SUPABASE_URL}/rest/v1/admin_lojas?user_id=eq.${userId}`, {
         method: 'PATCH',
         headers: headersAutenticados('application/json'),
         body: JSON.stringify({ ativo: novoAtivo })
     });
-    carregarLojas();
+    await carregarLojas();
+    if (lojaGerenciarAtual) renderizarListaAdminsModal();
+}
+
+async function removerAdmin(userId) {
+    if (!confirm("Remover o acesso desse usuário a esta loja? O login dele no Supabase continua existindo, só o vínculo com a loja é apagado.")) return;
+    if (!(await garantirSessaoOuRelogarSuper())) return;
+    await fetch(`${SUPABASE_URL}/rest/v1/admin_lojas?user_id=eq.${userId}`, {
+        method: 'DELETE',
+        headers: headersAutenticados()
+    });
+    await carregarLojas();
+    if (lojaGerenciarAtual) renderizarListaAdminsModal();
+}
+
+function abrirModalVincularDentroDeGerenciar() {
+    if (!lojaGerenciarAtual) return;
+    document.getElementById("modal-gerenciar-admins").style.display = "none";
+    abrirModalVincular(lojaGerenciarAtual.id, lojaGerenciarAtual.nome);
 }
 
 async function mudarStatusLoja(id, novoStatus) {
@@ -334,17 +390,22 @@ async function salvarNovaLoja() {
 
 function abrirModalVincular(lojaId, lojaNome) {
     lojaParaVincular = lojaId;
+    document.getElementById("vincular-email").value = "";
     document.getElementById("vincular-user-id").value = "";
-    document.querySelector("#modal-vincular-admin h2").innerText = `Vincular Admin: ${lojaNome}`;
+    document.getElementById("titulo-modal-vincular").innerText = `Vincular Admin: ${lojaNome}`;
     document.getElementById("modal-vincular-admin").style.display = "flex";
 }
 
 function fecharModalVincular() {
     document.getElementById("modal-vincular-admin").style.display = "none";
     lojaParaVincular = null;
+    if (lojaGerenciarAtual) {
+        document.getElementById("modal-gerenciar-admins").style.display = "flex";
+    }
 }
 
 async function salvarVinculo() {
+    const email = document.getElementById("vincular-email").value.trim();
     const userId = document.getElementById("vincular-user-id").value.trim();
     if (!userId) {
         alert("Cole o UID do usuário.");
@@ -357,7 +418,7 @@ async function salvarVinculo() {
         const res = await fetch(`${SUPABASE_URL}/rest/v1/admin_lojas`, {
             method: 'POST',
             headers: { ...headersAutenticados('application/json'), 'Prefer': 'resolution=merge-duplicates' },
-            body: JSON.stringify({ user_id: userId, loja_id: lojaParaVincular })
+            body: JSON.stringify({ user_id: userId, loja_id: lojaParaVincular, email: email || null, ativo: true })
         });
 
         if (!res.ok) {
@@ -366,8 +427,12 @@ async function salvarVinculo() {
             return;
         }
 
+        const voltarParaGerenciar = lojaGerenciarAtual;
         fecharModalVincular();
-        carregarLojas();
+        await carregarLojas();
+        if (voltarParaGerenciar) {
+            abrirModalGerenciarAdmins(voltarParaGerenciar.id, voltarParaGerenciar.nome);
+        }
     } catch (erro) {
         alert("Erro de conexão ao vincular admin.");
         console.error(erro);

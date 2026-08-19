@@ -93,6 +93,12 @@
         .modal-conteudo small { display: block; margin-bottom: 15px; color: var(--texto-claro); font-size: 12.5px; }
         .modal-botoes { display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; }
         .btn-cancelar { background-color: #eef0f4; color: #344054; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; }
+
+        .linha-admin-loja { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--borda); gap: 10px; }
+        .linha-admin-loja:last-child { border-bottom: none; }
+        .linha-admin-loja .email-admin { font-size: 13.5px; color: var(--texto); word-break: break-all; }
+        .linha-admin-loja .acoes-admin { display: flex; gap: 6px; flex-shrink: 0; }
+        .btn-remover-admin { background-color: var(--vermelho-suave); color: var(--vermelho); }
     </style>
 </head>
 <body>
@@ -136,7 +142,7 @@
                         <th>Nome</th>
                         <th>Subdomínio</th>
                         <th>Status</th>
-                        <th>Admin vinculado</th>
+                        <th>Admins</th>
                         <th>Ações</th>
                     </tr>
                 </thead>
@@ -162,15 +168,28 @@
 
     <div id="modal-vincular-admin" class="modal-overlay">
         <div class="modal-conteudo">
-            <h2>Vincular Admin</h2>
+            <h2 id="titulo-modal-vincular">Vincular Admin</h2>
             <p>
                 Crie o login no Supabase (Authentication → Users → Add user, com "Auto Confirm User" marcado),
-                copie o <strong>User UID</strong> dele e cole abaixo.
+                copie o <strong>User UID</strong> dele e cole abaixo. Uma loja pode ter mais de um admin — repita esse
+                passo pra adicionar outra pessoa à mesma loja.
             </p>
+            <input type="email" id="vincular-email" placeholder="E-mail do usuário (só pra exibição)">
             <input type="text" id="vincular-user-id" placeholder="UID do usuário (ex: 0487b354-...)" style="margin-bottom: 15px;">
             <div class="modal-botoes">
                 <button class="btn-cancelar" onclick="fecharModalVincular()">Cancelar</button>
                 <button class="btn-novo" onclick="salvarVinculo()">Vincular</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-gerenciar-admins" class="modal-overlay">
+        <div class="modal-conteudo" style="width: 460px;">
+            <h2 id="titulo-modal-gerenciar">Admins da Loja</h2>
+            <div id="lista-admins-loja" style="margin-bottom: 15px;"></div>
+            <div class="modal-botoes" style="justify-content: space-between;">
+                <button class="btn-vincular" style="border: none;" onclick="abrirModalVincularDentroDeGerenciar()"><i class="fa-solid fa-plus"></i> Adicionar outro admin</button>
+                <button class="btn-cancelar" onclick="fecharModalGerenciarAdmins()">Fechar</button>
             </div>
         </div>
     </div>

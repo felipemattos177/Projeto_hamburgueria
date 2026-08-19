@@ -233,6 +233,8 @@ function iniciarPainelAdmin() {
     carregarRelatorioEntregas();
     definirPeriodoPadrao('financeiro-data-inicio', 'financeiro-data-fim');
     carregarRelatorioFinanceiro();
+    definirPeriodoPadrao('dash-data-inicio', 'dash-data-fim');
+    carregarDashboard();
 
     intervaloPedidosAdmin = setInterval(carregarPedidosAdmin, 3000);
     intervaloProdutosEstoqueAdmin = setInterval(() => { carregarProdutos(); carregarEstoque(); }, 5000);
@@ -385,6 +387,312 @@ async function carregarRelatorioFinanceiro() {
         tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color: var(--vermelho);">Erro ao carregar dados financeiros.</td></tr>';
         console.error(erro);
     }
+}
+
+// ==========================================
+// MÓDULO 8: DASHBOARD ANALÍTICO
+// ==========================================
+let graficoFaturamento = null;
+let graficoPicos = null;
+let dashGranularidade = 'dia';
+let dashCacheDados = null;
+
+function formatarMoeda(v) {
+    return `R$ ${(Number(v) || 0).toFixed(2).replace('.', ',')}`;
+}
+
+function aplicarPeriodoRapido(dias) {
+    const fim = new Date();
+    const inicio = new Date();
+    inicio.setDate(inicio.getDate() - (dias - 1));
+    const paraISO = (d) => d.toISOString().substring(0, 10);
+    document.getElementById("dash-data-inicio").value = paraISO(inicio);
+    document.getElementById("dash-data-fim").value = paraISO(fim);
+    carregarDashboard();
+}
+
+function aplicarPeriodoRapidoMes() {
+    const hoje = new Date();
+    const inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    const paraISO = (d) => d.toISOString().substring(0, 10);
+    document.getElementById("dash-data-inicio").value = paraISO(inicio);
+    document.getElementById("dash-data-fim").value = paraISO(hoje);
+    carregarDashboard();
+}
+
+function aplicarPeriodoRapidoAno() {
+    const hoje = new Date();
+    const inicio = new Date(hoje.getFullYear(), 0, 1);
+    const paraISO = (d) => d.toISOString().substring(0, 10);
+    document.getElementById("dash-data-inicio").value = paraISO(inicio);
+    document.getElementById("dash-data-fim").value = paraISO(hoje);
+    carregarDashboard();
+}
+
+function mudarGranularidade(gran) {
+    dashGranularidade = gran;
+    document.getElementById("btn-gran-dia").classList.toggle("ativo", gran === "dia");
+    document.getElementById("btn-gran-mes").classList.toggle("ativo", gran === "mes");
+    if (dashCacheDados) renderizarGraficoFaturamento(dashCacheDados.pedidos);
+}
+
+async function carregarDashboard() {
+    if (!(await garantirSessaoOuRelogar())) return;
+
+    const dataInicio = document.getElementById("dash-data-inicio").value;
+    const dataFim = document.getElementById("dash-data-fim").value;
+    if (!dataInicio || !dataFim) return;
+
+    try {
+        const resPedidos = await fetch(
+            `${SUPABASE_URL}/rest/v1/pedidos?select=id,nome_cliente,telefone_cliente,cliente_id,data_pedido,total,forma_pagamento,tipo_entrega` +
+            `&loja_id=eq.${lojaAtual.id}` +
+            `&data_pedido=gte.${dataInicio}T00:00:00&data_pedido=lte.${dataFim}T23:59:59&order=data_pedido.asc`,
+            { headers: headersAutenticados() }
+        );
+        const pedidos = await resPedidos.json();
+        dashCacheDados = { pedidos };
+
+        // Período anterior (mesma duração, imediatamente antes) — só pra comparação
+        const msPorDia = 24 * 60 * 60 * 1000;
+        const inicioDate = new Date(dataInicio + "T00:00:00");
+        const fimDate = new Date(dataFim + "T00:00:00");
+        const duracaoDias = Math.round((fimDate - inicioDate) / msPorDia) + 1;
+        const inicioAnteriorDate = new Date(inicioDate.getTime() - duracaoDias * msPorDia);
+        const fimAnteriorDate = new Date(inicioDate.getTime() - msPorDia);
+        const paraISO = (d) => d.toISOString().substring(0, 10);
+
+        const resAnterior = await fetch(
+            `${SUPABASE_URL}/rest/v1/pedidos?select=total` +
+            `&loja_id=eq.${lojaAtual.id}` +
+            `&data_pedido=gte.${paraISO(inicioAnteriorDate)}T00:00:00&data_pedido=lte.${paraISO(fimAnteriorDate)}T23:59:59`,
+            { headers: headersAutenticados() }
+        );
+        const pedidosAnterior = await resAnterior.json();
+        const totalAnterior = pedidosAnterior.reduce((acc, p) => acc + (Number(p.total) || 0), 0);
+
+        // Itens dos pedidos do período (pra faturamento por produto)
+        let itens = [];
+        if (pedidos.length > 0) {
+            const idsPedidos = pedidos.map(p => p.id).join(',');
+            const resItens = await fetch(
+                `${SUPABASE_URL}/rest/v1/itens_pedido?select=pedido_id,produto_id,quantidade,preco_unitario` +
+                `&loja_id=eq.${lojaAtual.id}&pedido_id=in.(${idsPedidos})`,
+                { headers: headersAutenticados() }
+            );
+            itens = await resItens.json();
+        }
+
+        const resProdutos = await fetch(
+            `${SUPABASE_URL}/rest/v1/produtos?select=id,nome&loja_id=eq.${lojaAtual.id}`,
+            { headers: headersAutenticados() }
+        );
+        const produtosLoja = await resProdutos.json();
+        const nomeProdutoPorId = {};
+        produtosLoja.forEach(p => { nomeProdutoPorId[p.id] = p.nome; });
+
+        // ===== CÁLCULOS =====
+        const totalFaturado = pedidos.reduce((acc, p) => acc + (Number(p.total) || 0), 0);
+        const qtdPedidos = pedidos.length;
+        const ticketMedio = qtdPedidos > 0 ? totalFaturado / qtdPedidos : 0;
+
+        const horasPico = new Array(24).fill(0);
+        pedidos.forEach(p => {
+            if (p.data_pedido) horasPico[new Date(p.data_pedido).getHours()]++;
+        });
+
+        const porProduto = {};
+        itens.forEach(item => {
+            const id = item.produto_id;
+            if (!porProduto[id]) porProduto[id] = { nome: nomeProdutoPorId[id] || `Produto #${id}`, qtd: 0, faturamento: 0 };
+            porProduto[id].qtd += Number(item.quantidade) || 0;
+            porProduto[id].faturamento += (Number(item.quantidade) || 0) * (Number(item.preco_unitario) || 0);
+        });
+        const produtosOrdenados = Object.values(porProduto).sort((a, b) => b.faturamento - a.faturamento);
+
+        const porCliente = {};
+        pedidos.forEach(p => {
+            const chave = p.cliente_id || p.telefone_cliente || p.nome_cliente;
+            if (!chave) return;
+            if (!porCliente[chave]) porCliente[chave] = { nome: p.nome_cliente || "Cliente", qtd: 0, total: 0 };
+            porCliente[chave].qtd++;
+            porCliente[chave].total += Number(p.total) || 0;
+            porCliente[chave].nome = p.nome_cliente || porCliente[chave].nome;
+        });
+        const clientesOrdenados = Object.values(porCliente).sort((a, b) => b.qtd - a.qtd || b.total - a.total);
+
+        const porPagamento = {};
+        const porTipo = { entrega: 0, retirada: 0 };
+        pedidos.forEach(p => {
+            const forma = p.forma_pagamento || "Não informado";
+            porPagamento[forma] = (porPagamento[forma] || 0) + 1;
+            porTipo[p.tipo_entrega === "retirada" ? "retirada" : "entrega"]++;
+        });
+
+        // ===== RENDERIZAÇÃO =====
+        document.getElementById("dash-faturamento").innerText = formatarMoeda(totalFaturado);
+        document.getElementById("dash-pedidos-qtd").innerText = qtdPedidos;
+        document.getElementById("dash-ticket-medio").innerText = formatarMoeda(ticketMedio);
+
+        const elDelta = document.getElementById("dash-faturamento-delta");
+        if (totalAnterior > 0) {
+            const deltaPercent = ((totalFaturado - totalAnterior) / totalAnterior) * 100;
+            elDelta.className = deltaPercent >= 0 ? "delta-positivo" : "delta-negativo";
+            elDelta.innerText = `${deltaPercent >= 0 ? '▲' : '▼'} ${Math.abs(deltaPercent).toFixed(0)}% vs período anterior`;
+        } else {
+            elDelta.innerText = "";
+        }
+
+        const elClienteFiel = document.getElementById("dash-cliente-fiel");
+        elClienteFiel.innerText = clientesOrdenados.length > 0 ? `${clientesOrdenados[0].nome} (${clientesOrdenados[0].qtd}x)` : "-";
+
+        const tbodyProdutos = document.getElementById("dash-tabela-produtos");
+        let htmlProdutos = "";
+        produtosOrdenados.slice(0, 10).forEach(p => {
+            htmlProdutos += `<tr><td>${escaparHtml(p.nome)}</td><td>${p.qtd}</td><td>${formatarMoeda(p.faturamento)}</td></tr>`;
+        });
+        tbodyProdutos.innerHTML = htmlProdutos || '<tr><td colspan="3" style="text-align:center;">Sem vendas no período.</td></tr>';
+
+        const tbodyClientes = document.getElementById("dash-tabela-clientes");
+        let htmlClientes = "";
+        clientesOrdenados.slice(0, 10).forEach(c => {
+            htmlClientes += `<tr><td>${escaparHtml(c.nome)}</td><td>${c.qtd}</td><td>${formatarMoeda(c.total)}</td></tr>`;
+        });
+        tbodyClientes.innerHTML = htmlClientes || '<tr><td colspan="3" style="text-align:center;">Sem clientes no período.</td></tr>';
+
+        renderizarGraficoFaturamento(pedidos);
+        renderizarGraficoPicos(horasPico);
+
+        // ===== INSIGHTS =====
+        const insights = [];
+        if (qtdPedidos === 0) {
+            insights.push("Nenhum pedido nesse período.");
+        } else {
+            const picoMax = Math.max(...horasPico);
+            if (picoMax > 0) {
+                const horaPico = horasPico.indexOf(picoMax);
+                insights.push(`Horário de pico: das ${horaPico}h às ${(horaPico + 1) % 24}h, com ${picoMax} pedido(s) — bom momento pra reforçar a equipe.`);
+            }
+            if (produtosOrdenados.length > 0) {
+                const top = produtosOrdenados[0];
+                const pctProduto = totalFaturado > 0 ? ((top.faturamento / totalFaturado) * 100).toFixed(0) : 0;
+                insights.push(`"${escaparHtml(top.nome)}" é o produto que mais fatura, respondendo por ${pctProduto}% do total do período.`);
+            }
+            const formaTop = Object.keys(porPagamento).sort((a, b) => porPagamento[b] - porPagamento[a])[0];
+            if (formaTop) {
+                const pctForma = ((porPagamento[formaTop] / qtdPedidos) * 100).toFixed(0);
+                insights.push(`${pctForma}% dos pedidos são pagos via ${escaparHtml(formaTop)}.`);
+            }
+            if (porTipo.entrega + porTipo.retirada > 0) {
+                const pctEntrega = ((porTipo.entrega / qtdPedidos) * 100).toFixed(0);
+                insights.push(`${pctEntrega}% dos pedidos são de entrega, ${100 - pctEntrega}% de retirada.`);
+            }
+            if (clientesOrdenados.length > 0 && clientesOrdenados[0].qtd >= 2) {
+                insights.push(`${escaparHtml(clientesOrdenados[0].nome)} é o cliente mais fiel do período, com ${clientesOrdenados[0].qtd} pedidos.`);
+            }
+            if (totalAnterior > 0) {
+                const deltaPercent = ((totalFaturado - totalAnterior) / totalAnterior) * 100;
+                if (Math.abs(deltaPercent) >= 5) {
+                    insights.push(deltaPercent > 0
+                        ? `Faturamento ${deltaPercent.toFixed(0)}% maior que o período anterior de mesma duração.`
+                        : `Faturamento ${Math.abs(deltaPercent).toFixed(0)}% menor que o período anterior — vale investigar o motivo.`);
+                }
+            }
+        }
+        document.getElementById("dash-insights").innerHTML = insights.map(i => `<li>${i}</li>`).join('') || '<li>Sem dados suficientes pra gerar insights.</li>';
+
+    } catch (erro) {
+        console.error("Erro ao carregar dashboard:", erro);
+    }
+}
+
+function renderizarGraficoFaturamento(pedidos) {
+    const canvas = document.getElementById("grafico-faturamento");
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    const buckets = {};
+    pedidos.forEach(p => {
+        if (!p.data_pedido) return;
+        const d = new Date(p.data_pedido);
+        const chave = dashGranularidade === 'mes'
+            ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+            : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        buckets[chave] = (buckets[chave] || 0) + (Number(p.total) || 0);
+    });
+
+    const chaves = Object.keys(buckets).sort();
+    const labels = chaves.map(c => {
+        const partes = c.split('-');
+        return dashGranularidade === 'mes' ? `${partes[1]}/${partes[0]}` : `${partes[2]}/${partes[1]}`;
+    });
+    const dados = chaves.map(c => buckets[c]);
+
+    if (graficoFaturamento) graficoFaturamento.destroy();
+    graficoFaturamento = new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                data: dados,
+                backgroundColor: '#ff5e00',
+                borderRadius: 4,
+                categoryPercentage: 0.6,
+                barPercentage: 0.9,
+                maxBarThickness: 24
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: (ctx) => formatarMoeda(ctx.parsed.y) } }
+            },
+            scales: {
+                x: { grid: { display: false }, ticks: { color: '#898781', font: { size: 11 } } },
+                y: {
+                    beginAtZero: true,
+                    grid: { color: '#e1e0d9' },
+                    ticks: { color: '#898781', font: { size: 11 }, callback: (v) => `R$ ${v}` }
+                }
+            }
+        }
+    });
+}
+
+function renderizarGraficoPicos(horasPico) {
+    const canvas = document.getElementById("grafico-picos");
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    const labels = horasPico.map((_, h) => `${h}h`);
+
+    if (graficoPicos) graficoPicos.destroy();
+    graficoPicos = new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                data: horasPico,
+                backgroundColor: '#2563eb',
+                borderRadius: 4,
+                categoryPercentage: 0.7,
+                barPercentage: 0.9,
+                maxBarThickness: 18
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: (ctx) => `${ctx.parsed.y} pedido(s)` } }
+            },
+            scales: {
+                x: { grid: { display: false }, ticks: { color: '#898781', font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+                y: { beginAtZero: true, grid: { color: '#e1e0d9' }, ticks: { color: '#898781', font: { size: 11 }, precision: 0 } }
+            }
+        }
+    });
 }
 
 async function verificarSessaoAoAbrir() {

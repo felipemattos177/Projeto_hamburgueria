@@ -229,8 +229,10 @@ function iniciarPainelAdmin() {
     carregarEstoque();
     carregarPedidosAdmin();
     carregarConfiguracoesAdmin();
-    definirPeriodoPadraoEntregas();
+    definirPeriodoPadrao('entregas-data-inicio', 'entregas-data-fim');
     carregarRelatorioEntregas();
+    definirPeriodoPadrao('financeiro-data-inicio', 'financeiro-data-fim');
+    carregarRelatorioFinanceiro();
 
     intervaloPedidosAdmin = setInterval(carregarPedidosAdmin, 3000);
     intervaloProdutosEstoqueAdmin = setInterval(() => { carregarProdutos(); carregarEstoque(); }, 5000);
@@ -240,13 +242,13 @@ function iniciarPainelAdmin() {
 // ==========================================
 // MÓDULO 6: CONTROLE DE ENTREGAS
 // ==========================================
-function definirPeriodoPadraoEntregas() {
+function definirPeriodoPadrao(idInicio, idFim) {
     const hoje = new Date();
     const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
     const paraISO = (d) => d.toISOString().substring(0, 10);
 
-    const elInicio = document.getElementById("entregas-data-inicio");
-    const elFim = document.getElementById("entregas-data-fim");
+    const elInicio = document.getElementById(idInicio);
+    const elFim = document.getElementById(idFim);
     if (elInicio && !elInicio.value) elInicio.value = paraISO(primeiroDiaMes);
     if (elFim && !elFim.value) elFim.value = paraISO(hoje);
 }
@@ -291,6 +293,96 @@ async function carregarRelatorioEntregas() {
         document.getElementById("entregas-total-repasse").innerText = `R$ ${totalRepasse.toFixed(2).replace('.', ',')}`;
     } catch (erro) {
         tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--vermelho);">Erro ao carregar entregas.</td></tr>';
+        console.error(erro);
+    }
+}
+
+// ==========================================
+// MÓDULO 7: PAINEL FINANCEIRO
+// ==========================================
+async function carregarRelatorioFinanceiro() {
+    if (!(await garantirSessaoOuRelogar())) return;
+
+    const dataInicio = document.getElementById("financeiro-data-inicio").value;
+    const dataFim = document.getElementById("financeiro-data-fim").value;
+    const tbody = document.getElementById("tabela-financeiro");
+    if (!dataInicio || !dataFim || !tbody) return;
+
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Carregando...</td></tr>';
+
+    try {
+        const res = await fetch(
+            `${SUPABASE_URL}/rest/v1/pedidos?select=id,nome_cliente,data_pedido,forma_pagamento,tipo_entrega,total` +
+            `&loja_id=eq.${lojaAtual.id}` +
+            `&data_pedido=gte.${dataInicio}T00:00:00&data_pedido=lte.${dataFim}T23:59:59&order=data_pedido.desc`,
+            { headers: headersAutenticados() }
+        );
+        const pedidos = await res.json();
+
+        let totalVendido = 0;
+        const porPagamento = {};
+        const porTipo = { entrega: { qtd: 0, total: 0 }, retirada: { qtd: 0, total: 0 } };
+        let html = "";
+
+        pedidos.forEach(p => {
+            const valor = Number(p.total) || 0;
+            totalVendido += valor;
+
+            const pagamento = p.forma_pagamento || "Não informado";
+            if (!porPagamento[pagamento]) porPagamento[pagamento] = { qtd: 0, total: 0 };
+            porPagamento[pagamento].qtd++;
+            porPagamento[pagamento].total += valor;
+
+            const tipo = (p.tipo_entrega === "retirada") ? "retirada" : "entrega";
+            porTipo[tipo].qtd++;
+            porTipo[tipo].total += valor;
+
+            const dataFormatada = p.data_pedido ? new Date(p.data_pedido).toLocaleString('pt-BR') : '-';
+            html += `
+                <tr>
+                    <td>#${p.id}</td>
+                    <td>${escaparHtml(p.nome_cliente)}</td>
+                    <td>${dataFormatada}</td>
+                    <td>${escaparHtml(pagamento)}</td>
+                    <td>${tipo === 'retirada' ? 'Retirada' : 'Entrega'}</td>
+                    <td>R$ ${valor.toFixed(2).replace('.', ',')}</td>
+                </tr>
+            `;
+        });
+
+        tbody.innerHTML = html || '<tr><td colspan="6" style="text-align:center;">Nenhuma venda nesse período.</td></tr>';
+
+        document.getElementById("financeiro-total-vendido").innerText = `R$ ${totalVendido.toFixed(2).replace('.', ',')}`;
+        document.getElementById("financeiro-total-vendas").innerText = pedidos.length;
+        const ticketMedio = pedidos.length > 0 ? totalVendido / pedidos.length : 0;
+        document.getElementById("financeiro-ticket-medio").innerText = `R$ ${ticketMedio.toFixed(2).replace('.', ',')}`;
+
+        const elPagamentos = document.getElementById("financeiro-formas-pagamento");
+        let htmlPag = "";
+        Object.keys(porPagamento).forEach(forma => {
+            const dados = porPagamento[forma];
+            htmlPag += `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--borda); font-size: 14px;">
+                    <span>${escaparHtml(forma)} <span style="color: var(--texto-claro); font-size: 12px;">(${dados.qtd})</span></span>
+                    <strong>R$ ${dados.total.toFixed(2).replace('.', ',')}</strong>
+                </div>
+            `;
+        });
+        elPagamentos.innerHTML = htmlPag || '<p style="color: var(--texto-claro); font-size: 13px; margin: 0;">Sem dados no período.</p>';
+
+        const elTipos = document.getElementById("financeiro-tipos-entrega");
+        elTipos.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--borda); font-size: 14px;">
+                <span><i class="fa-solid fa-motorcycle"></i> Entrega <span style="color: var(--texto-claro); font-size: 12px;">(${porTipo.entrega.qtd})</span></span>
+                <strong>R$ ${porTipo.entrega.total.toFixed(2).replace('.', ',')}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 9px 0; font-size: 14px;">
+                <span><i class="fa-solid fa-store"></i> Retirada <span style="color: var(--texto-claro); font-size: 12px;">(${porTipo.retirada.qtd})</span></span>
+                <strong>R$ ${porTipo.retirada.total.toFixed(2).replace('.', ',')}</strong>
+            </div>
+        `;
+    } catch (erro) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color: var(--vermelho);">Erro ao carregar dados financeiros.</td></tr>';
         console.error(erro);
     }
 }

@@ -229,6 +229,7 @@
                 <button class="tab-btn ativa" onclick="mudarAbaAdmin('view-estoque', this)"><i class="fa-solid fa-boxes-stacked"></i> Cardápio & Estoque</button>
                 <button class="tab-btn" onclick="mudarAbaAdmin('view-pedidos', this)"><i class="fa-solid fa-motorcycle"></i> Gestão de Pedidos</button>
                 <button class="tab-btn" onclick="mudarAbaAdmin('view-entregas', this)"><i class="fa-solid fa-hand-holding-dollar"></i> Entregas</button>
+                <button class="tab-btn" onclick="mudarAbaAdmin('view-financeiro', this)"><i class="fa-solid fa-chart-line"></i> Financeiro</button>
                 <button class="tab-btn" onclick="mudarAbaAdmin('view-config', this)"><i class="fa-solid fa-gear"></i> Configurações</button>
             </nav>
 
@@ -362,6 +363,65 @@
                     </thead>
                     <tbody id="tabela-entregas">
                         <tr><td colspan="5" style="text-align: center;">Selecione um período.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- ABA 4: PAINEL FINANCEIRO                   -->
+            <!-- ========================================== -->
+            <div id="view-financeiro" class="view-section">
+
+                <div class="header-admin">
+                    <h1><span class="icone-secao"><i class="fa-solid fa-chart-line"></i></span> Painel Financeiro</h1>
+                </div>
+
+                <div class="barra-tempo" style="flex-wrap: wrap;">
+                    <strong><i class="fa-solid fa-calendar"></i> Período:</strong>
+                    <input type="date" id="financeiro-data-inicio" onchange="carregarRelatorioFinanceiro()" style="width: auto; padding: 8px; border-radius: 7px; border: 1px solid var(--borda); font-family: inherit; font-size: 14px;">
+                    <span>até</span>
+                    <input type="date" id="financeiro-data-fim" onchange="carregarRelatorioFinanceiro()" style="width: auto; padding: 8px; border-radius: 7px; border: 1px solid var(--borda); font-family: inherit; font-size: 14px;">
+                </div>
+
+                <div class="grid-config" style="margin-bottom: 18px;">
+                    <div class="card-config" style="--cor-card: var(--verde);">
+                        <h3 style="margin-bottom: 6px;"><i class="fa-solid fa-sack-dollar" style="color: var(--verde);"></i> Total Vendido</h3>
+                        <div id="financeiro-total-vendido" style="font-size: 26px; font-weight: 800; color: var(--texto);">R$ 0,00</div>
+                    </div>
+                    <div class="card-config" style="--cor-card: var(--azul);">
+                        <h3 style="margin-bottom: 6px;"><i class="fa-solid fa-receipt" style="color: var(--azul);"></i> Número de Vendas</h3>
+                        <div id="financeiro-total-vendas" style="font-size: 26px; font-weight: 800; color: var(--texto);">0</div>
+                    </div>
+                    <div class="card-config" style="--cor-card: var(--amarelo);">
+                        <h3 style="margin-bottom: 6px;"><i class="fa-solid fa-calculator" style="color: var(--amarelo);"></i> Ticket Médio</h3>
+                        <div id="financeiro-ticket-medio" style="font-size: 26px; font-weight: 800; color: var(--texto);">R$ 0,00</div>
+                    </div>
+                </div>
+
+                <div class="grid-config" style="margin-bottom: 20px;">
+                    <div class="card-config" style="--cor-card: var(--rosa);">
+                        <h3><i class="fa-solid fa-wallet" style="color: var(--rosa);"></i> Formas de Pagamento</h3>
+                        <div id="financeiro-formas-pagamento"></div>
+                    </div>
+                    <div class="card-config" style="--cor-card: var(--laranja-fogo);">
+                        <h3><i class="fa-solid fa-motorcycle" style="color: var(--laranja-fogo);"></i> Entrega x Retirada</h3>
+                        <div id="financeiro-tipos-entrega"></div>
+                    </div>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Pedido</th>
+                            <th>Cliente</th>
+                            <th>Data</th>
+                            <th>Pagamento</th>
+                            <th>Tipo</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabela-financeiro">
+                        <tr><td colspan="6" style="text-align: center;">Selecione um período.</td></tr>
                     </tbody>
                 </table>
             </div>

@@ -9,6 +9,129 @@ let listaDeProdutosGlobal = []; // GUARDA OS LANCHES PARA A EDIÇÃO
 let produtoEdicaoId = null; // CONTROLA SE ESTAMOS CRIANDO (null) OU EDITANDO (id);
 
 // ==========================================
+// MÓDULO -1: AUTENTICAÇÃO DO PAINEL (SUPABASE AUTH)
+// ==========================================
+const CHAVE_SESSAO_ADMIN = "hamburgueria_admin_sessao";
+
+function salvarSessao(dadosToken) {
+    const sessao = {
+        access_token: dadosToken.access_token,
+        refresh_token: dadosToken.refresh_token,
+        expira_em: Math.floor(Date.now() / 1000) + dadosToken.expires_in
+    };
+    localStorage.setItem(CHAVE_SESSAO_ADMIN, JSON.stringify(sessao));
+    return sessao;
+}
+
+function carregarSessao() {
+    const bruto = localStorage.getItem(CHAVE_SESSAO_ADMIN);
+    return bruto ? JSON.parse(bruto) : null;
+}
+
+function limparSessao() {
+    localStorage.removeItem(CHAVE_SESSAO_ADMIN);
+}
+
+function sessaoExpirada(sessao) {
+    if (!sessao) return true;
+    return Math.floor(Date.now() / 1000) >= (sessao.expira_em - 30); // 30s de margem
+}
+
+// Monta os headers de toda chamada ao Supabase usando o token do admin logado
+// (necessário pra passar nas políticas RLS que exigem usuário autenticado)
+function headersAutenticados(contentType) {
+    const sessao = carregarSessao();
+    const token = (sessao && sessao.access_token) ? sessao.access_token : SUPABASE_KEY;
+    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${token}` };
+    if (contentType) headers['Content-Type'] = contentType;
+    return headers;
+}
+
+async function fazerLoginAdmin(event) {
+    if (event) event.preventDefault();
+    const email = document.getElementById("login-email").value.trim();
+    const senha = document.getElementById("login-senha").value;
+    const erroEl = document.getElementById("login-erro");
+    const btn = document.getElementById("btn-login-admin");
+
+    erroEl.style.display = "none";
+    const textoOriginal = btn.innerText;
+    btn.innerText = "Entrando...";
+    btn.disabled = true;
+
+    try {
+        const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+            method: 'POST',
+            headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password: senha })
+        });
+        const dados = await res.json();
+
+        if (!res.ok) {
+            erroEl.innerText = "E-mail ou senha inválidos.";
+            erroEl.style.display = "block";
+            return;
+        }
+
+        salvarSessao(dados);
+        iniciarPainelAdmin();
+    } catch (erro) {
+        erroEl.innerText = "Erro de conexão. Tente novamente.";
+        erroEl.style.display = "block";
+        console.error(erro);
+    } finally {
+        btn.innerText = textoOriginal;
+        btn.disabled = false;
+    }
+}
+
+function sairAdmin() {
+    limparSessao();
+    location.reload();
+}
+
+async function renovarSessaoSeNecessario() {
+    const sessao = carregarSessao();
+    if (!sessao) return false;
+    if (!sessaoExpirada(sessao)) return true;
+
+    try {
+        const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+            method: 'POST',
+            headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: sessao.refresh_token })
+        });
+        if (!res.ok) { limparSessao(); return false; }
+        salvarSessao(await res.json());
+        return true;
+    } catch (erro) {
+        limparSessao();
+        return false;
+    }
+}
+
+function iniciarPainelAdmin() {
+    document.getElementById("tela-login-admin").style.display = "none";
+    document.getElementById("app-admin-container").style.display = "block";
+
+    carregarProdutos();
+    carregarEstoque();
+    carregarPedidosAdmin();
+    carregarConfiguracoesAdmin();
+
+    setInterval(carregarPedidosAdmin, 3000);
+    setInterval(() => { carregarProdutos(); carregarEstoque(); }, 5000);
+    setInterval(renovarSessaoSeNecessario, 5 * 60 * 1000);
+}
+
+async function verificarSessaoAoAbrir() {
+    const sessao = carregarSessao();
+    if (sessao && await renovarSessaoSeNecessario()) {
+        iniciarPainelAdmin();
+    }
+}
+
+// ==========================================
 // MÓDULO 0: NAVEGAÇÃO DE ABAS ADMIN
 // ==========================================
 function mudarAbaAdmin(idAba, botaoClicado) {
@@ -22,6 +145,18 @@ function mudarAbaAdmin(idAba, botaoClicado) {
     if(botaoClicado) botaoClicado.classList.add('ativa');
 }
 
+// Evita XSS: qualquer texto vindo do banco (nome de cliente, produto, ingrediente)
+// passa por aqui antes de entrar num innerHTML.
+function escaparHtml(texto) {
+    if (texto === null || texto === undefined) return "";
+    return String(texto)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
 // ==========================================
 // MÓDULO 1: GESTÃO DE PRODUTOS
 // ==========================================
@@ -29,7 +164,7 @@ async function carregarProdutos() {
     try {
         const resposta = await fetch(`${SUPABASE_URL}/rest/v1/produtos?select=*&order=id.asc`, {
             method: 'GET',
-            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+            headers: headersAutenticados()
         });
         const dados = await resposta.json();
         listaDeProdutosGlobal = dados; 
@@ -66,8 +201,8 @@ function renderizarTabelaProdutos(produtos) {
         tbody.innerHTML += `
             <tr>
                 <td>#${produto.id}</td>
-                <td><strong>${produto.nome}</strong></td>
-                <td>${produto.categoria}</td>
+                <td><strong>${escaparHtml(produto.nome)}</strong></td>
+                <td>${escaparHtml(produto.categoria)}</td>
                 <td>R$ ${produto.preco.toFixed(2).replace('.', ',')}</td>
                 <td><span class="status-badge ${badgeClass}">${badgeTexto}</span></td>
                 <td>
@@ -92,8 +227,8 @@ function renderizarTabelaProdutos(produtos) {
 async function mudarStatusProduto(id, novoStatus) {
     await fetch(`${SUPABASE_URL}/rest/v1/produtos?id=eq.${id}`, {
         method: 'PATCH',
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ativo: novoStatus }) 
+        headers: headersAutenticados('application/json'),
+        body: JSON.stringify({ ativo: novoStatus })
     });
     carregarProdutos();
 }
@@ -214,7 +349,7 @@ async function salvarNovoProduto() {
 
             const resUpload = await fetch(`${SUPABASE_URL}/storage/v1/object/imagens/${nomeUnico}`, {
                 method: 'POST',
-                headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': arquivo.type },
+                headers: headersAutenticados(arquivo.type),
                 body: arquivo
             });
 
@@ -234,7 +369,7 @@ async function salvarNovoProduto() {
 
         const res = await fetch(url, {
             method: metodo,
-            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+            headers: headersAutenticados('application/json'),
             body: JSON.stringify(payload)
         });
 
@@ -273,13 +408,13 @@ async function excluirProduto(id) {
         // Passo 1: Excluir a receita amarrada ao lanche primeiro (para não dar erro de Chave Estrangeira)
         await fetch(`${SUPABASE_URL}/rest/v1/receita_produto?produto_id=eq.${id}`, {
             method: 'DELETE',
-            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+            headers: headersAutenticados()
         });
 
         // Passo 2: Deletar o Produto
         const res = await fetch(`${SUPABASE_URL}/rest/v1/produtos?id=eq.${id}`, {
             method: 'DELETE',
-            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+            headers: headersAutenticados()
         });
 
         if(!res.ok) {
@@ -307,7 +442,7 @@ async function carregarEstoque() {
     try {
         const resposta = await fetch(`${SUPABASE_URL}/rest/v1/ingredientes?select=*&order=id.asc`, {
             method: 'GET',
-            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+            headers: headersAutenticados()
         });
         const dados = await resposta.json();
         listaDeIngredientesGlobal = dados; 
@@ -325,7 +460,7 @@ function renderizarTabelaEstoque(ingredientes) {
             <tr>
                 <td>#${ing.id}</td>
                 <td>
-                    <strong>${ing.nome}</strong><br>
+                    <strong>${escaparHtml(ing.nome)}</strong><br>
                     <small style="color:#aaa;">Extra: R$ ${Number(ing.preco_adicional).toFixed(2).replace('.', ',')}</small>
                 </td>
                 <td>${ing.unidade}</td>
@@ -353,8 +488,8 @@ async function ajustarSaldo(id, nome, saldoAtual) {
     try {
         await fetch(`${SUPABASE_URL}/rest/v1/ingredientes?id=eq.${id}`, {
             method: 'PATCH',
-            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ estoque: parseFloat(novoValorTexto) }) 
+            headers: headersAutenticados('application/json'),
+            body: JSON.stringify({ estoque: parseFloat(novoValorTexto) })
         });
         carregarEstoque();
     } catch (erro) { console.error(erro); }
@@ -414,7 +549,7 @@ async function salvarNovoIngrediente() {
     try {
         const res = await fetch(url, {
             method: metodo,
-            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+            headers: headersAutenticados('application/json'),
             body: JSON.stringify(payload)
         });
 
@@ -435,7 +570,7 @@ async function excluirIngrediente(id) {
     try {
         const res = await fetch(`${SUPABASE_URL}/rest/v1/ingredientes?id=eq.${id}`, {
             method: 'DELETE',
-            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+            headers: headersAutenticados()
         });
 
         if(!res.ok) {
@@ -484,7 +619,7 @@ async function buscarIngredientesDesteLanche(produtoId) {
     try {
         const resposta = await fetch(`${SUPABASE_URL}/rest/v1/receita_produto?produto_id=eq.${produtoId}`, {
             method: 'GET',
-            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+            headers: headersAutenticados()
         });
         const receitaDoBanco = await resposta.json();
         
@@ -503,8 +638,8 @@ async function buscarIngredientesDesteLanche(produtoId) {
 
             tbody.innerHTML += `
                 <tr>
-                    <td><strong>${nome}</strong></td>
-                    <td>${itemDaReceita.quantidade} ${unidade}</td>
+                    <td><strong>${escaparHtml(nome)}</strong></td>
+                    <td>${itemDaReceita.quantidade} ${escaparHtml(unidade)}</td>
                     <td>
                         <button class="btn-acao btn-excluir" onclick="removerDaReceita(${itemDaReceita.id})">Remover</button>
                     </td>
@@ -530,10 +665,7 @@ async function salvarIngredienteNaReceita() {
     try {
         const resposta = await fetch(`${SUPABASE_URL}/rest/v1/receita_produto`, {
             method: 'POST',
-            headers: {
-                'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`,
-                'Content-Type': 'application/json', 'Prefer': 'return=representation'
-            },
+            headers: { ...headersAutenticados('application/json'), 'Prefer': 'return=representation' },
             body: JSON.stringify({
                 produto_id: produtoAtualParaReceita,
                 ingrediente_id: parseInt(ingredienteId),
@@ -566,7 +698,7 @@ async function removerDaReceita(idDaReceita) {
     try {
         await fetch(`${SUPABASE_URL}/rest/v1/receita_produto?id=eq.${idDaReceita}`, {
             method: 'DELETE',
-            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+            headers: headersAutenticados()
         });
         buscarIngredientesDesteLanche(produtoAtualParaReceita);
     } catch (erro) { console.error("Erro ao remover:", erro); }
@@ -580,7 +712,7 @@ async function carregarPedidosAdmin() {
     try {
         const res = await fetch(`${SUPABASE_URL}/rest/v1/pedidos?select=*&order=id.asc`, {
             method: 'GET',
-            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+            headers: headersAutenticados()
         });
 
         if (!res.ok) {
@@ -631,6 +763,11 @@ function renderizarKanban(pedidos) {
 
         const totalNum = parseFloat(ped.total) || 0;
 
+        let obsHtml = "";
+        if (ped.observacoes && String(ped.observacoes).trim() !== "") {
+            obsHtml = `<div style="background: #332a00; color: #ffc107; padding: 8px 10px; border-radius: 6px; margin-top: 8px; font-size: 13px; white-space: pre-line;"><i class="fa-solid fa-pen"></i> ${escaparHtml(ped.observacoes)}</div>`;
+        }
+
         const cardHtml = `
             <div class="card-pedido ${statusFormatado.toLowerCase().replace(' ', '-')}">
                 <div class="card-header">
@@ -638,10 +775,11 @@ function renderizarKanban(pedidos) {
                     <span class="pedido-tempo"><i class="fa-regular fa-clock"></i> ${dataFormatada}</span>
                 </div>
                 <div class="info-cliente">
-                    <strong>${ped.nome_cliente || 'Cliente não informado'}</strong><br>
-                    Pgto: ${ped.forma_pagamento || '-'}<br>
+                    <strong>${escaparHtml(ped.nome_cliente) || 'Cliente não informado'}</strong><br>
+                    Pgto: ${escaparHtml(ped.forma_pagamento) || '-'}<br>
                     <span style="color: #2ed573; font-weight: bold;">R$ ${totalNum.toFixed(2).replace('.', ',')}</span>
                 </div>
+                ${obsHtml}
                 ${botoesAcaoKanban(ped.id, statusFormatado)}
             </div>
         `;
@@ -686,10 +824,7 @@ async function atualizarStatusPedido(id, novoStatus) {
     try {
         await fetch(`${SUPABASE_URL}/rest/v1/pedidos?id=eq.${id}`, {
             method: 'PATCH',
-            headers: {
-                'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`,
-                'Content-Type': 'application/json', 'Prefer': 'return=representation'
-            },
+            headers: { ...headersAutenticados('application/json'), 'Prefer': 'return=representation' },
             body: JSON.stringify(corpo)
         });
         
@@ -707,13 +842,13 @@ async function carregarConfiguracoesAdmin() {
     try {
         const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracoes?id=eq.1&select=*`, {
             method: 'GET',
-            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+            headers: headersAutenticados()
         });
         const dados = await res.json();
-        
+
         if (dados && dados.length > 0) {
             const config = dados[0];
-            
+
             // 1. Preenche os Dados da Loja (PIX, Horários, WhatsApp)
             document.getElementById("admin-chave-pix").value = config.chave_pix || "";
             document.getElementById("admin-nome-pix").value = config.nome_recebedor || "";
@@ -759,11 +894,7 @@ async function salvarConfiguracoesLoja() {
 
             const resUpload = await fetch(`${SUPABASE_URL}/storage/v1/object/imagens/${nomeUnico}`, {
                 method: 'POST',
-                headers: {
-                    'apikey': SUPABASE_KEY,
-                    'Authorization': `Bearer ${SUPABASE_KEY}`,
-                    'Content-Type': arquivo.type 
-                },
+                headers: headersAutenticados(arquivo.type),
                 body: arquivo
             });
 
@@ -783,11 +914,7 @@ async function salvarConfiguracoesLoja() {
             // Agora envia corretamente para o bucket 'audios'
             const resUploadAudio = await fetch(`${SUPABASE_URL}/storage/v1/object/audios/${nomeUnicoAudio}`, {
                 method: 'POST',
-                headers: {
-                    'apikey': SUPABASE_KEY,
-                    'Authorization': `Bearer ${SUPABASE_KEY}`,
-                    'Content-Type': arquivoAudio.type
-                },
+                headers: headersAutenticados(arquivoAudio.type),
                 body: arquivoAudio
             });
 
@@ -825,10 +952,7 @@ async function salvarConfiguracoesLoja() {
 
         const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracoes?id=eq.1`, {
             method: 'PATCH',
-            headers: {
-                'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`,
-                'Content-Type': 'application/json'
-            },
+            headers: headersAutenticados('application/json'),
             body: JSON.stringify(corpoDb)
         });
 
@@ -852,16 +976,5 @@ async function salvarConfiguracoesLoja() {
 // ==========================================
 // INICIALIZAÇÃO DO SISTEMA
 // ==========================================
-carregarProdutos();
-carregarEstoque();
-carregarPedidosAdmin();
-carregarConfiguracoesAdmin(); // Carrega os dados da loja ao abrir o painel
-
-// Atualiza o painel de pedidos silenciosamente a cada 3 segundos
-setInterval(carregarPedidosAdmin, 3000);
-
-// Atualiza o cardápio e o estoque a cada 15 segundos (Atualização Real-Time)
-setInterval(() => {
-    carregarProdutos();
-    carregarEstoque();
-}, 5000);
+// Só carrega os dados e liga os intervalos depois de confirmar login (ver iniciarPainelAdmin).
+verificarSessaoAoAbrir();

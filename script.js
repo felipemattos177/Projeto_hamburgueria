@@ -14,6 +14,18 @@ let configLoja = {
 let lojaAberta = true;
 let mensagemFechado = "";
 
+// Evita XSS: qualquer texto vindo do banco (nome/descrição de produto ou ingrediente)
+// passa por aqui antes de entrar num innerHTML.
+function escaparHtml(texto) {
+    if (texto === null || texto === undefined) return "";
+    return String(texto)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
 // === FUNÇÃO DE AVISOS PERSONALIZADOS ===
 function mostrarAviso(mensagem, titulo = "Ops!", tipo = "aviso") {
     let caixa = document.getElementById("caixa-aviso-custom");
@@ -156,7 +168,7 @@ async function carregarCardapioDoBanco() {
                 
                 // Cria um botão para cada categoria que existir no banco
                 categoriasUnicas.forEach(cat => {
-                    menuCategorias.innerHTML += `<button class="btn-categoria" onclick="filtrarCategoria('${cat}', this)">${cat}</button>`;
+                    menuCategorias.innerHTML += `<button class="btn-categoria" onclick="filtrarCategoria('${cat}', this)">${escaparHtml(cat)}</button>`;
                 });
             }
             // ------------------------------------------
@@ -193,8 +205,8 @@ function renderizarCardapio(categoriaFiltro = "Todos") {
                         ${badgeEsgotado}
                     </div>
                     <div class="produto-info">
-                        <h3>${produto.nome}</h3>
-                        <p>${produto.descricao}</p>
+                        <h3>${escaparHtml(produto.nome)}</h3>
+                        <p>${escaparHtml(produto.descricao)}</p>
                         <span class="preco">R$ ${produto.preco.toFixed(2).replace('.', ',')}</span>
                     </div>
                 </div>
@@ -275,10 +287,10 @@ async function abrirModalProduto(id) {
                 if(estoqueRealDisponivel >= consumoBaseDoIngrediente) { 
                     htmlAdicionais += `
                         <div class="adicional-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 12px; background: #222; border-radius: 8px; border: 1px solid #333;">
-                            <span style="color: #fff; font-weight: 500;">${add.nome} <br><small style="color: #aaa;">+ R$ ${Number(add.preco_adicional).toFixed(2).replace('.', ',')}</small></span>
+                            <span style="color: #fff; font-weight: 500;">${escaparHtml(add.nome)} <br><small style="color: #aaa;">+ R$ ${Number(add.preco_adicional).toFixed(2).replace('.', ',')}</small></span>
                             <div style="display: flex; align-items: center; gap: 12px;">
                                 <button type="button" onclick="alterarQtdAdicional('${add.id}', -1)" style="width: 32px; height: 32px; border-radius: 6px; background: #444; color: white; border: none; font-weight: bold; cursor: pointer; font-size: 18px;">-</button>
-                                <span class="qtd-adicional-span" id="qtd-add-${add.id}" data-id="${add.id}" data-nome="${add.nome}" data-preco="${add.preco_adicional}" style="font-weight: bold; color: #fff; width: 15px; text-align: center; font-size: 16px;">0</span>
+                                <span class="qtd-adicional-span" id="qtd-add-${add.id}" data-id="${add.id}" data-nome="${escaparHtml(add.nome)}" data-preco="${add.preco_adicional}" style="font-weight: bold; color: #fff; width: 15px; text-align: center; font-size: 16px;">0</span>
                                 <button type="button" onclick="alterarQtdAdicional('${add.id}', 1)" style="width: 32px; height: 32px; border-radius: 6px; background: var(--laranja-fogo, #ff5e00); color: white; border: none; font-weight: bold; cursor: pointer; font-size: 18px;">+</button>
                             </div>
                         </div>
@@ -290,6 +302,7 @@ async function abrirModalProduto(id) {
 
         let controleQtdHtml = "";
         let btnAdicionarHtml = "";
+        let observacaoHtml = "";
 
         if (!lojaAberta) {
             btnAdicionarHtml = `
@@ -302,10 +315,16 @@ async function abrirModalProduto(id) {
             btnAdicionarHtml = `
                 <div style="background: #333; color: #ff4757; text-align: center; padding: 15px; border-radius: 8px; margin-top: 15px; border: 1px solid #444;">
                     <i class="fa-solid fa-triangle-exclamation" style="font-size: 20px; margin-bottom: 5px;"></i><br>
-                    <strong>Estoque Insuficiente</strong><br><span style="font-size: 13px;">Falta ${ingredienteFaltanteBase} para finalizar a montagem.</span>
+                    <strong>Estoque Insuficiente</strong><br><span style="font-size: 13px;">Falta ${escaparHtml(ingredienteFaltanteBase)} para finalizar a montagem.</span>
                 </div>
             `;
         } else {
+            observacaoHtml = `
+                <div style="margin-top: 15px;">
+                    <label style="color: #fff; font-weight: bold; font-size: 14px; display: block; margin-bottom: 8px;">Alguma observação?</label>
+                    <textarea id="observacao-item" placeholder="Ex: sem cebola, sem tomate, caprichar no molho..." maxlength="200" style="width: 100%; min-height: 60px; padding: 12px; background: #222; border: 1px solid #333; border-radius: 8px; color: #fff; font-family: inherit; font-size: 14px; resize: vertical; box-sizing: border-box;"></textarea>
+                </div>
+            `;
             controleQtdHtml = `
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; padding: 15px; background: #222; border-radius: 8px;">
                     <span style="color: #fff; font-weight: bold; font-size: 16px;">Quantidade:</span>
@@ -323,10 +342,11 @@ async function abrirModalProduto(id) {
 
         detalhes.innerHTML = `
             <div class="produto-imagem" style="${imgModalSegura} height: 200px; background-size: cover; background-position: center; border-radius: 10px; margin-bottom: 15px; width: 100%;"></div>
-            <h2 style="color: #fff; font-size: 22px;">${produtoSendoVisto.nome}</h2>
-            <p style="color: #aaa; font-size: 14px; margin-bottom: 10px;">${produtoSendoVisto.descricao}</p>
+            <h2 style="color: #fff; font-size: 22px;">${escaparHtml(produtoSendoVisto.nome)}</h2>
+            <p style="color: #aaa; font-size: 14px; margin-bottom: 10px;">${escaparHtml(produtoSendoVisto.descricao)}</p>
             <h3 style="color: var(--laranja-fogo, #ff5e00); font-size: 22px;">R$ ${produtoSendoVisto.preco.toFixed(2).replace('.', ',')}</h3>
             ${htmlAdicionais}
+            ${observacaoHtml}
             ${controleQtdHtml}
             ${btnAdicionarHtml}
         `;
@@ -564,11 +584,15 @@ async function confirmarAdicao() {
         }
 
         // TUDO CERTO! Envia pro carrinho
+        const campoObservacao = document.getElementById("observacao-item");
+        const observacao = campoObservacao ? campoObservacao.value.trim().substring(0, 200) : "";
+
         for (let i = 0; i < qtdBaseEscolhida; i++) {
             const itemParaCarrinho = {
                 produtoBase: produtoSendoVisto,
-                adicionais: JSON.parse(JSON.stringify(adicionaisEscolhidos)), 
-                precoTotalItem: produtoSendoVisto.preco + totalAdicionais
+                adicionais: JSON.parse(JSON.stringify(adicionaisEscolhidos)),
+                precoTotalItem: produtoSendoVisto.preco + totalAdicionais,
+                observacao: observacao
             };
             carrinho.push(itemParaCarrinho);
         }
@@ -624,16 +648,22 @@ function renderizarCheckout() {
             listaAddsHtml = "<ul style='color: #aaa; font-size: 13px; margin-top: 5px; list-style: none;'>";
             item.adicionais.forEach(add => {
                 const subtotalAdd = add.preco * add.quantidade;
-                listaAddsHtml += `<li>+ ${add.quantidade}x ${add.nome} (R$ ${subtotalAdd.toFixed(2).replace('.', ',')})</li>`;
+                listaAddsHtml += `<li>+ ${add.quantidade}x ${escaparHtml(add.nome)} (R$ ${subtotalAdd.toFixed(2).replace('.', ',')})</li>`;
             });
             listaAddsHtml += "</ul>";
+        }
+
+        let obsHtml = "";
+        if (item.observacao) {
+            obsHtml = `<div style="color: #ffa502; font-size: 13px; margin-top: 6px;"><i class="fa-solid fa-pen"></i> Obs: ${escaparHtml(item.observacao)}</div>`;
         }
 
         divItens.innerHTML += `
             <div style="background: #222; border-radius: 8px; padding: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333;">
                 <div>
-                    <strong>1x ${item.produtoBase.nome} <span style="color: #aaa; font-size: 13px;">(R$ ${item.produtoBase.preco.toFixed(2).replace('.', ',')})</span></strong>
+                    <strong>1x ${escaparHtml(item.produtoBase.nome)} <span style="color: #aaa; font-size: 13px;">(R$ ${item.produtoBase.preco.toFixed(2).replace('.', ',')})</span></strong>
                     ${listaAddsHtml}
+                    ${obsHtml}
                     <div style="color: var(--laranja-fogo, #ff5e00); margin-top: 5px; font-weight: bold; font-size: 15px;">
                         Subtotal: R$ ${item.precoTotalItem.toFixed(2).replace('.', ',')}
                     </div>
@@ -844,6 +874,9 @@ async function enviarParaWhatsApp() {
                     const subtotalExtra = add.preco * add.quantidade;
                     textoPedido += `   + ${add.quantidade}x ${add.nome} (R$ ${subtotalExtra.toFixed(2).replace('.', ',')})\n`;
                 });
+                if (item.observacao) {
+                    textoPedido += `   📝 Obs: ${item.observacao}\n`;
+                }
                 textoPedido += `   *Subtotal do item: R$ ${item.precoTotalItem.toFixed(2).replace('.', ',')}*\n`;
             });
 
@@ -929,8 +962,8 @@ async function carregarHistoricoPedidos() {
                         <strong style="color: var(--laranja-fogo, #ff5e00);">Pedido #${p.id}</strong>
                         <span style="color: #aaa; font-size: 12px;">${dataFormatada}</span>
                     </div>
-                    <div style="color: #fff; font-size: 14px; margin-bottom: 5px;">Status: <strong>${p.status || 'Pendente'}</strong></div>
-                    <div style="color: #fff; font-size: 14px; margin-bottom: 5px;">Pagamento: ${p.forma_pagamento}</div>
+                    <div style="color: #fff; font-size: 14px; margin-bottom: 5px;">Status: <strong>${escaparHtml(p.status) || 'Pendente'}</strong></div>
+                    <div style="color: #fff; font-size: 14px; margin-bottom: 5px;">Pagamento: ${escaparHtml(p.forma_pagamento)}</div>
                     <div style="color: #2ed573; font-weight: bold; font-size: 15px;">Total: R$ ${Number(p.total).toFixed(2).replace('.', ',')}</div>
                 </div>
             `;
@@ -1218,72 +1251,78 @@ async function loginComGoogle() {
 
 // 2. Checa se o cliente acabou de voltar do login do Google e captura os dados dele
 function checarRetornoLoginGoogle() {
-    const urlAtual = window.location.href;
+    // Pegamos exatamente o Hash (tudo que vem depois do # na URL)
+    const hashAtual = window.location.hash;
     
-    if (urlAtual.includes("access_token=")) {
+    if (hashAtual && hashAtual.includes("access_token=")) {
         try {
-            // 1. Extrai e GUARDA o token imediatamente antes de apagar da tela
-            const tokenCompleto = urlAtual.split("access_token=")[1].split("&")[0];
+            // 1. Extrai o token de forma perfeita e limpa usando a ferramenta nativa do navegador
+            const parametros = new URLSearchParams(hashAtual.substring(1));
+            const tokenCompleto = parametros.get("access_token");
 
-            // 2. Agora sim, limpa a URL de forma elegante deixando o link limpo (localhost:3000)
-            window.history.replaceState({}, document.title, window.location.pathname);
+            if (!tokenCompleto) return; // Se não achar o token, aborta a missão
 
-            // 3. Aguarda o sistema iniciar e usa o token que guardamos em memória
-            setTimeout(async () => {
-                try {
-                    const resUser = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-                        method: 'GET',
-                        headers: {
-                            'apikey': SUPABASE_KEY,
-                            'Authorization': `Bearer ${tokenCompleto}` // Usa a variável segura
-                        }
-                    });
-
-                    if (resUser.ok) {
-                        const usuarioGoogle = await resUser.json();
-                        
-                        // Captura o nome completo vindo do Google
-                        const nomeGoogle = usuarioGoogle.user_metadata.full_name || usuarioGoogle.user_metadata.name || "Cliente Google";
-
-                        // Puxa o perfil atual do localStorage se já existir algo guardado
-                        let perfilExistente = JSON.parse(localStorage.getItem("vilelaburgers_perfil") || "{}");
-
-                        // Atualiza o perfil local com o Nome vindo do Google
-                        perfilExistente.nome = nomeGoogle;
-
-                        // Grava no localStorage do navegador do cliente
-                        localStorage.setItem("vilelaburgers_perfil", JSON.stringify(perfilExistente));
-
-                        // Força a atualização dos inputs visuais na tela
-                        carregarPerfilNaTela();
-                        preencherCheckoutComPerfil();
-
-                        // Dispara o popup verde de sucesso e joga o cliente para a aba de Perfil!
-                        mostrarAviso(`Olá, ${nomeGoogle}! Seu perfil foi conectado com o Google com sucesso.`, "Login Concluído!", "sucesso");
-                        navegarPara('perfil');
-                    } else {
-                        console.error("Supabase recusou o token do usuário.");
-                    }
-                } catch (erroInterno) {
-                    console.error("Erro ao consultar dados do usuário no Supabase:", erroInterno);
+            // 2. Faz o fetch na mesma hora usando o token, SEM limpar a URL da tela ainda
+            fetch(`${SUPABASE_URL}/auth/v1/user`, {
+                method: 'GET',
+                headers: {
+                    'apikey': SUPABASE_KEY,
+                    'Authorization': `Bearer ${tokenCompleto}`
                 }
-            }, 800); 
+            })
+            .then(res => {
+                if (res.ok) return res.json();
+                throw new Error("Token rejeitado pelo Supabase");
+            })
+            .then(usuarioGoogle => {
+                // Captura o nome retornado pelas credenciais do Google
+                const nomeGoogle = usuarioGoogle.user_metadata.full_name || usuarioGoogle.user_metadata.name || "Cliente Google";
+
+                // Sincroniza o nome no LocalStorage do navegador
+                let perfilExistente = JSON.parse(localStorage.getItem("vilelaburgers_perfil") || "{}");
+                perfilExistente.nome = nomeGoogle;
+                localStorage.setItem("vilelaburgers_perfil", JSON.stringify(perfilExistente));
+
+                // Atualiza as caixas de texto na tela do cliente
+                carregarPerfilNaTela();
+                preencherCheckoutComPerfil();
+
+                // 3. SÓ AGORA (quando tudo deu certo) APAGAMOS A URL GIGANTE PARA LIMPAR A TELA!
+                window.location.hash = "";
+                window.history.replaceState({}, document.title, window.location.pathname);
+
+                // Dispara o popup de sucesso verde e manda pra tela de perfil
+                mostrarAviso(`Olá, ${nomeGoogle}! Seu perfil foi conectado com o Google com sucesso.`, "Login Concluído!", "sucesso");
+                navegarPara('perfil');
+            })
+            .catch(err => {
+                console.error("Erro na validação do login Google:", err);
+                // Mesmo se der erro, limpamos a tela para o cliente não ficar travado
+                window.location.hash = "";
+                window.history.replaceState({}, document.title, window.location.pathname);
+            });
 
         } catch (e) {
-            console.error("Erro ao processar URL de retorno do Google:", e);
+            console.error("Erro no processamento dos parâmetros OAuth:", e);
         }
     }
 }
-// Executa o detector de retorno toda vez que a página inicia
+
+// ==========================================================
+// GATILHOS DE INICIALIZAÇÃO AUTOMÁTICA DO SISTEMA
+// ==========================================================
+
+// 1. Roda o verificador do Google imediatamente ao abrir o site
 checarRetornoLoginGoogle();
 
-// ==========================================
-// IDENTIDADE VISUAL DINÂMICA E INICIALIZAÇÃO
-// ==========================================
-// Roda a função assim que o cliente abre o site
+// 2. Carrega a Identidade Visual Dinâmica
 carregarIdentidadeVisual();
 
-// === INICIALIZAÇÃO DO SISTEMA ===
+// 3. Inicializa as configurações e horários da hamburgueria
 carregarConfiguracoes(); 
+
+// 4. Puxa os produtos do cardápio do banco de dados
 carregarCardapioDoBanco(); 
+
+// 5. Insere e atualiza a versão no rodapé
 renderizarRodape();

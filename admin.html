@@ -79,9 +79,32 @@
         
         .coluna-pedidos::-webkit-scrollbar { width: 6px; }
         .coluna-pedidos::-webkit-scrollbar-thumb { background: #444; border-radius: 10px; }
+
+        /* === TELA DE LOGIN DO ADMIN === */
+        #tela-login-admin { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #121212; display: flex; align-items: center; justify-content: center; z-index: 5000; }
+        .login-card { background: #1e1e1e; padding: 35px 30px; border-radius: 12px; width: 100%; max-width: 340px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+        .login-card h1 { color: var(--laranja-fogo); font-size: 22px; margin-bottom: 25px; text-align: center; }
+        .login-card input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #333; border-radius: 6px; background: #111; color: #fff; box-sizing: border-box; font-size: 15px; }
+        .login-card button { width: 100%; background: var(--laranja-fogo); color: #fff; border: none; padding: 13px; border-radius: 6px; font-weight: bold; font-size: 15px; cursor: pointer; }
+        #login-erro { color: #ff4757; font-size: 13px; margin-bottom: 12px; display: none; text-align: center; }
+        .btn-sair-admin { background: #57606f; color: #fff; border: none; padding: 12px 18px; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 14px; }
     </style>
 </head>
 <body>
+
+    <!-- TELA DE LOGIN (única coisa visível antes de autenticar) -->
+    <div id="tela-login-admin">
+        <form class="login-card" onsubmit="fazerLoginAdmin(event)">
+            <h1><i class="fa-solid fa-fire-flame-curved"></i> Fire Burger Admin</h1>
+            <div id="login-erro"></div>
+            <input type="email" id="login-email" placeholder="E-mail" autocomplete="username" required>
+            <input type="password" id="login-senha" placeholder="Senha" autocomplete="current-password" required>
+            <button type="submit" id="btn-login-admin">Entrar</button>
+        </form>
+    </div>
+
+    <!-- CONTEÚDO DO PAINEL: só aparece depois do login -->
+    <div id="app-admin-container" style="display: none;">
 
     <!-- SUBMENU DE NAVEGAÇÃO -->
     <div class="tabs-container">
@@ -90,6 +113,7 @@
         <button class="tab-btn" onclick="mudarAbaAdmin('view-pedidos', this)"><i class="fa-solid fa-motorcycle"></i> Gestão de Pedidos</button>
         <!-- NOVO BOTÃO DAS CONFIGURAÇÕES -->
         <button class="tab-btn" onclick="mudarAbaAdmin('view-config', this)"><i class="fa-solid fa-gear"></i> Configurações</button>
+        <button class="btn-sair-admin" onclick="sairAdmin()"><i class="fa-solid fa-right-from-bracket"></i> Sair</button>
     </div>
 
     <!-- ========================================== -->
@@ -360,6 +384,8 @@
             </div>
         </div>
     </div>
+
+    </div> <!-- fim de #app-admin-container -->
 
     <!-- Script de navegação embutido (responsável pelas abas e animação) -->
     <script>

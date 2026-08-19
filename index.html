@@ -27,15 +27,15 @@
     <style>
         /* === ESTILO DA TARJA INTELIGENTE DE LOJA FECHADA === */
         #aviso-loja-fechada {
-            display: none; 
+            display: none;
             background: #ff4757;
             color: white;
             text-align: center;
             padding: 12px;
             font-weight: bold;
-            position: sticky;
-            top: 0;
-            z-index: 9999;
+            margin-top: 60px; /* limpa o cabeçalho fixo, fica abaixo da logo */
+            position: relative;
+            z-index: 90;
             box-shadow: 0 4px 10px rgba(0,0,0,0.5);
             font-size: 14px;
             font-family: 'Roboto', sans-serif;

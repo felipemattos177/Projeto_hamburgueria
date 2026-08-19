@@ -1259,10 +1259,16 @@ function verificarHorarioLoja() {
         mensagemFechado = `Voltamos ${txtDia} às ${configLoja.horario_abertura}.`;
         
         if (bannerHtml) { bannerHtml.innerHTML = `⚠️ Loja Fechada no momento. ${mensagemFechado}`; bannerHtml.style.display = "block"; }
+        // O aviso já empurra o cabeçalho pra baixo (margin-top próprio), então o
+        // banner principal não precisa mais da margem que usa pra limpar o header sozinho.
+        const heroEl = document.getElementById("banner-fundo");
+        if (heroEl) heroEl.style.marginTop = "0";
         const detalhes = document.getElementById("detalhes-produto-modal");
         if (detalhes && !detalhes.innerHTML.includes("Loja Fechada no Momento") && produtoSendoVisto) { abrirModalProduto(produtoSendoVisto.id); }
     } else {
         if (bannerHtml) bannerHtml.style.display = "none";
+        const heroEl = document.getElementById("banner-fundo");
+        if (heroEl) heroEl.style.marginTop = "";
     }
 }
 

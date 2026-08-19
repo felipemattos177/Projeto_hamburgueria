@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel da Plataforma - Maths Hub</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root { --laranja-fogo: #ff5e00; }
+        body { font-family: 'Roboto', sans-serif; background-color: #f4f6f8; margin: 0; padding: 20px; color: #333; padding-bottom: 50px; }
+
+        #tela-login-super { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #121212; display: flex; align-items: center; justify-content: center; z-index: 5000; }
+        .login-card { background: #1e1e1e; padding: 35px 30px; border-radius: 12px; width: 100%; max-width: 340px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+        .login-card h1 { color: var(--laranja-fogo); font-size: 20px; margin-bottom: 25px; text-align: center; }
+        .login-card input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #333; border-radius: 6px; background: #111; color: #fff; box-sizing: border-box; font-size: 15px; }
+        .login-card button { width: 100%; background: var(--laranja-fogo); color: #fff; border: none; padding: 13px; border-radius: 6px; font-weight: bold; font-size: 15px; cursor: pointer; }
+        #login-erro-super { color: #ff4757; font-size: 13px; margin-bottom: 12px; display: none; text-align: center; }
+
+        .header-admin { display: flex; justify-content: space-between; align-items: center; background: #121212; color: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
+        .header-admin h1 { margin: 0; font-size: 22px; color: var(--laranja-fogo); }
+        .btn-sair { background: #57606f; color: #fff; border: none; padding: 10px 18px; border-radius: 5px; font-weight: bold; cursor: pointer; }
+        .btn-novo { background-color: #2ed573; color: white; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; }
+        .btn-novo:hover { background-color: #26b963; }
+
+        table { width: 100%; background: white; border-collapse: collapse; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; vertical-align: middle; }
+        th { background-color: #f1f2f6; color: #555; font-weight: 500; }
+
+        .status-badge { padding: 5px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; color: white; }
+        .status-ativo { background-color: #2ed573; }
+        .status-inativo { background-color: #ff4757; }
+
+        .btn-acao { padding: 8px 12px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 13px; }
+        .btn-toggle { background-color: #dfe4ea; color: #2f3542; }
+        .btn-vincular { background-color: #3498db; color: white; }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-conteudo { background: white; padding: 30px; border-radius: 10px; width: 400px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .modal-conteudo h2 { margin-top: 0; margin-bottom: 20px; color: #121212; }
+        .modal-conteudo input { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        .modal-conteudo small { display: block; margin-top: -10px; margin-bottom: 15px; color: #888; }
+        .modal-botoes { display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; }
+        .btn-cancelar { background-color: #dfe4ea; color: #333; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div id="tela-login-super">
+        <form class="login-card" onsubmit="fazerLoginSuper(event)">
+            <h1><i class="fa-solid fa-layer-group"></i> Painel da Plataforma</h1>
+            <div id="login-erro-super"></div>
+            <input type="email" id="login-email-super" placeholder="E-mail" autocomplete="username" required>
+            <input type="password" id="login-senha-super" placeholder="Senha" autocomplete="current-password" required>
+            <button type="submit" id="btn-login-super">Entrar</button>
+        </form>
+    </div>
+
+    <div id="app-super-container" style="display: none;">
+        <div class="header-admin">
+            <h1>🏪 Lojas na Plataforma</h1>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn-novo" onclick="abrirModalNovaLoja()">+ Nova Loja</button>
+                <button class="btn-sair" onclick="sairSuper()">Sair</button>
+            </div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nome</th>
+                    <th>Subdomínio</th>
+                    <th>Status</th>
+                    <th>Admin vinculado</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody id="tabela-lojas">
+                <tr><td colspan="6" style="text-align: center;">Carregando lojas...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div id="modal-nova-loja" class="modal-overlay">
+        <div class="modal-conteudo">
+            <h2>Cadastrar Nova Loja</h2>
+            <input type="text" id="nova-loja-nome" placeholder="Nome da hamburgueria (ex: PJ Lanches)">
+            <input type="text" id="nova-loja-subdominio" placeholder="Subdomínio (ex: pjlanches)">
+            <small>Vai ficar em: <span id="preview-subdominio">subdominio</span>.mathshub.com.br</small>
+            <div class="modal-botoes">
+                <button class="btn-cancelar" onclick="fecharModalNovaLoja()">Cancelar</button>
+                <button class="btn-novo" onclick="salvarNovaLoja()">Criar Loja</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-vincular-admin" class="modal-overlay">
+        <div class="modal-conteudo">
+            <h2>Vincular Admin</h2>
+            <p style="font-size: 14px; color: #555; margin-top: 0;">
+                Crie o login no Supabase (Authentication → Users → Add user, com "Auto Confirm User" marcado),
+                copie o <strong>User UID</strong> dele e cole abaixo.
+            </p>
+            <input type="text" id="vincular-user-id" placeholder="UID do usuário (ex: 0487b354-...)">
+            <div class="modal-botoes">
+                <button class="btn-cancelar" onclick="fecharModalVincular()">Cancelar</button>
+                <button class="btn-novo" onclick="salvarVinculo()">Vincular</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="superadmin.js"></script>
+</body>
+</html>

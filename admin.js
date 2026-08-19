@@ -972,6 +972,7 @@ async function carregarConfiguracoesAdmin() {
             document.getElementById("admin-hora-abre").value = config.horario_abertura || "";
             document.getElementById("admin-hora-fecha").value = config.horario_fechar || "";
             document.getElementById("admin-whatsapp").value = config.numero_whatsapp || "";
+            document.getElementById("admin-endereco").value = config.endereco || "";
 
             // 2. Preenche os Dados da Identidade Visual (White-Label)
             document.getElementById("admin-nome-loja").value = config.nome_loja || "";
@@ -1076,7 +1077,8 @@ async function salvarConfiguracoesLoja() {
             horario_abertura: document.getElementById("admin-hora-abre").value,
             horario_fechar: document.getElementById("admin-hora-fecha").value,
             numero_whatsapp: document.getElementById("admin-whatsapp").value,
-            
+            endereco: document.getElementById("admin-endereco").value,
+
             nome_loja: document.getElementById("admin-nome-loja").value,
             titulo_banner: document.getElementById("admin-titulo-banner").value,
             subtitulo_banner: document.getElementById("admin-subtitulo-banner").value,

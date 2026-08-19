@@ -1036,7 +1036,99 @@ async function carregarHistoricoPedidos() {
 }
 
 function fecharModal() { document.getElementById("modal-produto").classList.add("escondido"); document.body.classList.remove("modal-aberto"); }
-window.addEventListener('click', function(event) { const modal = document.getElementById("modal-produto"); if (event.target === modal) { fecharModal(); }});
+window.addEventListener('click', function(event) {
+    const modal = document.getElementById("modal-produto");
+    if (event.target === modal) { fecharModal(); }
+    const modalLoja = document.getElementById("modal-loja-info");
+    if (event.target === modalLoja) { fecharModalLojaInfo(); }
+});
+
+// ==========================================
+// MODAL "SOBRE A LOJA" (endereço, telefone, horário)
+// ==========================================
+function formatarDiasTrabalho(diasTrabalhoStr) {
+    const nomesAbrev = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+    const dias = (diasTrabalhoStr || "0,1,2,3,4,5,6")
+        .split(',')
+        .map(d => parseInt(d.trim()))
+        .filter(d => !isNaN(d) && d >= 0 && d <= 6)
+        .sort((a, b) => a - b);
+
+    if (dias.length === 0) return "Dias não informados";
+    if (dias.length === 7) return "Todos os dias";
+
+    const grupos = [];
+    let inicio = dias[0];
+    let anterior = dias[0];
+
+    for (let i = 1; i <= dias.length; i++) {
+        const atual = dias[i];
+        if (atual !== anterior + 1) {
+            grupos.push(inicio === anterior ? nomesAbrev[inicio] : `${nomesAbrev[inicio]} a ${nomesAbrev[anterior]}`);
+            inicio = atual;
+        }
+        anterior = atual;
+    }
+    return grupos.join(', ');
+}
+
+function formatarTelefoneExibicao(numero) {
+    const digitos = String(numero || "").replace(/\D/g, '');
+    if (digitos.length === 13 && digitos.startsWith('55')) {
+        return `(${digitos.substring(2, 4)}) ${digitos.substring(4, 9)}-${digitos.substring(9)}`;
+    }
+    if (digitos.length === 11) {
+        return `(${digitos.substring(0, 2)}) ${digitos.substring(2, 7)}-${digitos.substring(7)}`;
+    }
+    return numero || "";
+}
+
+function abrirModalLojaInfo() {
+    const modal = document.getElementById("modal-loja-info");
+    const conteudo = document.getElementById("conteudo-loja-info");
+    if (!modal || !conteudo) return;
+
+    const nome = configLoja.nome_loja || (lojaAtual ? lojaAtual.nome : "");
+    const logoHtml = (configLoja.logo_url && configLoja.logo_url.trim() !== "")
+        ? `<img src="${configLoja.logo_url}" alt="" style="width: 84px; height: 84px; object-fit: contain; border-radius: 16px; background: #222; flex-shrink: 0;">`
+        : `<div style="width: 84px; height: 84px; border-radius: 16px; background: #222; display: flex; align-items: center; justify-content: center; flex-shrink: 0;"><i class="fa-solid fa-fire-flame-curved" style="font-size: 34px; color: var(--laranja-fogo, #ff5e00);"></i></div>`;
+
+    const horarioTexto = `${formatarDiasTrabalho(configLoja.dias_trabalho)} • ${configLoja.horario_abertura || '--:--'} às ${configLoja.horario_fechar || '--:--'}`;
+    const telefoneTexto = formatarTelefoneExibicao(configLoja.numero_whatsapp);
+
+    conteudo.innerHTML = `
+        <div style="display: flex; gap: 16px; align-items: center; margin-bottom: 22px;">
+            ${logoHtml}
+            <div>
+                <h2 style="margin: 0 0 6px; color: #fff; font-size: 20px;">${escaparHtml(nome)}</h2>
+                <span style="color: ${lojaAberta ? '#2ed573' : '#ff4757'}; font-size: 13px; font-weight: bold;">${lojaAberta ? '● Aberto agora' : '● Fechado no momento'}</span>
+            </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+            ${configLoja.endereco ? `
+            <div style="display: flex; gap: 12px; align-items: flex-start;">
+                <i class="fa-solid fa-location-dot" style="color: var(--laranja-fogo, #ff5e00); width: 18px; margin-top: 3px;"></i>
+                <span style="color: #ddd; font-size: 14px; line-height: 1.4;">${escaparHtml(configLoja.endereco)}</span>
+            </div>` : ''}
+            ${telefoneTexto ? `
+            <div style="display: flex; gap: 12px; align-items: center;">
+                <i class="fa-solid fa-phone" style="color: var(--laranja-fogo, #ff5e00); width: 18px;"></i>
+                <span style="color: #ddd; font-size: 14px;">${escaparHtml(telefoneTexto)}</span>
+            </div>` : ''}
+            <div style="display: flex; gap: 12px; align-items: center;">
+                <i class="fa-solid fa-clock" style="color: var(--laranja-fogo, #ff5e00); width: 18px;"></i>
+                <span style="color: #ddd; font-size: 14px;">${escaparHtml(horarioTexto)}</span>
+            </div>
+        </div>
+    `;
+
+    modal.classList.remove("escondido");
+}
+
+function fecharModalLojaInfo() {
+    const modal = document.getElementById("modal-loja-info");
+    if (modal) modal.classList.add("escondido");
+}
 
 function navegarPara(aba) {
     const telas = ["tela-catalogo", "tela-checkout", "tela-perfil", "tela-pedidos"];

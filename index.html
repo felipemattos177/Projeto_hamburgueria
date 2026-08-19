@@ -51,11 +51,19 @@
 
     <!-- Header Fixo -->
     <header class="header">
-        <div class="logo">
+        <div class="logo" onclick="abrirModalLojaInfo()" style="cursor: pointer;">
             <img id="loja-logo-img" src="" alt="" style="display: none; height: 28px; width: 28px; object-fit: contain; border-radius: 6px; vertical-align: middle; margin-right: 8px;">
             <i id="loja-logo-icone" class="fa-solid fa-fire-flame-curved"></i> <span id="loja-nome">Maths_hub</span>
         </div>
     </header>
+
+    <!-- === MODAL "SOBRE A LOJA" === -->
+    <div id="modal-loja-info" class="modal-overlay escondido">
+        <div class="modal-conteudo">
+            <button class="btn-fechar-modal" onclick="fecharModalLojaInfo()"><i class="fa-solid fa-xmark"></i></button>
+            <div id="conteudo-loja-info"></div>
+        </div>
+    </div>
 
     <!-- ========================================== -->
     <!-- TELA 1: CATÁLOGO E CARDÁPIO                -->

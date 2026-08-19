@@ -981,6 +981,7 @@ async function carregarConfiguracoesAdmin() {
 
             // Salva o link da imagem atual no campo invisível
             document.getElementById("admin-img-banner").value = config.imagem_banner || "";
+            document.getElementById("admin-logo-loja").value = config.logo_url || "";
         }
     } catch (erro) {
         console.error("Erro ao puxar configurações no Admin:", erro);
@@ -995,7 +996,10 @@ async function salvarConfiguracoesLoja() {
 
     let urlDaImagem = document.getElementById("admin-img-banner").value;
     const inputArquivo = document.getElementById("admin-file-banner");
-    
+
+    let urlDoLogo = document.getElementById("admin-logo-loja").value;
+    const inputLogo = document.getElementById("admin-file-logo");
+
     const inputAudio = document.getElementById("admin-file-audio-fogo");
     let urlDoAudio = null;
 
@@ -1017,6 +1021,25 @@ async function salvarConfiguracoesLoja() {
 
             urlDaImagem = `${SUPABASE_URL}/storage/v1/object/public/imagens/${nomeUnico}`;
             document.getElementById("admin-img-banner").value = urlDaImagem;
+        }
+
+        // ==========================================================
+        // 1.2. UPLOAD DA LOGO (mesmo bucket 'imagens')
+        // ==========================================================
+        if (inputLogo && inputLogo.files.length > 0) {
+            const arquivoLogo = inputLogo.files[0];
+            const nomeUnicoLogo = `${lojaAtual.subdominio}/logo-${Date.now()}-${arquivoLogo.name.replace(/\s+/g, '-')}`;
+
+            const resUploadLogo = await fetch(`${SUPABASE_URL}/storage/v1/object/imagens/${nomeUnicoLogo}`, {
+                method: 'POST',
+                headers: headersAutenticados(arquivoLogo.type),
+                body: arquivoLogo
+            });
+
+            if (!resUploadLogo.ok) throw new Error("Falha ao subir a logo para a nuvem.");
+
+            urlDoLogo = `${SUPABASE_URL}/storage/v1/object/public/imagens/${nomeUnicoLogo}`;
+            document.getElementById("admin-logo-loja").value = urlDoLogo;
         }
 
         // ==========================================================
@@ -1058,7 +1081,8 @@ async function salvarConfiguracoesLoja() {
             titulo_banner: document.getElementById("admin-titulo-banner").value,
             subtitulo_banner: document.getElementById("admin-subtitulo-banner").value,
             cor_principal: document.getElementById("admin-cor-principal").value,
-            imagem_banner: urlDaImagem 
+            imagem_banner: urlDaImagem,
+            logo_url: urlDoLogo
         };
 
         if (urlDoAudio) {
@@ -1075,8 +1099,9 @@ async function salvarConfiguracoesLoja() {
         
         alert("✅ Configurações salvas com sucesso! Áudio e Imagem separados.");
         
-        if(inputArquivo) inputArquivo.value = ""; 
-        if(inputAudio) inputAudio.value = ""; 
+        if(inputArquivo) inputArquivo.value = "";
+        if(inputLogo) inputLogo.value = "";
+        if(inputAudio) inputAudio.value = "";
         
     } catch (erro) {
         alert("Erro ao salvar: " + erro.message);

@@ -1255,6 +1255,15 @@ async function carregarIdentidadeVisual() {
             if(elNomeLoja && config.nome_loja) elNomeLoja.innerText = config.nome_loja;
             if(elTituloBanner && config.titulo_banner) elTituloBanner.innerText = config.titulo_banner;
             if(elSubtituloBanner && config.subtitulo_banner) elSubtituloBanner.innerText = config.subtitulo_banner;
+
+            // Logo da loja (substitui o ícone de fogo padrão, se configurada)
+            const elLogoImg = document.getElementById("loja-logo-img");
+            const elLogoIcone = document.getElementById("loja-logo-icone");
+            if (elLogoImg && elLogoIcone && config.logo_url && config.logo_url.trim() !== "") {
+                elLogoImg.src = config.logo_url;
+                elLogoImg.style.display = "inline-block";
+                elLogoIcone.style.display = "none";
+            }
             
 
            // 2. Trocando a Imagem de Fundo

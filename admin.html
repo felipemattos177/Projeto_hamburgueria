@@ -203,8 +203,9 @@
             .sidebar { position: static; width: 100%; flex-direction: row; align-items: center; padding: 12px 14px; overflow-x: auto; }
             .sidebar-brand { padding: 0 12px 0 0; }
             .sidebar-nav { flex-direction: row; }
-            .sidebar-rodape { margin-top: 0; margin-left: auto; padding-top: 0; border-top: none; padding-left: 12px; }
+            .sidebar-rodape { margin-top: 0; margin-left: auto; padding-top: 0; border-top: none; padding-left: 12px; display: flex; align-items: center; }
             .btn-sair-admin { width: auto; white-space: nowrap; }
+            .sidebar-rodape > div { display: none; }
             .shell { flex-direction: column; }
             .conteudo { margin-left: 0; padding: 20px; }
         }
@@ -251,6 +252,9 @@
 
             <div class="sidebar-rodape">
                 <button class="btn-sair-admin" onclick="sairAdmin()"><i class="fa-solid fa-right-from-bracket"></i> Sair</button>
+                <div style="text-align: center; margin-top: 12px; font-size: 11px; color: #6b6f80;">
+                    Powered by <a href="https://mathshub.com.br" target="_blank" style="color: #9298ab; text-decoration: none; font-weight: 600;">Maths Hub</a>
+                </div>
             </div>
         </aside>
 

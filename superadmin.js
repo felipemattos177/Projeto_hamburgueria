@@ -6,6 +6,7 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 let listaDeLojasGlobal = [];
 let lojaParaVincular = null;
+let intervaloRenovarSessaoSuper = null;
 
 function escaparHtml(texto) {
     if (texto === null || texto === undefined) return "";
@@ -45,7 +46,7 @@ function limparSessaoSuper() {
 
 function sessaoSuperExpirada(sessao) {
     if (!sessao) return true;
-    return Math.floor(Date.now() / 1000) >= (sessao.expira_em - 30);
+    return Math.floor(Date.now() / 1000) >= (sessao.expira_em - 90);
 }
 
 function headersAutenticados(contentType) {
@@ -145,7 +146,26 @@ function iniciarPainelSuper() {
     document.getElementById("app-super-container").style.display = "block";
 
     carregarLojas();
-    setInterval(renovarSessaoSuperSeNecessario, 5 * 60 * 1000);
+    intervaloRenovarSessaoSuper = setInterval(renovarSessaoSuperSeNecessario, 60 * 1000);
+}
+
+// Roda antes de toda chamada ao banco: renova o token se estiver perto de
+// expirar. Se a sessão já morreu de vez (ex: aba ficou muito tempo em segundo
+// plano), volta pra tela de login em vez de falhar silenciosamente com 401.
+async function garantirSessaoOuRelogarSuper() {
+    const ok = await renovarSessaoSuperSeNecessario();
+    if (!ok) {
+        if (intervaloRenovarSessaoSuper) clearInterval(intervaloRenovarSessaoSuper);
+        limparSessaoSuper();
+        document.getElementById("app-super-container").style.display = "none";
+        document.getElementById("tela-login-super").style.display = "flex";
+        const erroEl = document.getElementById("login-erro-super");
+        if (erroEl) {
+            erroEl.innerText = "Sua sessão expirou. Faça login novamente.";
+            erroEl.style.display = "block";
+        }
+    }
+    return ok;
 }
 
 async function verificarSessaoAoAbrirSuper() {
@@ -162,6 +182,7 @@ async function verificarSessaoAoAbrirSuper() {
 // GESTÃO DE LOJAS
 // ==========================================
 async function carregarLojas() {
+    if (!(await garantirSessaoOuRelogarSuper())) return;
     try {
         const [resLojas, resVinculos] = await Promise.all([
             fetch(`${SUPABASE_URL}/rest/v1/lojas?select=*&order=id.asc`, { headers: headersAutenticados() }),
@@ -210,6 +231,7 @@ function renderizarTabelaLojas(lojas, lojasComAdmin) {
 }
 
 async function mudarStatusLoja(id, novoStatus) {
+    if (!(await garantirSessaoOuRelogarSuper())) return;
     await fetch(`${SUPABASE_URL}/rest/v1/lojas?id=eq.${id}`, {
         method: 'PATCH',
         headers: headersAutenticados('application/json'),
@@ -242,6 +264,8 @@ async function salvarNovaLoja() {
         alert("Preencha o nome e o subdomínio.");
         return;
     }
+
+    if (!(await garantirSessaoOuRelogarSuper())) return;
 
     try {
         const res = await fetch(`${SUPABASE_URL}/rest/v1/lojas`, {
@@ -300,6 +324,8 @@ async function salvarVinculo() {
         alert("Cole o UID do usuário.");
         return;
     }
+
+    if (!(await garantirSessaoOuRelogarSuper())) return;
 
     try {
         const res = await fetch(`${SUPABASE_URL}/rest/v1/admin_lojas`, {

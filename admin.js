@@ -103,7 +103,7 @@ function limparSessao() {
 
 function sessaoExpirada(sessao) {
     if (!sessao) return true;
-    return Math.floor(Date.now() / 1000) >= (sessao.expira_em - 30); // 30s de margem
+    return Math.floor(Date.now() / 1000) >= (sessao.expira_em - 90); // 90s de margem
 }
 
 // Monta os headers de toda chamada ao Supabase usando o token do admin logado
@@ -188,6 +188,36 @@ async function renovarSessaoSeNecessario() {
     }
 }
 
+let intervaloPedidosAdmin = null;
+let intervaloProdutosEstoqueAdmin = null;
+let intervaloRenovarSessaoAdmin = null;
+
+function pararIntervalosAdmin() {
+    if (intervaloPedidosAdmin) clearInterval(intervaloPedidosAdmin);
+    if (intervaloProdutosEstoqueAdmin) clearInterval(intervaloProdutosEstoqueAdmin);
+    if (intervaloRenovarSessaoAdmin) clearInterval(intervaloRenovarSessaoAdmin);
+}
+
+// Roda antes de toda chamada periódica: renova o token se estiver perto de
+// expirar. Se a sessão já morreu de vez (ex: aba ficou muito tempo em segundo
+// plano e o timer de renovação não disparou a tempo), para o polling e volta
+// pra tela de login em vez de ficar repetindo erro 401 silenciosamente.
+async function garantirSessaoOuRelogar() {
+    const ok = await renovarSessaoSeNecessario();
+    if (!ok) {
+        pararIntervalosAdmin();
+        limparSessao();
+        document.getElementById("app-admin-container").style.display = "none";
+        document.getElementById("tela-login-admin").style.display = "flex";
+        const erroEl = document.getElementById("login-erro");
+        if (erroEl) {
+            erroEl.innerText = "Sua sessão expirou. Faça login novamente.";
+            erroEl.style.display = "block";
+        }
+    }
+    return ok;
+}
+
 function iniciarPainelAdmin() {
     document.getElementById("tela-login-admin").style.display = "none";
     document.getElementById("app-admin-container").style.display = "block";
@@ -197,9 +227,9 @@ function iniciarPainelAdmin() {
     carregarPedidosAdmin();
     carregarConfiguracoesAdmin();
 
-    setInterval(carregarPedidosAdmin, 3000);
-    setInterval(() => { carregarProdutos(); carregarEstoque(); }, 5000);
-    setInterval(renovarSessaoSeNecessario, 5 * 60 * 1000);
+    intervaloPedidosAdmin = setInterval(carregarPedidosAdmin, 3000);
+    intervaloProdutosEstoqueAdmin = setInterval(() => { carregarProdutos(); carregarEstoque(); }, 5000);
+    intervaloRenovarSessaoAdmin = setInterval(renovarSessaoSeNecessario, 60 * 1000);
 }
 
 async function verificarSessaoAoAbrir() {
@@ -239,6 +269,7 @@ function escaparHtml(texto) {
 // MÓDULO 1: GESTÃO DE PRODUTOS
 // ==========================================
 async function carregarProdutos() {
+    if (!(await garantirSessaoOuRelogar())) return;
     try {
         const resposta = await fetch(`${SUPABASE_URL}/rest/v1/produtos?select=*&loja_id=eq.${lojaAtual.id}&order=id.asc`, {
             method: 'GET',
@@ -517,6 +548,7 @@ async function excluirProduto(id) {
 let ingredienteEdicaoId = null; // Memória para saber se estamos editando um ingrediente
 
 async function carregarEstoque() {
+    if (!(await garantirSessaoOuRelogar())) return;
     try {
         const resposta = await fetch(`${SUPABASE_URL}/rest/v1/ingredientes?select=*&loja_id=eq.${lojaAtual.id}&order=id.asc`, {
             method: 'GET',
@@ -788,6 +820,7 @@ async function removerDaReceita(idDaReceita) {
 // MÓDULO 4: GESTÃO DE PEDIDOS (KANBAN)
 // ==========================================
 async function carregarPedidosAdmin() {
+    if (!(await garantirSessaoOuRelogar())) return;
     try {
         const res = await fetch(`${SUPABASE_URL}/rest/v1/pedidos?select=*&loja_id=eq.${lojaAtual.id}&order=id.asc`, {
             method: 'GET',

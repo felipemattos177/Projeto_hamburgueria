@@ -70,11 +70,11 @@ function mostrarTelaLojaIndisponivel(titulo, mensagem) {
 // (evita que a conta de uma hamburgueria acesse o painel de outra).
 async function verificarAcessoLoja(userId) {
     try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/admin_lojas?select=loja_id&user_id=eq.${userId}`, {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/admin_lojas?select=loja_id,ativo&user_id=eq.${userId}`, {
             headers: headersAutenticados()
         });
         const dados = await res.json();
-        return dados.length > 0 && dados[0].loja_id === lojaAtual.id;
+        return dados.length > 0 && dados[0].loja_id === lojaAtual.id && dados[0].ativo !== false;
     } catch (erro) {
         return false;
     }
@@ -160,6 +160,182 @@ async function fazerLoginAdmin(event) {
         erroEl.innerText = "Erro de conexão. Tente novamente.";
         erroEl.style.display = "block";
         console.error(erro);
+    } finally {
+        btn.innerText = textoOriginal;
+        btn.disabled = false;
+    }
+}
+
+// ==========================================
+// LOGIN COM GOOGLE
+// ==========================================
+function loginComGoogleAdmin() {
+    const redirecionarPara = window.location.origin + window.location.pathname + window.location.search;
+    window.location.href = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirecionarPara)}`;
+}
+
+// Roda ao carregar a página: se voltamos do Google com um token no hash da
+// URL, valida e faz login. Retorna true se conseguiu logar (pra não seguir
+// o fluxo normal de "mostrar tela de login").
+async function checarRetornoOAuthAdmin() {
+    const hash = window.location.hash;
+    if (!hash || !hash.includes("access_token=") || hash.includes("type=recovery")) return false;
+
+    const params = new URLSearchParams(hash.substring(1));
+    const accessToken = params.get("access_token");
+    const refreshToken = params.get("refresh_token");
+    const expiresIn = params.get("expires_in");
+    if (!accessToken) return false;
+
+    try {
+        const resUser = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${accessToken}` }
+        });
+        if (!resUser.ok) throw new Error("Token do Google rejeitado");
+        const usuario = await resUser.json();
+
+        salvarSessao({ access_token: accessToken, refresh_token: refreshToken, expires_in: parseInt(expiresIn) || 3600, user: usuario });
+
+        window.location.hash = "";
+        window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+
+        const temAcesso = await verificarAcessoLoja(usuario.id);
+        if (!temAcesso) {
+            limparSessao();
+            const erroEl = document.getElementById("login-erro");
+            if (erroEl) {
+                erroEl.innerText = "Sua conta Google não tem acesso a esta loja. Peça pro suporte vincular seu acesso.";
+                erroEl.style.display = "block";
+            }
+            return false;
+        }
+
+        iniciarPainelAdmin();
+        return true;
+    } catch (erro) {
+        console.error("Erro no login com Google:", erro);
+        window.location.hash = "";
+        window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+        return false;
+    }
+}
+
+// ==========================================
+// RECUPERAÇÃO DE SENHA
+// ==========================================
+let tokenRecuperacaoSenha = null;
+
+function mostrarPainelLoginNormal() {
+    document.getElementById("painel-login-normal").style.display = "block";
+    document.getElementById("painel-recuperar-senha").style.display = "none";
+    document.getElementById("painel-nova-senha").style.display = "none";
+}
+
+function mostrarPainelRecuperarSenha() {
+    document.getElementById("painel-login-normal").style.display = "none";
+    document.getElementById("painel-recuperar-senha").style.display = "block";
+    document.getElementById("painel-nova-senha").style.display = "none";
+}
+
+function mostrarPainelNovaSenha() {
+    document.getElementById("painel-login-normal").style.display = "none";
+    document.getElementById("painel-recuperar-senha").style.display = "none";
+    document.getElementById("painel-nova-senha").style.display = "block";
+}
+
+// Se voltamos do link do e-mail de recuperação, o Supabase manda um token
+// temporário no hash da URL com type=recovery. Guarda ele pra usar depois
+// em salvarNovaSenha() e mostra o formulário de nova senha.
+function tratarRetornoRecuperacaoSenha() {
+    const hash = window.location.hash;
+    if (!hash || !hash.includes("type=recovery")) return false;
+
+    const params = new URLSearchParams(hash.substring(1));
+    const accessToken = params.get("access_token");
+    if (!accessToken) return false;
+
+    tokenRecuperacaoSenha = accessToken;
+
+    window.location.hash = "";
+    window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+
+    mostrarPainelNovaSenha();
+    return true;
+}
+
+async function enviarRecuperacaoSenha() {
+    const email = document.getElementById("recuperar-email").value.trim();
+    const erroEl = document.getElementById("recuperar-erro");
+    const sucessoEl = document.getElementById("recuperar-sucesso");
+    const btn = document.getElementById("btn-recuperar-senha");
+    erroEl.style.display = "none";
+    sucessoEl.style.display = "none";
+
+    if (!email) {
+        erroEl.innerText = "Digite seu e-mail.";
+        erroEl.style.display = "block";
+        return;
+    }
+
+    const textoOriginal = btn.innerText;
+    btn.innerText = "Enviando...";
+    btn.disabled = true;
+
+    try {
+        const redirecionarPara = window.location.origin + window.location.pathname + window.location.search;
+        await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
+            method: 'POST',
+            headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, options: { redirect_to: redirecionarPara } })
+        });
+        // O Supabase sempre responde OK aqui por segurança, mesmo se o e-mail
+        // não existir na base — não dá pra saber, então a mensagem é genérica.
+        sucessoEl.innerText = "Se esse e-mail estiver cadastrado, você vai receber um link de recuperação em instantes.";
+        sucessoEl.style.display = "block";
+    } catch (erro) {
+        erroEl.innerText = "Erro de conexão. Tente novamente.";
+        erroEl.style.display = "block";
+    } finally {
+        btn.innerText = textoOriginal;
+        btn.disabled = false;
+    }
+}
+
+async function salvarNovaSenha() {
+    const novaSenha = document.getElementById("nova-senha-input").value;
+    const erroEl = document.getElementById("nova-senha-erro");
+    const btn = document.getElementById("btn-salvar-nova-senha");
+    erroEl.style.display = "none";
+
+    if (!novaSenha || novaSenha.length < 6) {
+        erroEl.innerText = "A senha precisa ter pelo menos 6 caracteres.";
+        erroEl.style.display = "block";
+        return;
+    }
+    if (!tokenRecuperacaoSenha) {
+        erroEl.innerText = "Link de recuperação inválido ou expirado. Solicite um novo.";
+        erroEl.style.display = "block";
+        return;
+    }
+
+    const textoOriginal = btn.innerText;
+    btn.innerText = "Salvando...";
+    btn.disabled = true;
+
+    try {
+        const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+            method: 'PUT',
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${tokenRecuperacaoSenha}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: novaSenha })
+        });
+        if (!res.ok) throw new Error("Falha ao atualizar senha");
+
+        tokenRecuperacaoSenha = null;
+        alert("Senha atualizada com sucesso! Faça login com sua nova senha.");
+        mostrarPainelLoginNormal();
+    } catch (erro) {
+        erroEl.innerText = "Não foi possível atualizar a senha. O link pode ter expirado — solicite um novo.";
+        erroEl.style.display = "block";
     } finally {
         btn.innerText = textoOriginal;
         btn.disabled = false;
@@ -1597,6 +1773,12 @@ async function salvarConfiguracoesLoja() {
 async function iniciarAdmin() {
     const lojaOk = await resolverLoja();
     if (!lojaOk) return;
+
+    if (tratarRetornoRecuperacaoSenha()) return;
+
+    const logadoPorGoogle = await checarRetornoOAuthAdmin();
+    if (logadoPorGoogle) return;
+
     await verificarSessaoAoAbrir();
 }
 

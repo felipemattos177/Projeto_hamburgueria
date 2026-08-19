@@ -186,19 +186,20 @@ async function carregarLojas() {
     try {
         const [resLojas, resVinculos] = await Promise.all([
             fetch(`${SUPABASE_URL}/rest/v1/lojas?select=*&order=id.asc`, { headers: headersAutenticados() }),
-            fetch(`${SUPABASE_URL}/rest/v1/admin_lojas?select=loja_id`, { headers: headersAutenticados() })
+            fetch(`${SUPABASE_URL}/rest/v1/admin_lojas?select=loja_id,ativo`, { headers: headersAutenticados() })
         ]);
         listaDeLojasGlobal = await resLojas.json();
         const vinculos = await resVinculos.json();
-        const lojasComAdmin = new Set(vinculos.map(v => v.loja_id));
+        const vinculoPorLoja = {};
+        vinculos.forEach(v => { vinculoPorLoja[v.loja_id] = v.ativo; });
 
-        renderizarTabelaLojas(listaDeLojasGlobal, lojasComAdmin);
+        renderizarTabelaLojas(listaDeLojasGlobal, vinculoPorLoja);
     } catch (erro) {
         console.error(erro);
     }
 }
 
-function renderizarTabelaLojas(lojas, lojasComAdmin) {
+function renderizarTabelaLojas(lojas, vinculoPorLoja) {
     const tbody = document.getElementById("tabela-lojas");
     if (!tbody) return;
     tbody.innerHTML = "";
@@ -212,7 +213,21 @@ function renderizarTabelaLojas(lojas, lojasComAdmin) {
         const badgeClass = loja.ativo ? "status-ativo" : "status-inativo";
         const badgeTexto = loja.ativo ? "Ativa" : "Inativa";
         const botaoTexto = loja.ativo ? "Desativar" : "Ativar";
-        const temAdmin = lojasComAdmin.has(loja.id);
+
+        const temVinculo = Object.prototype.hasOwnProperty.call(vinculoPorLoja, loja.id);
+        const acessoAtivo = temVinculo && vinculoPorLoja[loja.id] !== false;
+
+        let colunaAdmin;
+        let botaoAcesso = "";
+        if (!temVinculo) {
+            colunaAdmin = '<span style="color:#ff4757;">Sem admin</span>';
+        } else if (acessoAtivo) {
+            colunaAdmin = '<span style="color:#2ed573;">✔ Ativo</span>';
+            botaoAcesso = `<button class="btn-acao btn-toggle" onclick="alternarAcessoAdmin(${loja.id}, false)">Desativar acesso</button>`;
+        } else {
+            colunaAdmin = '<span style="color:#ffa502;">⏸ Desativado</span>';
+            botaoAcesso = `<button class="btn-acao btn-toggle" onclick="alternarAcessoAdmin(${loja.id}, true)">Reativar acesso</button>`;
+        }
 
         tbody.innerHTML += `
             <tr>
@@ -220,14 +235,25 @@ function renderizarTabelaLojas(lojas, lojasComAdmin) {
                 <td><strong>${escaparHtml(loja.nome)}</strong></td>
                 <td>${escaparHtml(loja.subdominio)}.mathshub.com.br</td>
                 <td><span class="status-badge ${badgeClass}">${badgeTexto}</span></td>
-                <td>${temAdmin ? '<span style="color:#2ed573;">✔ Vinculado</span>' : '<span style="color:#ff4757;">Sem admin</span>'}</td>
+                <td>${colunaAdmin}</td>
                 <td>
                     <button class="btn-acao btn-toggle" onclick="mudarStatusLoja(${loja.id}, ${!loja.ativo})">${botaoTexto}</button>
+                    ${botaoAcesso}
                     <button class="btn-acao btn-vincular" onclick="abrirModalVincular(${loja.id}, '${escaparHtml(loja.nome)}')">Vincular Admin</button>
                 </td>
             </tr>
         `;
     });
+}
+
+async function alternarAcessoAdmin(lojaId, novoAtivo) {
+    if (!(await garantirSessaoOuRelogarSuper())) return;
+    await fetch(`${SUPABASE_URL}/rest/v1/admin_lojas?loja_id=eq.${lojaId}`, {
+        method: 'PATCH',
+        headers: headersAutenticados('application/json'),
+        body: JSON.stringify({ ativo: novoAtivo })
+    });
+    carregarLojas();
 }
 
 async function mudarStatusLoja(id, novoStatus) {

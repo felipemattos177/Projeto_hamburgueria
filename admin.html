@@ -57,7 +57,15 @@
         .login-card input:focus { outline: none; border-color: var(--laranja-fogo); background: #fff; }
         .login-card button { width: 100%; background: var(--laranja-fogo); color: #fff; border: none; padding: 13px; border-radius: 9px; font-weight: 600; font-size: 14px; cursor: pointer; transition: .15s; }
         .login-card button:hover { filter: brightness(1.08); }
-        #login-erro { color: var(--vermelho); background: var(--vermelho-suave); padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; display: none; text-align: center; }
+        #login-erro, #recuperar-erro, #nova-senha-erro { color: var(--vermelho); background: var(--vermelho-suave); padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; display: none; text-align: center; }
+        #recuperar-sucesso { color: var(--verde); background: var(--verde-suave); padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; display: none; text-align: center; }
+        .btn-google { width: 100%; background: #fff; color: #344054; border: 1px solid var(--borda); padding: 11px; border-radius: 9px; font-weight: 600; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; font-family: inherit; transition: .15s; }
+        .btn-google:hover { background: #fafbfc; }
+        .divisor-login { display: flex; align-items: center; text-align: center; color: var(--texto-claro); font-size: 12px; margin: 16px 0; }
+        .divisor-login::before, .divisor-login::after { content: ""; flex: 1; border-bottom: 1px solid var(--borda); }
+        .divisor-login span { padding: 0 10px; }
+        .link-recuperar { text-align: center; color: var(--texto-suave); font-size: 13px; margin: 14px 0 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+        .link-recuperar:hover { color: var(--laranja-fogo); }
 
         /* ===== LAYOUT: SIDEBAR + CONTEÚDO ===== */
         #app-admin-container { display: none; }
@@ -215,17 +223,52 @@
 
     <!-- TELA DE LOGIN (única coisa visível antes de autenticar) -->
     <div id="tela-login-admin">
-        <form class="login-card" onsubmit="fazerLoginAdmin(event)">
+        <div class="login-card">
             <div class="login-icone"><i class="fa-solid fa-fire-flame-curved"></i></div>
             <h1><span id="login-nome-loja">Painel Admin</span></h1>
             <p class="subtitulo">Entre com sua conta para gerenciar sua loja</p>
-            <div id="login-erro"></div>
-            <label>E-mail</label>
-            <input type="email" id="login-email" placeholder="seu@email.com" autocomplete="username" required>
-            <label>Senha</label>
-            <input type="password" id="login-senha" placeholder="••••••••" autocomplete="current-password" required>
-            <button type="submit" id="btn-login-admin">Entrar</button>
-        </form>
+
+            <!-- PAINEL 1: login normal -->
+            <div id="painel-login-normal">
+                <div id="login-erro"></div>
+
+                <button type="button" class="btn-google" onclick="loginComGoogleAdmin()">
+                    <img src="https://www.google.com/favicon.ico" alt="" style="width: 16px; height: 16px;">
+                    Continuar com Google
+                </button>
+
+                <div class="divisor-login"><span>ou</span></div>
+
+                <form onsubmit="fazerLoginAdmin(event)">
+                    <label>E-mail</label>
+                    <input type="email" id="login-email" placeholder="seu@email.com" autocomplete="username" required>
+                    <label>Senha</label>
+                    <input type="password" id="login-senha" placeholder="••••••••" autocomplete="current-password" required>
+                    <button type="submit" id="btn-login-admin">Entrar</button>
+                </form>
+
+                <p class="link-recuperar" onclick="mostrarPainelRecuperarSenha()">Esqueci minha senha</p>
+            </div>
+
+            <!-- PAINEL 2: pedir e-mail pra recuperação -->
+            <div id="painel-recuperar-senha" style="display: none;">
+                <div id="recuperar-erro"></div>
+                <div id="recuperar-sucesso"></div>
+                <label>Digite seu e-mail cadastrado</label>
+                <input type="email" id="recuperar-email" placeholder="seu@email.com">
+                <button type="button" id="btn-recuperar-senha" onclick="enviarRecuperacaoSenha()">Enviar link de recuperação</button>
+                <p class="link-recuperar" onclick="mostrarPainelLoginNormal()">Voltar pro login</p>
+            </div>
+
+            <!-- PAINEL 3: definir nova senha (aparece ao voltar do link do e-mail) -->
+            <div id="painel-nova-senha" style="display: none;">
+                <p class="subtitulo" style="margin-top: -8px;">Defina sua nova senha de acesso</p>
+                <div id="nova-senha-erro"></div>
+                <label>Nova senha</label>
+                <input type="password" id="nova-senha-input" placeholder="Mínimo 6 caracteres">
+                <button type="button" id="btn-salvar-nova-senha" onclick="salvarNovaSenha()">Salvar nova senha</button>
+            </div>
+        </div>
     </div>
 
     <!-- CONTEÚDO DO PAINEL: só aparece depois do login -->

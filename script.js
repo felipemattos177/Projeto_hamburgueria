@@ -1085,7 +1085,7 @@ async function renderizarRodape() {
     const footer = document.createElement("footer"); 
     footer.style.cssText = "text-align: center; padding: 30px 15px; background: transparent; color: #777; font-size: 13px; margin-top: 40px; width: 100%; padding-bottom: 100px;"; 
     footer.innerHTML = `
-        <div style="margin-bottom: 8px;">&copy; ${ano} Vilela Burgers. Identidade e conteúdo reservados.</div>
+        <div style="margin-bottom: 8px;">&copy; ${ano} ${escaparHtml(configLoja.nome_loja || lojaAtual.nome)}. Identidade e conteúdo reservados.</div>
         <div style="margin-bottom: 8px;">Tecnologia por <a href="https://mathshub.com.br" target="_blank" style="color: var(--laranja-fogo, #ff5e00); text-decoration: none; font-weight: bold;">Maths Labs</a> 🚀</div>
         <div id="versao-app" style="font-size: 11px; color: #555; margin-top: 10px;">Sincronizando versão...</div>
     `;

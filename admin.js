@@ -7,6 +7,75 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 let listaDeIngredientesGlobal = []; // Essa já existe
 let listaDeProdutosGlobal = []; // GUARDA OS LANCHES PARA A EDIÇÃO
 let produtoEdicaoId = null; // CONTROLA SE ESTAMOS CRIANDO (null) OU EDITANDO (id);
+let lojaAtual = null; // { id, subdominio, nome, ativo }
+
+// ==========================================
+// MÓDULO -2: RESOLUÇÃO DA LOJA PELO SUBDOMÍNIO
+// ==========================================
+function obterSlugDaLoja() {
+    const params = new URLSearchParams(window.location.search);
+    const slugParam = params.get("loja");
+    if (slugParam) return slugParam.toLowerCase();
+    return window.location.hostname.split(".")[0].toLowerCase();
+}
+
+async function resolverLoja() {
+    const slug = obterSlugDaLoja();
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/lojas?select=*&subdominio=eq.${encodeURIComponent(slug)}&limit=1`, {
+            headers: headersAutenticados()
+        });
+        const dados = await res.json();
+
+        if (!dados || dados.length === 0) {
+            mostrarTelaLojaIndisponivel("Loja não encontrada", "Não encontramos nenhuma hamburgueria neste endereço.");
+            return false;
+        }
+        if (!dados[0].ativo) {
+            mostrarTelaLojaIndisponivel("Loja inativa", "Esta loja está desativada no momento. Fale com o suporte da plataforma.");
+            return false;
+        }
+
+        lojaAtual = dados[0];
+
+        document.title = `Painel de Gestão - ${lojaAtual.nome}`;
+        const elLogin = document.getElementById("login-nome-loja");
+        const elTabs = document.getElementById("tabs-nome-loja");
+        if (elLogin) elLogin.innerText = `${lojaAtual.nome} Admin`;
+        if (elTabs) elTabs.innerText = `${lojaAtual.nome} Admin`;
+
+        return true;
+    } catch (erro) {
+        mostrarTelaLojaIndisponivel("Erro de conexão", "Não foi possível conectar ao servidor.");
+        return false;
+    }
+}
+
+function mostrarTelaLojaIndisponivel(titulo, mensagem) {
+    document.body.innerHTML = `
+        <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #121212; color: #fff; padding: 30px; text-align: center; font-family: 'Roboto', sans-serif;">
+            <div>
+                <i class="fa-solid fa-shop-slash" style="font-size: 40px; color: #ff5e00; margin-bottom: 15px;"></i>
+                <h2 style="margin-bottom: 10px;">${escaparHtml(titulo)}</h2>
+                <p style="color: #aaa;">${escaparHtml(mensagem)}</p>
+            </div>
+        </div>
+    `;
+}
+
+// Confere se o usuário que acabou de logar está vinculado a ESTA loja
+// (evita que a conta de uma hamburgueria acesse o painel de outra).
+async function verificarAcessoLoja(userId) {
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/admin_lojas?select=loja_id&user_id=eq.${userId}`, {
+            headers: headersAutenticados()
+        });
+        const dados = await res.json();
+        return dados.length > 0 && dados[0].loja_id === lojaAtual.id;
+    } catch (erro) {
+        return false;
+    }
+}
 
 // ==========================================
 // MÓDULO -1: AUTENTICAÇÃO DO PAINEL (SUPABASE AUTH)
@@ -74,6 +143,15 @@ async function fazerLoginAdmin(event) {
         }
 
         salvarSessao(dados);
+
+        const temAcesso = await verificarAcessoLoja(dados.user.id);
+        if (!temAcesso) {
+            limparSessao();
+            erroEl.innerText = "Esta conta não tem acesso a esta loja.";
+            erroEl.style.display = "block";
+            return;
+        }
+
         iniciarPainelAdmin();
     } catch (erro) {
         erroEl.innerText = "Erro de conexão. Tente novamente.";
@@ -162,7 +240,7 @@ function escaparHtml(texto) {
 // ==========================================
 async function carregarProdutos() {
     try {
-        const resposta = await fetch(`${SUPABASE_URL}/rest/v1/produtos?select=*&order=id.asc`, {
+        const resposta = await fetch(`${SUPABASE_URL}/rest/v1/produtos?select=*&loja_id=eq.${lojaAtual.id}&order=id.asc`, {
             method: 'GET',
             headers: headersAutenticados()
         });
@@ -345,7 +423,7 @@ async function salvarNovoProduto() {
     try {
         if (inputArquivo && inputArquivo.files.length > 0) {
             const arquivo = inputArquivo.files[0];
-            const nomeUnico = `produto-${Date.now()}-${arquivo.name.replace(/\s+/g, '-')}`;
+            const nomeUnico = `${lojaAtual.subdominio}/produto-${Date.now()}-${arquivo.name.replace(/\s+/g, '-')}`;
 
             const resUpload = await fetch(`${SUPABASE_URL}/storage/v1/object/imagens/${nomeUnico}`, {
                 method: 'POST',
@@ -357,7 +435,7 @@ async function salvarNovoProduto() {
             urlDaImagem = `${SUPABASE_URL}/storage/v1/object/public/imagens/${nomeUnico}`;
         }
 
-        const payload = { nome, descricao, preco, categoria, imagem: urlDaImagem };
+        const payload = { nome, descricao, preco, categoria, imagem: urlDaImagem, loja_id: lojaAtual.id };
         
         let url = `${SUPABASE_URL}/rest/v1/produtos`;
         let metodo = 'POST'; 
@@ -440,7 +518,7 @@ let ingredienteEdicaoId = null; // Memória para saber se estamos editando um in
 
 async function carregarEstoque() {
     try {
-        const resposta = await fetch(`${SUPABASE_URL}/rest/v1/ingredientes?select=*&order=id.asc`, {
+        const resposta = await fetch(`${SUPABASE_URL}/rest/v1/ingredientes?select=*&loja_id=eq.${lojaAtual.id}&order=id.asc`, {
             method: 'GET',
             headers: headersAutenticados()
         });
@@ -537,7 +615,7 @@ async function salvarNovoIngrediente() {
         return;
     }
 
-    const payload = { nome, unidade, estoque, preco_adicional };
+    const payload = { nome, unidade, estoque, preco_adicional, loja_id: lojaAtual.id };
     let url = `${SUPABASE_URL}/rest/v1/ingredientes`;
     let metodo = 'POST';
 
@@ -617,7 +695,7 @@ function fecharModalReceita() {
 
 async function buscarIngredientesDesteLanche(produtoId) {
     try {
-        const resposta = await fetch(`${SUPABASE_URL}/rest/v1/receita_produto?produto_id=eq.${produtoId}`, {
+        const resposta = await fetch(`${SUPABASE_URL}/rest/v1/receita_produto?produto_id=eq.${produtoId}&loja_id=eq.${lojaAtual.id}`, {
             method: 'GET',
             headers: headersAutenticados()
         });
@@ -669,7 +747,8 @@ async function salvarIngredienteNaReceita() {
             body: JSON.stringify({
                 produto_id: produtoAtualParaReceita,
                 ingrediente_id: parseInt(ingredienteId),
-                quantidade: parseFloat(quantidade)
+                quantidade: parseFloat(quantidade),
+                loja_id: lojaAtual.id
             })
         });
 
@@ -710,7 +789,7 @@ async function removerDaReceita(idDaReceita) {
 // ==========================================
 async function carregarPedidosAdmin() {
     try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/pedidos?select=*&order=id.asc`, {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/pedidos?select=*&loja_id=eq.${lojaAtual.id}&order=id.asc`, {
             method: 'GET',
             headers: headersAutenticados()
         });
@@ -840,7 +919,7 @@ async function atualizarStatusPedido(id, novoStatus) {
 
 async function carregarConfiguracoesAdmin() {
     try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracoes?id=eq.1&select=*`, {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracoes?loja_id=eq.${lojaAtual.id}&select=*`, {
             method: 'GET',
             headers: headersAutenticados()
         });
@@ -890,7 +969,7 @@ async function salvarConfiguracoesLoja() {
         // ==========================================================
         if (inputArquivo && inputArquivo.files.length > 0) {
             const arquivo = inputArquivo.files[0];
-            const nomeUnico = `banner-${Date.now()}-${arquivo.name.replace(/\s+/g, '-')}`;
+            const nomeUnico = `${lojaAtual.subdominio}/banner-${Date.now()}-${arquivo.name.replace(/\s+/g, '-')}`;
 
             const resUpload = await fetch(`${SUPABASE_URL}/storage/v1/object/imagens/${nomeUnico}`, {
                 method: 'POST',
@@ -909,7 +988,7 @@ async function salvarConfiguracoesLoja() {
         // ==========================================================
         if (inputAudio && inputAudio.files.length > 0) {
             const arquivoAudio = inputAudio.files[0];
-            const nomeUnicoAudio = `som_fogo-${Date.now()}.mp3`;
+            const nomeUnicoAudio = `${lojaAtual.subdominio}/som_fogo-${Date.now()}.mp3`;
 
             // Agora envia corretamente para o bucket 'audios'
             const resUploadAudio = await fetch(`${SUPABASE_URL}/storage/v1/object/audios/${nomeUnicoAudio}`, {
@@ -950,7 +1029,7 @@ async function salvarConfiguracoesLoja() {
             corpoDb.audio_fogo = urlDoAudio;
         }
 
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracoes?id=eq.1`, {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracoes?loja_id=eq.${lojaAtual.id}`, {
             method: 'PATCH',
             headers: headersAutenticados('application/json'),
             body: JSON.stringify(corpoDb)
@@ -976,5 +1055,12 @@ async function salvarConfiguracoesLoja() {
 // ==========================================
 // INICIALIZAÇÃO DO SISTEMA
 // ==========================================
-// Só carrega os dados e liga os intervalos depois de confirmar login (ver iniciarPainelAdmin).
-verificarSessaoAoAbrir();
+// Primeiro resolve qual loja este subdomínio é; só então mostra a tela de
+// login (ou o painel, se já tiver sessão válida). Ver iniciarPainelAdmin.
+async function iniciarAdmin() {
+    const lojaOk = await resolverLoja();
+    if (!lojaOk) return;
+    await verificarSessaoAoAbrir();
+}
+
+iniciarAdmin();

@@ -95,7 +95,7 @@
     <!-- TELA DE LOGIN (única coisa visível antes de autenticar) -->
     <div id="tela-login-admin">
         <form class="login-card" onsubmit="fazerLoginAdmin(event)">
-            <h1><i class="fa-solid fa-fire-flame-curved"></i> Fire Burger Admin</h1>
+            <h1><i class="fa-solid fa-fire-flame-curved"></i> <span id="login-nome-loja">Admin</span></h1>
             <div id="login-erro"></div>
             <input type="email" id="login-email" placeholder="E-mail" autocomplete="username" required>
             <input type="password" id="login-senha" placeholder="Senha" autocomplete="current-password" required>
@@ -108,7 +108,7 @@
 
     <!-- SUBMENU DE NAVEGAÇÃO -->
     <div class="tabs-container">
-        <div class="tabs-logo"><i class="fa-solid fa-fire-flame-curved"></i> Fire Burger Admin</div>
+        <div class="tabs-logo"><i class="fa-solid fa-fire-flame-curved"></i> <span id="tabs-nome-loja">Admin</span></div>
         <button class="tab-btn ativa" onclick="mudarAbaAdmin('view-estoque', this)"><i class="fa-solid fa-boxes-stacked"></i> Cardápio & Estoque</button>
         <button class="tab-btn" onclick="mudarAbaAdmin('view-pedidos', this)"><i class="fa-solid fa-motorcycle"></i> Gestão de Pedidos</button>
         <!-- NOVO BOTÃO DAS CONFIGURAÇÕES -->

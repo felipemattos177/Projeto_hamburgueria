@@ -13,6 +13,56 @@ let configLoja = {
 };
 let lojaAberta = true;
 let mensagemFechado = "";
+let lojaAtual = null; // { id, subdominio, nome, ativo }
+
+function obterSlugDaLoja() {
+    const params = new URLSearchParams(window.location.search);
+    const slugParam = params.get("loja");
+    if (slugParam) return slugParam.toLowerCase();
+    return window.location.hostname.split(".")[0].toLowerCase();
+}
+
+// Descobre qual loja este site está servindo, pelo subdomínio (ou ?loja=slug
+// pra testar em localhost/preview). Precisa rodar antes de qualquer outra
+// chamada ao banco, já que tudo depois é filtrado por loja_id.
+async function resolverLoja() {
+    const slug = obterSlugDaLoja();
+    try {
+        const resposta = await fetchSupabase(`/rest/v1/lojas?select=*&subdominio=eq.${encodeURIComponent(slug)}&limit=1`);
+        const dados = await resposta.json();
+
+        if (!dados || dados.length === 0) {
+            mostrarTelaLojaIndisponivel("Loja não encontrada", "Não encontramos nenhuma hamburgueria neste endereço.");
+            return false;
+        }
+        if (!dados[0].ativo) {
+            mostrarTelaLojaIndisponivel("Loja indisponível", "Esta loja está temporariamente fora do ar. Entre em contato com o estabelecimento.");
+            return false;
+        }
+
+        lojaAtual = dados[0];
+        return true;
+    } catch (erro) {
+        mostrarTelaLojaIndisponivel("Erro de conexão", "Não foi possível conectar ao servidor. Tente novamente em instantes.");
+        return false;
+    }
+}
+
+function mostrarTelaLojaIndisponivel(titulo, mensagem) {
+    document.body.innerHTML = `
+        <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #121212; color: #fff; padding: 30px; text-align: center; font-family: 'Roboto', sans-serif;">
+            <div>
+                <i class="fa-solid fa-shop-slash" style="font-size: 40px; color: var(--laranja-fogo, #ff5e00); margin-bottom: 15px;"></i>
+                <h2 style="margin-bottom: 10px;">${escaparHtml(titulo)}</h2>
+                <p style="color: #aaa;">${escaparHtml(mensagem)}</p>
+            </div>
+        </div>
+    `;
+}
+
+function chaveLocalStorage(sufixo) {
+    return `loja_${lojaAtual.subdominio}_${sufixo}`;
+}
 
 // Evita XSS: qualquer texto vindo do banco (nome/descrição de produto ou ingrediente)
 // passa por aqui antes de entrar num innerHTML.
@@ -107,13 +157,14 @@ async function fetchSupabase(endpoint, options = {}) {
 }
 
 function obterOuCriarClienteId() {
-    let id = localStorage.getItem("vilelaburgers_cliente_id");
+    const chave = chaveLocalStorage("cliente_id");
+    let id = localStorage.getItem(chave);
     if (!id) {
         id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
             var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
             return v.toString(16);
         });
-        localStorage.setItem("vilelaburgers_cliente_id", id);
+        localStorage.setItem(chave, id);
     }
     return id;
 }
@@ -140,7 +191,7 @@ function calcularUsoIngredienteNoCarrinho(ingredienteId) {
 // === 2. EXTRAÇÃO DE DADOS AO VIVO ===
 async function carregarCardapioDoBanco() {
     try {
-        const resposta = await fetchSupabase(`/rest/v1/cardapio_inteligente?select=*&ativo=eq.true`);
+        const resposta = await fetchSupabase(`/rest/v1/cardapio_inteligente?select=*&ativo=eq.true&loja_id=eq.${lojaAtual.id}`);
         if (!resposta.ok) throw new Error(`Erro na API: HTTP ${resposta.status}`);
         const dados = await resposta.json();
 
@@ -172,7 +223,7 @@ async function carregarCardapioDoBanco() {
                 });
             }
             // ------------------------------------------
-        const resRec = await fetchSupabase(`/rest/v1/receita_produto?select=*`);
+        const resRec = await fetchSupabase(`/rest/v1/receita_produto?select=*&loja_id=eq.${lojaAtual.id}`);
         receitasGlobais = await resRec.json();
 
         renderizarCardapio();
@@ -234,13 +285,13 @@ async function abrirModalProduto(id) {
     modal.classList.remove("escondido");
 
     try {
-        const resExtras = await fetchSupabase(`/rest/v1/ingredientes?select=id,nome,preco_adicional,estoque&preco_adicional=gt.0&estoque=gt.0`);
+        const resExtras = await fetchSupabase(`/rest/v1/ingredientes?select=id,nome,preco_adicional,estoque&preco_adicional=gt.0&estoque=gt.0&loja_id=eq.${lojaAtual.id}`);
         const adicionaisDoBanco = await resExtras.json();
 
-        const resRec = await fetchSupabase(`/rest/v1/receita_produto?select=*`);
+        const resRec = await fetchSupabase(`/rest/v1/receita_produto?select=*&loja_id=eq.${lojaAtual.id}`);
         receitasGlobais = await resRec.json();
 
-        const resIngTodos = await fetchSupabase(`/rest/v1/ingredientes?select=id,nome,estoque`);
+        const resIngTodos = await fetchSupabase(`/rest/v1/ingredientes?select=id,nome,estoque&loja_id=eq.${lojaAtual.id}`);
         const todosIngredientes = await resIngTodos.json();
 
         const receitaDesteLanche = receitasGlobais.filter(r => r.produto_id == produtoSendoVisto.id);
@@ -373,7 +424,7 @@ async function alterarQtdBase(delta) {
     btn.disabled = true;
 
     try {
-        const resIng = await fetchSupabase(`/rest/v1/ingredientes?select=id,nome,estoque`);
+        const resIng = await fetchSupabase(`/rest/v1/ingredientes?select=id,nome,estoque&loja_id=eq.${lojaAtual.id}`);
         const ingredientesLive = await resIng.json();
         const receitaDesteLanche = receitasGlobais.filter(r => r.produto_id == produtoSendoVisto.id);
 
@@ -468,7 +519,7 @@ async function alterarQtdAdicional(id, delta) {
     btn.disabled = true;
 
     try {
-        const resIng = await fetchSupabase(`/rest/v1/ingredientes?select=nome,estoque&id=eq.${id}`);
+        const resIng = await fetchSupabase(`/rest/v1/ingredientes?select=nome,estoque&id=eq.${id}&loja_id=eq.${lojaAtual.id}`);
         const dadosIng = await resIng.json();
 
         if (dadosIng && dadosIng.length > 0) {
@@ -523,7 +574,7 @@ async function confirmarAdicao() {
     }
 
     try {
-        const resIng = await fetchSupabase(`/rest/v1/ingredientes?select=id,nome,estoque`);
+        const resIng = await fetchSupabase(`/rest/v1/ingredientes?select=id,nome,estoque&loja_id=eq.${lojaAtual.id}`);
         const ingredientesLive = await resIng.json();
 
         const receitaDesteLanche = receitasGlobais.filter(r => r.produto_id == produtoSendoVisto.id);
@@ -807,7 +858,7 @@ async function enviarParaWhatsApp() {
     }
 
     try {
-        const perfilSalvo = JSON.parse(localStorage.getItem("vilelaburgers_perfil") || "{}");
+        const perfilSalvo = JSON.parse(localStorage.getItem(chaveLocalStorage("perfil")) || "{}");
         const telefoneCliente = perfilSalvo.telefone ? String(perfilSalvo.telefone).replace(/\D/g, '') : "";
         const clienteId = obterOuCriarClienteId();
 
@@ -819,7 +870,8 @@ async function enviarParaWhatsApp() {
             p_telefone_cliente: telefoneCliente,
             p_status: "Pendente",
             p_previsao_entrega: "Em até 50 minutos",
-            p_carrinho: carrinho 
+            p_carrinho: carrinho,
+            p_loja_id: lojaAtual.id
         };
 
         const resSupabase = await fetchSupabase(`/rest/v1/rpc/registrar_pedido_completo`, {
@@ -857,7 +909,8 @@ async function enviarParaWhatsApp() {
 
         // Aguarda 2,5 segundos com o fogo estralando antes de ir para o WhatsApp
         setTimeout(() => {
-            let textoPedido = `🔥 *NOVO PEDIDO - VILELA BURGERS* 🔥\n\n`;
+            const nomeLojaTexto = (configLoja.nome_loja || lojaAtual.nome || "").toUpperCase();
+            let textoPedido = `🔥 *NOVO PEDIDO - ${nomeLojaTexto}* 🔥\n\n`;
             textoPedido += `👤 *Cliente:* ${nome}\n📍 *Endereço:* ${enderecoFormatado}\n`;
             
             if (pagamento === "Dinheiro") {
@@ -898,9 +951,12 @@ async function enviarParaWhatsApp() {
                 somFogo.pause();
             }
             
-            let numeroLimpo = configLoja.numero_whatsapp ? String(configLoja.numero_whatsapp).replace(/\D/g, '') : "5543996150221";
-            if(numeroLimpo === "") numeroLimpo = "5543996150221";
-            
+            const numeroLimpo = configLoja.numero_whatsapp ? String(configLoja.numero_whatsapp).replace(/\D/g, '') : "";
+            if (numeroLimpo === "") {
+                mostrarAviso("Pedido registrado, mas esta loja ainda não configurou um número de WhatsApp. Entre em contato diretamente com o estabelecimento.", "WhatsApp não configurado");
+                return;
+            }
+
             // =========================================================
             // LÓGICA INTELIGENTE PARA FORÇAR O APLICATIVO DO WHATSAPP
             // =========================================================
@@ -934,17 +990,21 @@ async function carregarHistoricoPedidos() {
     if (!container) return;
 
     const clienteId = obterOuCriarClienteId();
-    const perfilSalvo = JSON.parse(localStorage.getItem("vilelaburgers_perfil") || "{}");
+    const perfilSalvo = JSON.parse(localStorage.getItem(chaveLocalStorage("perfil")) || "{}");
     const telefoneCliente = perfilSalvo.telefone ? String(perfilSalvo.telefone).replace(/\D/g, '') : "";
 
     container.innerHTML = `<p style="color: #aaa; text-align: center; padding: 20px;">Carregando seus pedidos...</p>`;
 
     try {
-        let queryUrl = `/rest/v1/pedidos?select=*&or=(cliente_id.eq.${clienteId}`;
-        if (telefoneCliente) queryUrl += `,telefone_cliente.eq.${telefoneCliente}`;
-        queryUrl += `)&order=data_pedido.desc`;
-
-        const resposta = await fetchSupabase(queryUrl);
+        const resposta = await fetchSupabase(`/rest/v1/rpc/buscar_meus_pedidos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                p_loja_id: lojaAtual.id,
+                p_cliente_id: clienteId,
+                p_telefone: telefoneCliente || null
+            })
+        });
         if (!resposta.ok) throw new Error("Erro histórico");
         const pedidos = await resposta.json();
 
@@ -1005,18 +1065,18 @@ function navegarPara(aba) {
 
 function salvarPerfil() {
     const perfil = { nome: document.getElementById("perfil-nome").value, telefone: document.getElementById("perfil-telefone").value, rua: document.getElementById("perfil-rua").value, numero: document.getElementById("perfil-numero").value, bairro: document.getElementById("perfil-bairro").value, complemento: document.getElementById("perfil-complemento").value };
-    localStorage.setItem("vilelaburgers_perfil", JSON.stringify(perfil)); 
+    localStorage.setItem(chaveLocalStorage("perfil"), JSON.stringify(perfil)); 
     mostrarAviso("Seus dados de entrega foram salvos com sucesso!", "Tudo Certo!", "sucesso"); 
     navegarPara('inicio'); 
 }
 
 function carregarPerfilNaTela() {
-    const salvo = localStorage.getItem("vilelaburgers_perfil");
+    const salvo = localStorage.getItem(chaveLocalStorage("perfil"));
     if (salvo) { const perfil = JSON.parse(salvo); document.getElementById("perfil-nome").value = perfil.nome || ""; document.getElementById("perfil-telefone").value = perfil.telefone || ""; document.getElementById("perfil-rua").value = perfil.rua || ""; document.getElementById("perfil-numero").value = perfil.numero || ""; document.getElementById("perfil-bairro").value = perfil.bairro || ""; document.getElementById("perfil-complemento").value = perfil.complemento || ""; }
 }
 
 function preencherCheckoutComPerfil() {
-    const salvo = localStorage.getItem("vilelaburgers_perfil");
+    const salvo = localStorage.getItem(chaveLocalStorage("perfil"));
     if (salvo) { const perfil = JSON.parse(salvo); document.getElementById("nome-cliente").value = perfil.nome || ""; document.getElementById("rua-cliente").value = perfil.rua || ""; document.getElementById("numero-cliente").value = perfil.numero || ""; document.getElementById("bairro-cliente").value = perfil.bairro || ""; document.getElementById("complemento-cliente").value = perfil.complemento || ""; }
 }
 
@@ -1047,7 +1107,7 @@ async function renderizarRodape() {
 
 async function carregarConfiguracoes() {
     try {
-        const res = await fetchSupabase(`/rest/v1/configuracoes?select=*&limit=1`);
+        const res = await fetchSupabase(`/rest/v1/configuracoes?select=*&loja_id=eq.${lojaAtual.id}&limit=1`);
         const dados = await res.json();
         if (dados && dados.length > 0) configLoja = dados[0];
     } catch (erro) {
@@ -1120,16 +1180,19 @@ function verificarHorarioLoja() {
 let memoriaStatusPedidos = {}; 
 
 async function rastrearPedidosEmAndamento() {
+    if (!lojaAtual) return;
     const clienteId = obterOuCriarClienteId();
     if (!clienteId) return;
 
     try {
-        // Puxamos os pedidos recentes do cliente. Removemos o filtro de status da URL 
-        // para garantir que o Supabase não barre a resposta por erro de sintaxe.
-        const res = await fetchSupabase(`/rest/v1/pedidos?select=id,status&cliente_id=eq.${clienteId}&order=data_pedido.desc&limit=5`);
-        
+        const res = await fetchSupabase(`/rest/v1/rpc/buscar_meus_pedidos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ p_loja_id: lojaAtual.id, p_cliente_id: clienteId, p_telefone: null })
+        });
+
         if (!res.ok) return;
-        const pedidosAoVivo = await res.json();
+        const pedidosAoVivo = (await res.json()).slice(0, 5);
 
         pedidosAoVivo.forEach(pedidoDb => {
             // Se o pedido não tem status ou já foi finalizado/entregue antes, pula
@@ -1175,7 +1238,7 @@ setInterval(rastrearPedidosEmAndamento, 10000);
 // ==========================================
 async function carregarIdentidadeVisual() {
     try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracoes?id=eq.1&select=*`, {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracoes?loja_id=eq.${lojaAtual.id}&select=*`, {
             method: 'GET',
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
         });
@@ -1279,9 +1342,9 @@ function checarRetornoLoginGoogle() {
                 const nomeGoogle = usuarioGoogle.user_metadata.full_name || usuarioGoogle.user_metadata.name || "Cliente Google";
 
                 // Sincroniza o nome no LocalStorage do navegador
-                let perfilExistente = JSON.parse(localStorage.getItem("vilelaburgers_perfil") || "{}");
+                let perfilExistente = JSON.parse(localStorage.getItem(chaveLocalStorage("perfil")) || "{}");
                 perfilExistente.nome = nomeGoogle;
-                localStorage.setItem("vilelaburgers_perfil", JSON.stringify(perfilExistente));
+                localStorage.setItem(chaveLocalStorage("perfil"), JSON.stringify(perfilExistente));
 
                 // Atualiza as caixas de texto na tela do cliente
                 carregarPerfilNaTela();
@@ -1311,18 +1374,26 @@ function checarRetornoLoginGoogle() {
 // ==========================================================
 // GATILHOS DE INICIALIZAÇÃO AUTOMÁTICA DO SISTEMA
 // ==========================================================
+// Tudo abaixo só roda depois de descobrir qual loja este subdomínio é —
+// sem isso não tem como filtrar cardápio, pedidos, nem configurações.
+async function iniciarApp() {
+    const lojaOk = await resolverLoja();
+    if (!lojaOk) return;
 
-// 1. Roda o verificador do Google imediatamente ao abrir o site
-checarRetornoLoginGoogle();
+    // 1. Roda o verificador do Google imediatamente ao abrir o site
+    checarRetornoLoginGoogle();
 
-// 2. Carrega a Identidade Visual Dinâmica
-carregarIdentidadeVisual();
+    // 2. Carrega a Identidade Visual Dinâmica
+    carregarIdentidadeVisual();
 
-// 3. Inicializa as configurações e horários da hamburgueria
-carregarConfiguracoes(); 
+    // 3. Inicializa as configurações e horários da hamburgueria
+    carregarConfiguracoes();
 
-// 4. Puxa os produtos do cardápio do banco de dados
-carregarCardapioDoBanco(); 
+    // 4. Puxa os produtos do cardápio do banco de dados
+    carregarCardapioDoBanco();
 
-// 5. Insere e atualiza a versão no rodapé
-renderizarRodape();
+    // 5. Insere e atualiza a versão no rodapé
+    renderizarRodape();
+}
+
+iniciarApp();

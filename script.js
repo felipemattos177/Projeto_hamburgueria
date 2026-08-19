@@ -677,13 +677,44 @@ function atualizarContadorCart() {
     }
 }
 
+let tipoEntregaSelecionado = "entrega";
+
+// Usado em todo lugar que precisa do total (checkout, PIX, WhatsApp) pra
+// nunca esquecer de somar a taxa de entrega em algum deles.
+function obterTaxaEntregaAtual() {
+    return (tipoEntregaSelecionado === "entrega") ? (Number(configLoja.taxa_entrega) || 0) : 0;
+}
+
+function selecionarTipoEntrega(tipo) {
+    tipoEntregaSelecionado = tipo;
+    const btnEntrega = document.getElementById("btn-tipo-entrega");
+    const btnRetirada = document.getElementById("btn-tipo-retirada");
+    const camposEndereco = document.getElementById("campos-endereco-entrega");
+    if (!btnEntrega || !btnRetirada || !camposEndereco) return;
+
+    if (tipo === "entrega") {
+        btnEntrega.style.background = "var(--laranja-fogo, #ff5e00)";
+        btnEntrega.style.borderColor = "var(--laranja-fogo, #ff5e00)";
+        btnRetirada.style.background = "transparent";
+        btnRetirada.style.borderColor = "#333";
+        camposEndereco.style.display = "block";
+    } else {
+        btnRetirada.style.background = "var(--laranja-fogo, #ff5e00)";
+        btnRetirada.style.borderColor = "var(--laranja-fogo, #ff5e00)";
+        btnEntrega.style.background = "transparent";
+        btnEntrega.style.borderColor = "#333";
+        camposEndereco.style.display = "none";
+    }
+    renderizarCheckout();
+}
+
 function abrirCheckout() {
     if (carrinho.length === 0) { mostrarAviso("Adicione algo delicioso antes de finalizar.", "Carrinho Vazio"); return; }
     navegarPara('checkout');
-    renderizarCheckout();
-    carregarPerfilNaTela(); 
+    selecionarTipoEntrega('entrega');
+    carregarPerfilNaTela();
     preencherCheckoutComPerfil();
-    verificarTroco(); 
+    verificarTroco();
 }
 
 function renderizarCheckout() {
@@ -730,8 +761,19 @@ function renderizarCheckout() {
         </button>
     `;
 
+    const taxaEntregaCheckout = obterTaxaEntregaAtual();
+    if (taxaEntregaCheckout > 0) {
+        somaTotal += taxaEntregaCheckout;
+        divItens.innerHTML += `
+            <div style="display: flex; justify-content: space-between; color: #aaa; font-size: 14px; margin-top: 12px; padding-top: 10px; border-top: 1px dashed #333;">
+                <span><i class="fa-solid fa-motorcycle"></i> Taxa de entrega</span>
+                <span>R$ ${taxaEntregaCheckout.toFixed(2).replace('.', ',')}</span>
+            </div>
+        `;
+    }
+
     document.getElementById("valor-total").innerText = `R$ ${somaTotal.toFixed(2).replace('.', ',')}`;
-    verificarTroco(); 
+    verificarTroco();
 }
 
 function removerDoCarrinho(index) {
@@ -768,8 +810,8 @@ function verificarTroco() {
             return; 
         }
 
-        const totalCalculado = carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0);
-        
+        const totalCalculado = carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0) + obterTaxaEntregaAtual();
+
         if (!areaPix) {
             areaPix = document.createElement("div");
             areaPix.id = "area-pix-dinamica";
@@ -799,7 +841,7 @@ function gerarPixCopiaECola(valorPix) {
 }
 
 function copiarPixParaAreaDeTransferencia() {
-    const totalCalculado = carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0);
+    const totalCalculado = carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0) + obterTaxaEntregaAtual();
     const codigoPix = gerarPixCopiaECola(totalCalculado);
 
     navigator.clipboard.writeText(codigoPix).then(() => {
@@ -839,15 +881,21 @@ async function enviarParaWhatsApp() {
     const bairro = document.getElementById("bairro-cliente").value;
     const complemento = document.getElementById("complemento-cliente").value;
     const pagamento = document.getElementById("forma-pagamento").value;
+    const ehEntrega = tipoEntregaSelecionado === "entrega";
 
-    if (nome === "" || rua === "" || numero === "" || bairro === "") {
-        mostrarAviso("Por favor, preencha seu Nome, Rua, Número e Bairro para a entrega!", "Dados Incompletos");
+    if (nome === "") {
+        mostrarAviso("Por favor, preencha seu nome.", "Dados Incompletos");
+        return;
+    }
+    if (ehEntrega && (rua === "" || numero === "" || bairro === "")) {
+        mostrarAviso("Por favor, preencha Rua, Número e Bairro para a entrega!", "Dados Incompletos");
         return;
     }
 
-    const enderecoFormatado = `${rua}, ${numero} - ${bairro} ${complemento ? '(' + complemento + ')' : ''}`;
-    const totalCalculado = carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0);
-    
+    const enderecoFormatado = ehEntrega ? `${rua}, ${numero} - ${bairro} ${complemento ? '(' + complemento + ')' : ''}` : "";
+    const taxaEntrega = obterTaxaEntregaAtual();
+    const totalCalculado = carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0) + taxaEntrega;
+
     const btnFinalizar = document.querySelector(".btn-whatsapp");
     let textoOriginalBotao = "Enviar Pedido";
 
@@ -871,7 +919,8 @@ async function enviarParaWhatsApp() {
             p_status: "Pendente",
             p_previsao_entrega: "Em até 50 minutos",
             p_carrinho: carrinho,
-            p_loja_id: lojaAtual.id
+            p_loja_id: lojaAtual.id,
+            p_tipo_entrega: tipoEntregaSelecionado
         };
 
         const resSupabase = await fetchSupabase(`/rest/v1/rpc/registrar_pedido_completo`, {
@@ -911,8 +960,10 @@ async function enviarParaWhatsApp() {
         setTimeout(() => {
             const nomeLojaTexto = (configLoja.nome_loja || lojaAtual.nome || "").toUpperCase();
             let textoPedido = `🔥 *NOVO PEDIDO - ${nomeLojaTexto}* 🔥\n\n`;
-            textoPedido += `👤 *Cliente:* ${nome}\n📍 *Endereço:* ${enderecoFormatado}\n`;
-            
+            textoPedido += `👤 *Cliente:* ${nome}\n`;
+            textoPedido += ehEntrega ? `📍 *Endereço:* ${enderecoFormatado}\n` : `🏪 *Retirada na loja*\n`;
+
+
             if (pagamento === "Dinheiro") {
                 const troco = document.getElementById("troco-dinheiro").value;
                 textoPedido += `💳 *Pagamento:* Dinheiro (Troco para R$ ${troco})\n\n`;
@@ -932,6 +983,10 @@ async function enviarParaWhatsApp() {
                 }
                 textoPedido += `   *Subtotal do item: R$ ${item.precoTotalItem.toFixed(2).replace('.', ',')}*\n`;
             });
+
+            if (taxaEntrega > 0) {
+                textoPedido += `\n🛵 *Taxa de entrega: R$ ${taxaEntrega.toFixed(2).replace('.', ',')}*\n`;
+            }
 
             textoPedido += `\n💰 *TOTAL DO PEDIDO: R$ ${totalCalculado.toFixed(2).replace('.', ',')}*`;
 

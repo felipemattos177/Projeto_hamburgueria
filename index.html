@@ -107,14 +107,22 @@
 
             <section class="checkout-secao">
                 <h3><i class="fa-solid fa-location-dot"></i> Entrega</h3>
-                <input type="text" id="nome-cliente" placeholder="Seu Nome Completo">
-                
-                <input type="text" id="rua-cliente" placeholder="Rua / Avenida">
-                <div style="display: flex; gap: 10px;">
-                    <input type="text" id="numero-cliente" placeholder="Número" style="width: 40%;">
-                    <input type="text" id="bairro-cliente" placeholder="Bairro" style="width: 60%;">
+
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <button type="button" id="btn-tipo-entrega" onclick="selecionarTipoEntrega('entrega')" style="flex: 1; padding: 12px; border-radius: 8px; border: 2px solid var(--laranja-fogo, #ff5e00); background: var(--laranja-fogo, #ff5e00); color: #fff; font-weight: bold; cursor: pointer; font-size: 14px;"><i class="fa-solid fa-motorcycle"></i> Entrega</button>
+                    <button type="button" id="btn-tipo-retirada" onclick="selecionarTipoEntrega('retirada')" style="flex: 1; padding: 12px; border-radius: 8px; border: 2px solid #333; background: transparent; color: #fff; font-weight: bold; cursor: pointer; font-size: 14px;"><i class="fa-solid fa-store"></i> Retirar na loja</button>
                 </div>
-                <input type="text" id="complemento-cliente" placeholder="Complemento / Ponto de Referência">
+
+                <input type="text" id="nome-cliente" placeholder="Seu Nome Completo">
+
+                <div id="campos-endereco-entrega">
+                    <input type="text" id="rua-cliente" placeholder="Rua / Avenida">
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="numero-cliente" placeholder="Número" style="width: 40%;">
+                        <input type="text" id="bairro-cliente" placeholder="Bairro" style="width: 60%;">
+                    </div>
+                    <input type="text" id="complemento-cliente" placeholder="Complemento / Ponto de Referência">
+                </div>
             </section>
 
             <section class="checkout-secao">

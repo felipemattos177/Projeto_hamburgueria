@@ -228,6 +228,7 @@
             <nav class="sidebar-nav">
                 <button class="tab-btn ativa" onclick="mudarAbaAdmin('view-estoque', this)"><i class="fa-solid fa-boxes-stacked"></i> Cardápio & Estoque</button>
                 <button class="tab-btn" onclick="mudarAbaAdmin('view-pedidos', this)"><i class="fa-solid fa-motorcycle"></i> Gestão de Pedidos</button>
+                <button class="tab-btn" onclick="mudarAbaAdmin('view-entregas', this)"><i class="fa-solid fa-hand-holding-dollar"></i> Entregas</button>
                 <button class="tab-btn" onclick="mudarAbaAdmin('view-config', this)"><i class="fa-solid fa-gear"></i> Configurações</button>
             </nav>
 
@@ -323,6 +324,49 @@
             </div>
 
             <!-- ========================================== -->
+            <!-- ABA 3: CONTROLE DE ENTREGAS                -->
+            <!-- ========================================== -->
+            <div id="view-entregas" class="view-section">
+
+                <div class="header-admin">
+                    <h1><span class="icone-secao"><i class="fa-solid fa-hand-holding-dollar"></i></span> Controle de Entregas</h1>
+                </div>
+
+                <div class="barra-tempo" style="flex-wrap: wrap;">
+                    <strong><i class="fa-solid fa-calendar"></i> Período:</strong>
+                    <input type="date" id="entregas-data-inicio" onchange="carregarRelatorioEntregas()" style="width: auto; padding: 8px; border-radius: 7px; border: 1px solid var(--borda); font-family: inherit; font-size: 14px;">
+                    <span>até</span>
+                    <input type="date" id="entregas-data-fim" onchange="carregarRelatorioEntregas()" style="width: auto; padding: 8px; border-radius: 7px; border: 1px solid var(--borda); font-family: inherit; font-size: 14px;">
+                </div>
+
+                <div class="grid-config" style="margin-bottom: 20px;">
+                    <div class="card-config" style="--cor-card: var(--verde);">
+                        <h3 style="margin-bottom: 6px;"><i class="fa-solid fa-motorcycle" style="color: var(--verde);"></i> Entregas no Período</h3>
+                        <div id="entregas-total-qtd" style="font-size: 28px; font-weight: 800; color: var(--texto);">0</div>
+                    </div>
+                    <div class="card-config" style="--cor-card: var(--laranja-fogo);">
+                        <h3 style="margin-bottom: 6px;"><i class="fa-solid fa-sack-dollar" style="color: var(--laranja-fogo);"></i> Total a Repassar</h3>
+                        <div id="entregas-total-repasse" style="font-size: 28px; font-weight: 800; color: var(--texto);">R$ 0,00</div>
+                    </div>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Pedido</th>
+                            <th>Cliente</th>
+                            <th>Data</th>
+                            <th>Taxa Cobrada</th>
+                            <th>Repasse</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabela-entregas">
+                        <tr><td colspan="5" style="text-align: center;">Selecione um período.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- ========================================== -->
             <!-- ABA 3: CONFIGURAÇÕES DA LOJA               -->
             <!-- ========================================== -->
             <div id="view-config" class="view-section">
@@ -356,6 +400,20 @@
                                 <label>Fecha às</label>
                                 <input type="time" id="admin-hora-fecha" style="margin-bottom: 0;">
                             </div>
+                        </div>
+                    </div>
+
+                    <div class="card-config" style="--cor-card: var(--rosa);">
+                        <h3><i class="fa-solid fa-motorcycle" style="color: var(--rosa);"></i> Entrega</h3>
+                        <label>Taxa de Entrega Cobrada do Cliente (R$)</label>
+                        <input type="number" id="admin-taxa-entrega" placeholder="0.00" step="0.01">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 12px;">
+                            <input type="checkbox" id="admin-repasse-igual" onchange="alternarCampoRepasse()" style="width: auto; margin: 0;">
+                            O valor repassado ao entregador é o mesmo cobrado do cliente
+                        </label>
+                        <div id="bloco-valor-repasse">
+                            <label>Valor Fixo Pago ao Entregador (R$)</label>
+                            <input type="number" id="admin-valor-repasse" placeholder="0.00" step="0.01" style="margin-bottom: 0;">
                         </div>
                     </div>
 

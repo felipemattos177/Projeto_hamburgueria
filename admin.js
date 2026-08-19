@@ -229,10 +229,70 @@ function iniciarPainelAdmin() {
     carregarEstoque();
     carregarPedidosAdmin();
     carregarConfiguracoesAdmin();
+    definirPeriodoPadraoEntregas();
+    carregarRelatorioEntregas();
 
     intervaloPedidosAdmin = setInterval(carregarPedidosAdmin, 3000);
     intervaloProdutosEstoqueAdmin = setInterval(() => { carregarProdutos(); carregarEstoque(); }, 5000);
     intervaloRenovarSessaoAdmin = setInterval(renovarSessaoSeNecessario, 60 * 1000);
+}
+
+// ==========================================
+// MÓDULO 6: CONTROLE DE ENTREGAS
+// ==========================================
+function definirPeriodoPadraoEntregas() {
+    const hoje = new Date();
+    const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    const paraISO = (d) => d.toISOString().substring(0, 10);
+
+    const elInicio = document.getElementById("entregas-data-inicio");
+    const elFim = document.getElementById("entregas-data-fim");
+    if (elInicio && !elInicio.value) elInicio.value = paraISO(primeiroDiaMes);
+    if (elFim && !elFim.value) elFim.value = paraISO(hoje);
+}
+
+async function carregarRelatorioEntregas() {
+    if (!(await garantirSessaoOuRelogar())) return;
+
+    const dataInicio = document.getElementById("entregas-data-inicio").value;
+    const dataFim = document.getElementById("entregas-data-fim").value;
+    const tbody = document.getElementById("tabela-entregas");
+    if (!dataInicio || !dataFim || !tbody) return;
+
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Carregando...</td></tr>';
+
+    try {
+        const res = await fetch(
+            `${SUPABASE_URL}/rest/v1/pedidos?select=id,nome_cliente,data_pedido,valor_entrega,valor_repasse_entregador` +
+            `&loja_id=eq.${lojaAtual.id}&tipo_entrega=eq.entrega` +
+            `&data_pedido=gte.${dataInicio}T00:00:00&data_pedido=lte.${dataFim}T23:59:59&order=data_pedido.desc`,
+            { headers: headersAutenticados() }
+        );
+        const pedidos = await res.json();
+
+        let totalRepasse = 0;
+        let html = "";
+        pedidos.forEach(p => {
+            totalRepasse += Number(p.valor_repasse_entregador) || 0;
+            const dataFormatada = p.data_pedido ? new Date(p.data_pedido).toLocaleDateString('pt-BR') : '-';
+            html += `
+                <tr>
+                    <td>#${p.id}</td>
+                    <td>${escaparHtml(p.nome_cliente)}</td>
+                    <td>${dataFormatada}</td>
+                    <td>R$ ${Number(p.valor_entrega || 0).toFixed(2).replace('.', ',')}</td>
+                    <td>R$ ${Number(p.valor_repasse_entregador || 0).toFixed(2).replace('.', ',')}</td>
+                </tr>
+            `;
+        });
+
+        tbody.innerHTML = html || '<tr><td colspan="5" style="text-align:center;">Nenhuma entrega nesse período.</td></tr>';
+        document.getElementById("entregas-total-qtd").innerText = pedidos.length;
+        document.getElementById("entregas-total-repasse").innerText = `R$ ${totalRepasse.toFixed(2).replace('.', ',')}`;
+    } catch (erro) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--vermelho);">Erro ao carregar entregas.</td></tr>';
+        console.error(erro);
+    }
 }
 
 async function verificarSessaoAoAbrir() {
@@ -974,6 +1034,12 @@ async function carregarConfiguracoesAdmin() {
             document.getElementById("admin-whatsapp").value = config.numero_whatsapp || "";
             document.getElementById("admin-endereco").value = config.endereco || "";
 
+            // Entrega
+            document.getElementById("admin-taxa-entrega").value = config.taxa_entrega || 0;
+            document.getElementById("admin-repasse-igual").checked = config.repasse_igual_taxa !== false;
+            document.getElementById("admin-valor-repasse").value = config.valor_repasse_entregador || 0;
+            alternarCampoRepasse();
+
             // 2. Preenche os Dados da Identidade Visual (White-Label)
             document.getElementById("admin-nome-loja").value = config.nome_loja || "";
             document.getElementById("admin-titulo-banner").value = config.titulo_banner || "";
@@ -987,6 +1053,11 @@ async function carregarConfiguracoesAdmin() {
     } catch (erro) {
         console.error("Erro ao puxar configurações no Admin:", erro);
     }
+}
+
+function alternarCampoRepasse() {
+    const igual = document.getElementById("admin-repasse-igual").checked;
+    document.getElementById("bloco-valor-repasse").style.display = igual ? "none" : "block";
 }
 
 async function salvarConfiguracoesLoja() {
@@ -1078,6 +1149,9 @@ async function salvarConfiguracoesLoja() {
             horario_fechar: document.getElementById("admin-hora-fecha").value,
             numero_whatsapp: document.getElementById("admin-whatsapp").value,
             endereco: document.getElementById("admin-endereco").value,
+            taxa_entrega: parseFloat(document.getElementById("admin-taxa-entrega").value) || 0,
+            repasse_igual_taxa: document.getElementById("admin-repasse-igual").checked,
+            valor_repasse_entregador: parseFloat(document.getElementById("admin-valor-repasse").value) || 0,
 
             nome_loja: document.getElementById("admin-nome-loja").value,
             titulo_banner: document.getElementById("admin-titulo-banner").value,

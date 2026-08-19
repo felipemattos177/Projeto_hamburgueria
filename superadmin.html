@@ -4,82 +4,147 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel da Plataforma - Maths Hub</title>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        :root { --laranja-fogo: #ff5e00; }
-        body { font-family: 'Roboto', sans-serif; background-color: #f4f6f8; margin: 0; padding: 20px; color: #333; padding-bottom: 50px; }
+        :root {
+            --laranja-fogo: #ff5e00;
+            --laranja-suave: #fff2ea;
+            --bg-app: #f4f5f9;
+            --bg-header: #15171f;
+            --bg-card: #ffffff;
+            --texto: #171923;
+            --texto-suave: #667085;
+            --texto-claro: #98a2b3;
+            --borda: #e7e9ef;
+            --verde: #16a34a;
+            --verde-suave: #dcfce7;
+            --vermelho: #dc2626;
+            --vermelho-suave: #fee2e2;
+            --azul: #2563eb;
+            --azul-suave: #dbeafe;
+            --sombra: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
+            --sombra-lg: 0 10px 30px rgba(16,24,40,.12);
+            --raio: 12px;
+        }
+        * { box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-app); margin: 0; color: var(--texto); -webkit-font-smoothing: antialiased; }
 
-        #tela-login-super { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #121212; display: flex; align-items: center; justify-content: center; z-index: 5000; }
-        .login-card { background: #1e1e1e; padding: 35px 30px; border-radius: 12px; width: 100%; max-width: 340px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
-        .login-card h1 { color: var(--laranja-fogo); font-size: 20px; margin-bottom: 25px; text-align: center; }
-        .login-card input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #333; border-radius: 6px; background: #111; color: #fff; box-sizing: border-box; font-size: 15px; }
-        .login-card button { width: 100%; background: var(--laranja-fogo); color: #fff; border: none; padding: 13px; border-radius: 6px; font-weight: bold; font-size: 15px; cursor: pointer; }
-        #login-erro-super { color: #ff4757; font-size: 13px; margin-bottom: 12px; display: none; text-align: center; }
+        #tela-login-super {
+            position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px;
+            background:
+                radial-gradient(circle at 15% 15%, rgba(255,94,0,.18), transparent 45%),
+                radial-gradient(circle at 85% 85%, rgba(37,99,235,.15), transparent 45%),
+                var(--bg-header);
+            z-index: 5000;
+        }
+        .login-card { background: var(--bg-card); padding: 40px 34px; border-radius: 18px; width: 100%; max-width: 360px; box-shadow: var(--sombra-lg); }
+        .login-icone { width: 52px; height: 52px; border-radius: 14px; background: var(--laranja-fogo); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 22px; margin: 0 auto 18px; }
+        .login-card h1 { color: var(--texto); font-size: 18px; font-weight: 700; margin: 0 0 4px; text-align: center; }
+        .login-card p.subtitulo { color: var(--texto-suave); font-size: 13px; text-align: center; margin: 0 0 24px; }
+        .login-card label { font-size: 13px; font-weight: 500; color: var(--texto-suave); margin-bottom: 6px; display: block; }
+        .login-card input { width: 100%; padding: 12px 14px; margin-bottom: 16px; border: 1px solid var(--borda); border-radius: 9px; background: #fbfbfd; color: var(--texto); font-size: 14px; font-family: inherit; }
+        .login-card input:focus { outline: none; border-color: var(--laranja-fogo); background: #fff; }
+        .login-card button { width: 100%; background: var(--laranja-fogo); color: #fff; border: none; padding: 13px; border-radius: 9px; font-weight: 600; font-size: 14px; cursor: pointer; transition: .15s; }
+        .login-card button:hover { filter: brightness(1.08); }
+        #login-erro-super { color: var(--vermelho); background: var(--vermelho-suave); padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; display: none; text-align: center; }
 
-        .header-admin { display: flex; justify-content: space-between; align-items: center; background: #121212; color: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
-        .header-admin h1 { margin: 0; font-size: 22px; color: var(--laranja-fogo); }
-        .btn-sair { background: #57606f; color: #fff; border: none; padding: 10px 18px; border-radius: 5px; font-weight: bold; cursor: pointer; }
-        .btn-novo { background-color: #2ed573; color: white; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; }
-        .btn-novo:hover { background-color: #26b963; }
+        .topo {
+            background: var(--bg-header); color: #fff; padding: 18px 32px; display: flex; justify-content: space-between; align-items: center;
+        }
+        .topo-brand { display: flex; align-items: center; gap: 12px; }
+        .topo-brand-icone { width: 36px; height: 36px; border-radius: 9px; background: var(--laranja-fogo); display: flex; align-items: center; justify-content: center; font-size: 15px; }
+        .topo-brand div strong { display: block; font-size: 15px; font-weight: 700; }
+        .topo-brand div span { font-size: 11.5px; color: #9aa0b4; }
 
-        table { width: 100%; background: white; border-collapse: collapse; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
-        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; vertical-align: middle; }
-        th { background-color: #f1f2f6; color: #555; font-weight: 500; }
+        .conteudo { max-width: 1100px; margin: 0 auto; padding: 32px 24px 60px; }
 
-        .status-badge { padding: 5px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; color: white; }
-        .status-ativo { background-color: #2ed573; }
-        .status-inativo { background-color: #ff4757; }
+        .header-admin { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+        .header-admin h1 { margin: 0; font-size: 19px; font-weight: 700; color: var(--texto); display: flex; align-items: center; gap: 10px; }
+        .header-admin h1 .icone-secao { width: 34px; height: 34px; border-radius: 9px; background: var(--laranja-suave); color: var(--laranja-fogo); display: inline-flex; align-items: center; justify-content: center; font-size: 15px; }
 
-        .btn-acao { padding: 8px 12px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 13px; }
-        .btn-toggle { background-color: #dfe4ea; color: #2f3542; }
-        .btn-vincular { background-color: #3498db; color: white; }
+        .btn-sair { background: transparent; color: #b6b9c6; border: 1px solid rgba(255,255,255,.18); padding: 9px 16px; border-radius: 8px; font-weight: 500; cursor: pointer; font-size: 13.5px; transition: .15s; font-family: inherit; }
+        .btn-sair:hover { background: rgba(255,255,255,.08); color: #fff; }
+        .btn-novo { background-color: var(--laranja-fogo); color: white; border: none; padding: 10px 18px; border-radius: 9px; font-weight: 600; font-size: 14px; cursor: pointer; transition: .15s; display: inline-flex; align-items: center; gap: 8px; font-family: inherit; }
+        .btn-novo:hover { filter: brightness(1.08); }
 
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 1000; }
-        .modal-conteudo { background: white; padding: 30px; border-radius: 10px; width: 400px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
-        .modal-conteudo h2 { margin-top: 0; margin-bottom: 20px; color: #121212; }
-        .modal-conteudo input { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
-        .modal-conteudo small { display: block; margin-top: -10px; margin-bottom: 15px; color: #888; }
+        table { width: 100%; background: var(--bg-card); border-collapse: collapse; border-radius: var(--raio); overflow: hidden; box-shadow: var(--sombra); border: 1px solid var(--borda); }
+        th, td { padding: 14px 16px; text-align: left; border-bottom: 1px solid var(--borda); font-size: 14px; vertical-align: middle; }
+        tbody tr:last-child td { border-bottom: none; }
+        tbody tr:hover { background: #fafafc; }
+        th { background-color: #fafbfc; color: var(--texto-suave); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+
+        .status-badge { padding: 4px 11px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+        .status-ativo { background-color: var(--verde-suave); color: var(--verde); }
+        .status-inativo { background-color: var(--vermelho-suave); color: var(--vermelho); }
+
+        .btn-acao { padding: 7px 12px; border: none; border-radius: 7px; cursor: pointer; font-weight: 600; font-size: 12.5px; transition: .15s; }
+        .btn-toggle { background-color: #eef0f4; color: #344054; }
+        .btn-toggle:hover { background-color: #e1e4ea; }
+        .btn-vincular { background-color: var(--azul-suave); color: var(--azul); margin-left: 5px; }
+        .btn-vincular:hover { filter: brightness(.96); }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,17,25,.55); backdrop-filter: blur(2px); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-conteudo { background: var(--bg-card); padding: 30px; border-radius: 16px; width: 400px; box-shadow: var(--sombra-lg); }
+        .modal-conteudo h2 { margin-top: 0; margin-bottom: 18px; color: var(--texto); font-size: 18px; font-weight: 700; }
+        .modal-conteudo p { font-size: 13.5px; color: var(--texto-suave); line-height: 1.5; }
+        .modal-conteudo input { width: 100%; padding: 10px 12px; margin-bottom: 8px; border: 1px solid var(--borda); border-radius: 8px; box-sizing: border-box; font-family: inherit; font-size: 14px; background: #fbfbfd; color: var(--texto); }
+        .modal-conteudo input:focus { outline: none; border-color: var(--laranja-fogo); background: #fff; }
+        .modal-conteudo small { display: block; margin-bottom: 15px; color: var(--texto-claro); font-size: 12.5px; }
         .modal-botoes { display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; }
-        .btn-cancelar { background-color: #dfe4ea; color: #333; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .btn-cancelar { background-color: #eef0f4; color: #344054; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; }
     </style>
 </head>
 <body>
 
     <div id="tela-login-super">
         <form class="login-card" onsubmit="fazerLoginSuper(event)">
-            <h1><i class="fa-solid fa-layer-group"></i> Painel da Plataforma</h1>
+            <div class="login-icone"><i class="fa-solid fa-layer-group"></i></div>
+            <h1>Painel da Plataforma</h1>
+            <p class="subtitulo">Acesso restrito ao administrador da Maths Hub</p>
             <div id="login-erro-super"></div>
-            <input type="email" id="login-email-super" placeholder="E-mail" autocomplete="username" required>
-            <input type="password" id="login-senha-super" placeholder="Senha" autocomplete="current-password" required>
+            <label>E-mail</label>
+            <input type="email" id="login-email-super" placeholder="seu@email.com" autocomplete="username" required>
+            <label>Senha</label>
+            <input type="password" id="login-senha-super" placeholder="••••••••" autocomplete="current-password" required>
             <button type="submit" id="btn-login-super">Entrar</button>
         </form>
     </div>
 
     <div id="app-super-container" style="display: none;">
-        <div class="header-admin">
-            <h1>🏪 Lojas na Plataforma</h1>
-            <div style="display: flex; gap: 10px;">
-                <button class="btn-novo" onclick="abrirModalNovaLoja()">+ Nova Loja</button>
-                <button class="btn-sair" onclick="sairSuper()">Sair</button>
+        <div class="topo">
+            <div class="topo-brand">
+                <div class="topo-brand-icone"><i class="fa-solid fa-layer-group"></i></div>
+                <div>
+                    <strong>Maths Hub</strong>
+                    <span>Painel da plataforma</span>
+                </div>
             </div>
+            <button class="btn-sair" onclick="sairSuper()"><i class="fa-solid fa-right-from-bracket"></i> Sair</button>
         </div>
 
-        <table>
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Nome</th>
-                    <th>Subdomínio</th>
-                    <th>Status</th>
-                    <th>Admin vinculado</th>
-                    <th>Ações</th>
-                </tr>
-            </thead>
-            <tbody id="tabela-lojas">
-                <tr><td colspan="6" style="text-align: center;">Carregando lojas...</td></tr>
-            </tbody>
-        </table>
+        <div class="conteudo">
+            <div class="header-admin">
+                <h1><span class="icone-secao"><i class="fa-solid fa-shop"></i></span> Lojas na Plataforma</h1>
+                <button class="btn-novo" onclick="abrirModalNovaLoja()"><i class="fa-solid fa-plus"></i> Nova Loja</button>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nome</th>
+                        <th>Subdomínio</th>
+                        <th>Status</th>
+                        <th>Admin vinculado</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="tabela-lojas">
+                    <tr><td colspan="6" style="text-align: center;">Carregando lojas...</td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <div id="modal-nova-loja" class="modal-overlay">
@@ -98,11 +163,11 @@
     <div id="modal-vincular-admin" class="modal-overlay">
         <div class="modal-conteudo">
             <h2>Vincular Admin</h2>
-            <p style="font-size: 14px; color: #555; margin-top: 0;">
+            <p>
                 Crie o login no Supabase (Authentication → Users → Add user, com "Auto Confirm User" marcado),
                 copie o <strong>User UID</strong> dele e cole abaixo.
             </p>
-            <input type="text" id="vincular-user-id" placeholder="UID do usuário (ex: 0487b354-...)">
+            <input type="text" id="vincular-user-id" placeholder="UID do usuário (ex: 0487b354-...)" style="margin-bottom: 15px;">
             <div class="modal-botoes">
                 <button class="btn-cancelar" onclick="fecharModalVincular()">Cancelar</button>
                 <button class="btn-novo" onclick="salvarVinculo()">Vincular</button>

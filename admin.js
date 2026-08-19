@@ -214,12 +214,12 @@ async function verificarSessaoAoAbrir() {
 // ==========================================
 function mudarAbaAdmin(idAba, botaoClicado) {
     // Esconde todas as abas
-    document.querySelectorAll('.view-section').forEach(aba => aba.style.display = 'none');
+    document.querySelectorAll('.view-section').forEach(aba => aba.classList.remove('ativa'));
     // Tira o foco de todos os botões
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('ativa'));
-    
+
     // Mostra a aba clicada e foca o botão
-    document.getElementById(idAba).style.display = 'block';
+    document.getElementById(idAba).classList.add('ativa');
     if(botaoClicado) botaoClicado.classList.add('ativa');
 }
 
@@ -848,7 +848,7 @@ function renderizarKanban(pedidos) {
         }
 
         const cardHtml = `
-            <div class="card-pedido ${statusFormatado.toLowerCase().replace(' ', '-')}">
+            <div class="card-pedido ${statusFormatado.toLowerCase().replace(/ /g, '-')}">
                 <div class="card-header">
                     <span class="pedido-id">#${ped.id}</span>
                     <span class="pedido-tempo"><i class="fa-regular fa-clock"></i> ${dataFormatada}</span>

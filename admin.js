@@ -22,8 +22,11 @@ function obterSlugDaLoja() {
 async function resolverLoja() {
     const slug = obterSlugDaLoja();
     try {
+        // Sempre com a chave pública (nunca o token de sessão): isso roda antes
+        // do login, e um token velho/expirado sobrando no navegador não pode
+        // derrubar essa consulta que deveria ser sempre pública.
         const res = await fetch(`${SUPABASE_URL}/rest/v1/lojas?select=*&subdominio=eq.${encodeURIComponent(slug)}&limit=1`, {
-            headers: headersAutenticados()
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
         });
         const dados = await res.json();
 

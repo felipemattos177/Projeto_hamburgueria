@@ -1473,9 +1473,41 @@ async function carregarPedidosAdmin() {
         }
 
         const pedidos = await res.json();
+        await processarImpressaoAutomatica(pedidos);
         renderizarKanban(pedidos);
     } catch (erro) {
         document.getElementById("col-pendentes").innerHTML = `<p style="color:#ff4757; text-align:center; margin-top:20px;"><b>Erro no Script:</b> ${erro.message}</p>`;
+    }
+}
+
+// null = ainda não sabemos quais pedidos pendentes já existiam antes de a
+// página carregar; evita imprimir tudo de uma vez ao abrir o painel.
+let idsPedidosVistosAutoImpressao = null;
+
+async function processarImpressaoAutomatica(pedidos) {
+    const idsPendentesAtuais = pedidos
+        .filter(p => String(p.status || 'Pendente').trim().toLowerCase() === 'pendente')
+        .map(p => p.id);
+
+    if (idsPedidosVistosAutoImpressao === null) {
+        idsPedidosVistosAutoImpressao = new Set(idsPendentesAtuais);
+        return;
+    }
+
+    const toggleImpressao = document.getElementById("admin-impressao-automatica");
+    if (!toggleImpressao || !toggleImpressao.checked) {
+        // Mesmo desligado, mantém o controle em dia — senão, ao religar o
+        // toggle, todo pedido acumulado nesse meio-tempo dispararia de vez.
+        idsPendentesAtuais.forEach(id => idsPedidosVistosAutoImpressao.add(id));
+        return;
+    }
+
+    for (const id of idsPendentesAtuais) {
+        if (!idsPedidosVistosAutoImpressao.has(id)) {
+            idsPedidosVistosAutoImpressao.add(id);
+            await atualizarStatusPedido(id, 'Em Preparo');
+            await imprimirPedido(id);
+        }
     }
 }
 
@@ -1527,11 +1559,15 @@ function renderizarKanban(pedidos) {
                 </div>
                 <div class="info-cliente">
                     <strong>${escaparHtml(ped.nome_cliente) || 'Cliente não informado'}</strong><br>
+                    ${ped.tipo_entrega === 'retirada'
+                        ? '<i class="fa-solid fa-store"></i> Retirada na loja<br>'
+                        : (ped.endereco_entrega ? `<i class="fa-solid fa-location-dot"></i> ${escaparHtml(ped.endereco_entrega)}<br>` : '')}
                     Pgto: ${escaparHtml(ped.forma_pagamento) || '-'}<br>
                     <span style="color: #2ed573; font-weight: bold;">R$ ${totalNum.toFixed(2).replace('.', ',')}</span>
                 </div>
                 ${obsHtml}
                 ${botoesAcaoKanban(ped.id, statusFormatado)}
+                <button class="btn-imprimir-pedido" onclick="imprimirPedido(${ped.id})"><i class="fa-solid fa-print"></i> Imprimir cupom</button>
             </div>
         `;
 
@@ -1586,6 +1622,112 @@ async function atualizarStatusPedido(id, novoStatus) {
 }
 
 // ==========================================
+// MÓDULO 9: IMPRESSÃO DE CUPOM
+// ==========================================
+async function imprimirPedido(pedidoId) {
+    if (!(await garantirSessaoOuRelogar())) return;
+
+    try {
+        const resPedido = await fetch(
+            `${SUPABASE_URL}/rest/v1/pedidos?select=*&id=eq.${pedidoId}&loja_id=eq.${lojaAtual.id}`,
+            { headers: headersAutenticados() }
+        );
+        const pedidos = await resPedido.json();
+        if (!pedidos || pedidos.length === 0) return;
+        const pedido = pedidos[0];
+
+        const resItens = await fetch(
+            `${SUPABASE_URL}/rest/v1/itens_pedido?select=id,produto_id,quantidade,preco_unitario,observacao&pedido_id=eq.${pedidoId}&loja_id=eq.${lojaAtual.id}`,
+            { headers: headersAutenticados() }
+        );
+        const itens = await resItens.json();
+
+        const idsProdutos = [...new Set(itens.map(i => i.produto_id))];
+        const nomeProdutoPorId = {};
+        if (idsProdutos.length > 0) {
+            const resProdutos = await fetch(
+                `${SUPABASE_URL}/rest/v1/produtos?select=id,nome&id=in.(${idsProdutos.join(',')})`,
+                { headers: headersAutenticados() }
+            );
+            (await resProdutos.json()).forEach(p => { nomeProdutoPorId[p.id] = p.nome; });
+        }
+
+        const idsItens = itens.map(i => i.id);
+        const adicionaisPorItem = {};
+        if (idsItens.length > 0) {
+            const resAdd = await fetch(
+                `${SUPABASE_URL}/rest/v1/itens_pedido_adicionais?select=item_pedido_id,ingrediente_id,quantidade,preco_unitario&item_pedido_id=in.(${idsItens.join(',')})`,
+                { headers: headersAutenticados() }
+            );
+            const adicionais = await resAdd.json();
+            const idsIngred = [...new Set(adicionais.map(a => a.ingrediente_id))];
+            const nomeIngredPorId = {};
+            if (idsIngred.length > 0) {
+                const resIngred = await fetch(
+                    `${SUPABASE_URL}/rest/v1/ingredientes?select=id,nome&id=in.(${idsIngred.join(',')})`,
+                    { headers: headersAutenticados() }
+                );
+                (await resIngred.json()).forEach(i => { nomeIngredPorId[i.id] = i.nome; });
+            }
+            adicionais.forEach(a => {
+                if (!adicionaisPorItem[a.item_pedido_id]) adicionaisPorItem[a.item_pedido_id] = [];
+                adicionaisPorItem[a.item_pedido_id].push({
+                    nome: nomeIngredPorId[a.ingrediente_id] || 'Adicional',
+                    quantidade: a.quantidade,
+                    preco: a.preco_unitario
+                });
+            });
+        }
+
+        montarCupomImpressao(pedido, itens, nomeProdutoPorId, adicionaisPorItem);
+        setTimeout(() => window.print(), 150);
+    } catch (erro) {
+        console.error("Erro ao preparar impressão:", erro);
+        alert("Erro ao preparar a impressão do pedido.");
+    }
+}
+
+function montarCupomImpressao(pedido, itens, nomeProdutoPorId, adicionaisPorItem) {
+    const area = document.getElementById("area-impressao");
+    if (!area) return;
+
+    const dataFormatada = pedido.data_pedido ? new Date(pedido.data_pedido).toLocaleString('pt-BR') : '';
+    const nomeLoja = (lojaAtual && lojaAtual.nome) || "Pedido";
+    const tipoEntregaTexto = pedido.tipo_entrega === 'retirada' ? 'RETIRADA NA LOJA' : 'ENTREGA';
+    const valorEntrega = Number(pedido.valor_entrega) || 0;
+
+    let itensHtml = "";
+    itens.forEach(item => {
+        const nomeProd = nomeProdutoPorId[item.produto_id] || `Produto #${item.produto_id}`;
+        itensHtml += `<div class="cupom-linha"><span>1x ${escaparHtml(nomeProd)}</span><span>R$ ${Number(item.preco_unitario).toFixed(2).replace('.', ',')}</span></div>`;
+        (adicionaisPorItem[item.id] || []).forEach(add => {
+            itensHtml += `<div class="cupom-linha"><span>&nbsp;&nbsp;+ ${add.quantidade}x ${escaparHtml(add.nome)}</span><span>R$ ${(Number(add.preco) * Number(add.quantidade)).toFixed(2).replace('.', ',')}</span></div>`;
+        });
+        if (item.observacao) {
+            itensHtml += `<div class="cupom-obs">Obs: ${escaparHtml(item.observacao)}</div>`;
+        }
+    });
+
+    area.innerHTML = `
+        <div class="cupom-centro cupom-titulo">${escaparHtml(nomeLoja)}</div>
+        <div class="cupom-centro">Pedido #${pedido.id} — ${dataFormatada}</div>
+        <div class="cupom-sep"></div>
+        <div class="cupom-linha"><strong>${tipoEntregaTexto}</strong></div>
+        <div class="cupom-linha"><span>Cliente:</span><span>${escaparHtml(pedido.nome_cliente || '-')}</span></div>
+        ${pedido.telefone_cliente ? `<div class="cupom-linha"><span>Telefone:</span><span>${escaparHtml(pedido.telefone_cliente)}</span></div>` : ''}
+        ${pedido.endereco_entrega ? `<div class="cupom-obs">${escaparHtml(pedido.endereco_entrega)}</div>` : ''}
+        <div class="cupom-sep"></div>
+        ${itensHtml}
+        <div class="cupom-sep"></div>
+        ${valorEntrega > 0 ? `<div class="cupom-linha"><span>Taxa de entrega</span><span>R$ ${valorEntrega.toFixed(2).replace('.', ',')}</span></div>` : ''}
+        <div class="cupom-linha cupom-titulo"><span>TOTAL</span><span>R$ ${Number(pedido.total).toFixed(2).replace('.', ',')}</span></div>
+        <div class="cupom-sep"></div>
+        <div class="cupom-linha"><span>Pagamento:</span><span>${escaparHtml(pedido.forma_pagamento || '-')}</span></div>
+        ${pedido.observacoes ? `<div class="cupom-sep"></div><div class="cupom-obs">${escaparHtml(pedido.observacoes).replace(/\n/g, '<br>')}</div>` : ''}
+    `;
+}
+
+// ==========================================
 // MÓDULO 5: CONFIGURAÇÕES DA LOJA (O Cofre Mestre)
 // ==========================================
 
@@ -1609,6 +1751,7 @@ async function carregarConfiguracoesAdmin() {
             document.getElementById("admin-hora-fecha").value = config.horario_fechar || "";
             document.getElementById("admin-whatsapp").value = config.numero_whatsapp || "";
             document.getElementById("admin-endereco").value = config.endereco || "";
+            document.getElementById("admin-impressao-automatica").checked = config.impressao_automatica === true;
 
             // Entrega
             document.getElementById("admin-taxa-entrega").value = config.taxa_entrega || 0;
@@ -1725,6 +1868,7 @@ async function salvarConfiguracoesLoja() {
             horario_fechar: document.getElementById("admin-hora-fecha").value,
             numero_whatsapp: document.getElementById("admin-whatsapp").value,
             endereco: document.getElementById("admin-endereco").value,
+            impressao_automatica: document.getElementById("admin-impressao-automatica").checked,
             taxa_entrega: parseFloat(document.getElementById("admin-taxa-entrega").value) || 0,
             repasse_igual_taxa: document.getElementById("admin-repasse-igual").checked,
             valor_repasse_entregador: parseFloat(document.getElementById("admin-valor-repasse").value) || 0,

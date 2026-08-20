@@ -207,6 +207,24 @@
         .delta-positivo { color: var(--verde); }
         .delta-negativo { color: var(--vermelho); }
 
+        /* ===== IMPRESSÃO DE CUPOM ===== */
+        .toggle-linha { display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 4px; }
+        .toggle-linha input { width: auto; margin: 0; }
+        .btn-imprimir-pedido { background: #eef0f4; color: #344054; border: none; padding: 8px 10px; border-radius: 7px; cursor: pointer; font-weight: 600; font-size: 12.5px; margin-top: 6px; width: 100%; }
+        .btn-imprimir-pedido:hover { background: #e1e4ea; }
+
+        #area-impressao { display: none; }
+        @media print {
+            body * { visibility: hidden; }
+            #area-impressao, #area-impressao * { visibility: visible; }
+            #area-impressao { display: block; position: absolute; top: 0; left: 0; width: 76mm; padding: 4mm; font-family: 'Courier New', monospace; font-size: 12px; color: #000; }
+            #area-impressao .cupom-linha { display: flex; justify-content: space-between; gap: 6px; }
+            #area-impressao .cupom-sep { border-top: 1px dashed #000; margin: 6px 0; }
+            #area-impressao .cupom-centro { text-align: center; }
+            #area-impressao .cupom-titulo { font-weight: bold; font-size: 14px; }
+            #area-impressao .cupom-obs { padding-left: 10px; font-style: italic; }
+        }
+
         @media (max-width: 880px) {
             .sidebar { position: static; width: 100%; flex-direction: row; align-items: center; padding: 12px 14px; overflow-x: auto; }
             .sidebar-brand { padding: 0 12px 0 0; }
@@ -621,6 +639,15 @@
                     </div>
 
                     <div class="card-config" style="--cor-card: var(--azul);">
+                        <h3><i class="fa-solid fa-print" style="color: var(--azul);"></i> Impressão de Cupom</h3>
+                        <label class="toggle-linha">
+                            <input type="checkbox" id="admin-impressao-automatica">
+                            Imprimir automaticamente pedidos novos
+                        </label>
+                        <p class="dica">Quando ligado, todo pedido "Pendente" novo já muda pra "Em Preparo" e dispara a impressão sozinho — sem precisar clicar em nada. Precisa do navegador configurado em modo kiosk de impressão pra funcionar 100% sem diálogo (veja instruções que passamos junto).</p>
+                    </div>
+
+                    <div class="card-config" style="--cor-card: var(--azul);">
                         <h3><i class="fa-brands fa-whatsapp" style="color: var(--azul);"></i> Contato e Endereço</h3>
                         <label>Número Oficial (+55 + DDD)</label>
                         <input type="text" id="admin-whatsapp" placeholder="Ex: 5543996150221">
@@ -768,6 +795,9 @@
             </div>
         </div>
     </div>
+
+    <!-- Área usada só na hora de imprimir o cupom (escondida na tela normal) -->
+    <div id="area-impressao"></div>
 
     <script src="admin.js"></script>
 </body>

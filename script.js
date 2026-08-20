@@ -920,7 +920,8 @@ async function enviarParaWhatsApp() {
             p_previsao_entrega: "Em até 50 minutos",
             p_carrinho: carrinho,
             p_loja_id: lojaAtual.id,
-            p_tipo_entrega: tipoEntregaSelecionado
+            p_tipo_entrega: tipoEntregaSelecionado,
+            p_endereco_entrega: ehEntrega ? enderecoFormatado : null
         };
 
         const resSupabase = await fetchSupabase(`/rest/v1/rpc/registrar_pedido_completo`, {

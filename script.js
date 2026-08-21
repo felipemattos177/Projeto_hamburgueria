@@ -15,6 +15,11 @@ let lojaAberta = true;
 let mensagemFechado = "";
 let lojaAtual = null; // { id, subdominio, nome, ativo }
 
+// Guarda o valor que foi copiado no botão "Copiar Código PIX" — só libera
+// enviar o pedido no Pix se isso bater com o total atual do carrinho (se o
+// carrinho mudar depois de copiar, o código copiado ficaria com valor errado).
+let pixValorCopiado = null;
+
 function obterSlugDaLoja() {
     const params = new URLSearchParams(window.location.search);
     const slugParam = params.get("loja");
@@ -855,6 +860,7 @@ function copiarPixParaAreaDeTransferencia() {
     const codigoPix = gerarPixCopiaECola(totalCalculado);
 
     navigator.clipboard.writeText(codigoPix).then(() => {
+        pixValorCopiado = totalCalculado;
         const btn = document.getElementById("btn-copiar-pix");
         btn.innerHTML = `<i class="fa-solid fa-check"></i> Copiado! Abra seu app do banco`;
         btn.style.background = "#ffa502"; btn.style.color = "#fff";
@@ -905,6 +911,14 @@ async function enviarParaWhatsApp() {
     const enderecoFormatado = ehEntrega ? `${rua}, ${numero} - ${bairro} ${complemento ? '(' + complemento + ')' : ''}` : "";
     const taxaEntrega = obterTaxaEntregaAtual();
     const totalCalculado = carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0) + taxaEntrega;
+
+    if (pagamento.toUpperCase() === "PIX" && configLoja.chave_pix && configLoja.chave_pix.trim() !== "") {
+        const pixAindaValido = pixValorCopiado !== null && Math.abs(pixValorCopiado - totalCalculado) < 0.01;
+        if (!pixAindaValido) {
+            mostrarAviso("Copia o código PIX antes de enviar — é só clicar em \"Copiar Código PIX\" logo acima do botão de enviar.", "Falta copiar o PIX");
+            return;
+        }
+    }
 
     const btnFinalizar = document.querySelector(".btn-whatsapp");
     let textoOriginalBotao = "Enviar Pedido";

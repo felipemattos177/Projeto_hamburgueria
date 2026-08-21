@@ -165,6 +165,11 @@
         .barra-tempo span { color: var(--texto-suave); font-size: 13px; }
 
         .painel-board { display: flex; gap: 18px; overflow-x: auto; align-items: flex-start; }
+        .kpi-strip { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+        .kpi-card { flex: 1 1 130px; background: var(--bg-card); border: 1px solid var(--borda); border-radius: var(--raio); box-shadow: var(--sombra); padding: 12px 14px; text-align: center; border-top: 3px solid var(--cor-kpi, var(--laranja-fogo)); }
+        .kpi-card .kpi-valor { font-size: 30px; font-weight: 800; color: var(--texto); line-height: 1.1; }
+        .kpi-card .kpi-rotulo { font-size: 11.5px; font-weight: 600; color: var(--texto-suave); margin-top: 4px; text-transform: uppercase; letter-spacing: .3px; }
+        .kpi-strip-tempos .kpi-card .kpi-valor { font-size: 22px; }
         .coluna { flex: 1; min-width: 300px; background: #eef0f5; border-radius: var(--raio); padding: 14px; display: flex; flex-direction: column; max-height: calc(100vh - 220px); }
         .coluna h2 { font-size: 14px; font-weight: 700; text-align: left; margin: 0 0 14px; padding: 0 4px; display: flex; align-items: center; gap: 8px; color: var(--texto); }
         .coluna-pedidos { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 2px; }
@@ -403,6 +408,43 @@
                     <strong><i class="fa-solid fa-clock"></i> Tempo Estimado Atual:</strong>
                     <input type="number" id="input-tempo-preparo" value="40" onchange="carregarPedidosAdmin()">
                     <span>minutos (mude aqui conforme o movimento da chapa)</span>
+                </div>
+
+                <div class="kpi-strip">
+                    <div class="kpi-card" style="--cor-kpi: var(--laranja-fogo);">
+                        <div class="kpi-valor" id="kpi-pedidos-hoje">0</div>
+                        <div class="kpi-rotulo">Pedidos Hoje</div>
+                    </div>
+                    <div class="kpi-card" style="--cor-kpi: var(--vermelho);">
+                        <div class="kpi-valor" id="kpi-pendentes">0</div>
+                        <div class="kpi-rotulo">Pendentes</div>
+                    </div>
+                    <div class="kpi-card" style="--cor-kpi: var(--amarelo);">
+                        <div class="kpi-valor" id="kpi-preparo">0</div>
+                        <div class="kpi-rotulo">Em Preparo</div>
+                    </div>
+                    <div class="kpi-card" style="--cor-kpi: var(--verde);">
+                        <div class="kpi-valor" id="kpi-saiu">0</div>
+                        <div class="kpi-rotulo">Saiu p/ Entrega</div>
+                    </div>
+                    <div class="kpi-card" style="--cor-kpi: var(--verde);">
+                        <div class="kpi-valor" id="kpi-entregues-hoje">0</div>
+                        <div class="kpi-rotulo">Entregues Hoje</div>
+                    </div>
+                </div>
+                <div class="kpi-strip kpi-strip-tempos">
+                    <div class="kpi-card" style="--cor-kpi: var(--azul);">
+                        <div class="kpi-valor" id="kpi-tempo-preparo">--</div>
+                        <div class="kpi-rotulo">Tempo médio de Preparo</div>
+                    </div>
+                    <div class="kpi-card" style="--cor-kpi: var(--azul);">
+                        <div class="kpi-valor" id="kpi-tempo-entrega">--</div>
+                        <div class="kpi-rotulo">Tempo médio de Entrega</div>
+                    </div>
+                    <div class="kpi-card" style="--cor-kpi: var(--azul);">
+                        <div class="kpi-valor" id="kpi-tempo-total">--</div>
+                        <div class="kpi-rotulo">Tempo médio Total</div>
+                    </div>
                 </div>
 
                 <div class="painel-board">

@@ -1003,18 +1003,35 @@ function partesDataBr(valorTimestamp) {
     return { ano: obj.year, mes: obj.month, dia: obj.day };
 }
 
-// Diferença entre dois timestamps do banco, formatada como "Xh Ymin" ou "Ymin".
-function duracaoEntre(inicioStr, fimStr) {
-    if (!inicioStr || !fimStr) return '-';
+// Minutos entre dois timestamps do banco (null se faltar algum ou vier negativo).
+function minutosEntre(inicioStr, fimStr) {
+    if (!inicioStr || !fimStr) return null;
     const temFusoI = /[Zz]|[+-]\d{2}:?\d{2}$/.test(inicioStr);
     const temFusoF = /[Zz]|[+-]\d{2}:?\d{2}$/.test(fimStr);
     const inicio = new Date(temFusoI ? inicioStr : inicioStr + 'Z');
     const fim = new Date(temFusoF ? fimStr : fimStr + 'Z');
-    const minutosTotais = Math.round((fim - inicio) / 60000);
-    if (minutosTotais < 0) return '-';
+    const minutosTotais = (fim - inicio) / 60000;
+    return minutosTotais >= 0 ? minutosTotais : null;
+}
+
+// "Xh Ymin" ou "Ymin" a partir de um total em minutos.
+function formatarMinutos(min) {
+    if (min === null || min === undefined || isNaN(min)) return '-';
+    const minutosTotais = Math.round(min);
     const horas = Math.floor(minutosTotais / 60);
     const minutos = minutosTotais % 60;
     return horas > 0 ? `${horas}h ${minutos}min` : `${minutos}min`;
+}
+
+// Diferença entre dois timestamps do banco, formatada como "Xh Ymin" ou "Ymin".
+function duracaoEntre(inicioStr, fimStr) {
+    const min = minutosEntre(inicioStr, fimStr);
+    return min === null ? '-' : formatarMinutos(min);
+}
+
+// Data de hoje (YYYY-MM-DD) no fuso de Brasília, pra comparar com timestamps do banco.
+function hojeBrString() {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 }
 
 // ==========================================
@@ -1588,6 +1605,7 @@ async function carregarPedidosAdmin() {
         const pedidos = await res.json();
         await processarPedidosNovos(pedidos);
         renderizarKanban(pedidos);
+        renderizarKpisPedidos(pedidos);
     } catch (erro) {
         document.getElementById("col-pendentes").innerHTML = `<p style="color:#ff4757; text-align:center; margin-top:20px;"><b>Erro no Script:</b> ${erro.message}</p>`;
     }
@@ -1710,6 +1728,39 @@ function renderizarKanban(pedidos) {
     colPendentes.innerHTML = htmlPendentes || "<p style='text-align:center; color:#555; margin-top:20px;'>Vazio</p>";
     colPreparo.innerHTML = htmlPreparo || "<p style='text-align:center; color:#555; margin-top:20px;'>Vazio</p>";
     colEntrega.innerHTML = htmlEntrega || "<p style='text-align:center; color:#555; margin-top:20px;'>Vazio</p>";
+}
+
+// KPIs no topo da Gestão de Pedidos: pra bater o olho e já entender o
+// movimento do dia, tipo um painel de TV.
+function renderizarKpisPedidos(pedidos) {
+    const hoje = hojeBrString();
+    const dataEhHoje = (valor) => {
+        if (!valor) return false;
+        const d = partesDataBr(valor);
+        return `${d.ano}-${d.mes}-${d.dia}` === hoje;
+    };
+    const statusLimpo = (p) => String(p.status || 'Pendente').trim().toLowerCase();
+
+    const pedidosHoje = pedidos.filter(p => dataEhHoje(p.data_pedido));
+    const entreguesHoje = pedidosHoje.filter(p => statusLimpo(p) === 'entregue');
+
+    const elPedidosHoje = document.getElementById("kpi-pedidos-hoje");
+    if (!elPedidosHoje) return; // usuário pode estar em outra aba sem esses elementos
+
+    elPedidosHoje.innerText = pedidosHoje.length;
+    document.getElementById("kpi-pendentes").innerText = pedidos.filter(p => statusLimpo(p) === 'pendente').length;
+    document.getElementById("kpi-preparo").innerText = pedidos.filter(p => statusLimpo(p) === 'em preparo').length;
+    document.getElementById("kpi-saiu").innerText = pedidos.filter(p => statusLimpo(p) === 'saiu para entrega').length;
+    document.getElementById("kpi-entregues-hoje").innerText = entreguesHoje.length;
+
+    const media = (arr) => arr.length ? (arr.reduce((a, b) => a + b, 0) / arr.length) : null;
+    const temposPreparo = pedidosHoje.map(p => minutosEntre(p.data_pedido, p.saiu_em)).filter(v => v !== null);
+    const temposEntrega = pedidosHoje.map(p => minutosEntre(p.saiu_em, p.entregue_em)).filter(v => v !== null);
+    const temposTotal = pedidosHoje.map(p => minutosEntre(p.data_pedido, p.entregue_em)).filter(v => v !== null);
+
+    document.getElementById("kpi-tempo-preparo").innerText = formatarMinutos(media(temposPreparo));
+    document.getElementById("kpi-tempo-entrega").innerText = formatarMinutos(media(temposEntrega));
+    document.getElementById("kpi-tempo-total").innerText = formatarMinutos(media(temposTotal));
 }
 
 function botoesAcaoKanban(id, status) {

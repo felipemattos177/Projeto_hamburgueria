@@ -914,6 +914,10 @@
                 <div id="entregador-erro" style="display:none; color: var(--vermelho); background: var(--vermelho-suave); padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; text-align: center;"></div>
                 <label>Nome do Entregador</label>
                 <input type="text" id="entregador-nome" placeholder="Ex: João" style="margin-bottom: 0;">
+                <br><br>
+                <label>WhatsApp do Entregador (+55 + DDD, opcional)</label>
+                <input type="text" id="entregador-telefone" placeholder="Ex: 5543996150221" style="margin-bottom: 0;">
+                <p class="dica" style="margin-top: 6px;">Se preencher, depois de gerar o código dá pra mandar o link de acesso já pronto pelo WhatsApp.</p>
                 <div class="modal-botoes">
                     <button class="btn-cancelar" onclick="fecharModalEntregador()">Cancelar</button>
                     <button class="btn-novo" id="btn-salvar-entregador" onclick="salvarEntregador()">Gerar Código</button>
@@ -923,7 +927,8 @@
             <div id="entregador-token-gerado" style="display:none; text-align: center;">
                 <p style="font-size: 13.5px; color: var(--texto-suave);">Passa esse código pro entregador — é só o que ele precisa pra entrar em <strong>entregador.html</strong>:</p>
                 <div id="texto-token-gerado" style="font-size: 24px; font-weight: 800; letter-spacing: 2px; background: var(--laranja-suave); color: var(--laranja-fogo); padding: 14px; border-radius: 10px; margin-bottom: 16px;"></div>
-                <button class="btn-novo" style="width: 100%; justify-content: center;" onclick="fecharModalEntregador()">Concluído</button>
+                <button class="btn-novo" id="btn-enviar-token-whatsapp" style="width: 100%; justify-content: center; background: #25D366; display:none; margin-bottom: 10px;" onclick="enviarTokenPorWhatsapp()"><i class="fa-brands fa-whatsapp"></i> Enviar por WhatsApp</button>
+                <button class="btn-cancelar" style="width: 100%; justify-content: center;" onclick="fecharModalEntregador()">Concluído</button>
             </div>
         </div>
     </div>

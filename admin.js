@@ -2015,6 +2015,7 @@ function renderizarTabelaEntregadores(entregadores) {
                 <td><span class="status-badge ${badgeClass}">${badgeTexto}</span></td>
                 <td>
                     <button class="btn-acao btn-toggle" onclick="alternarStatusEntregador(${ent.id}, ${!ent.ativo})">${botaoTexto}</button>
+                    ${ent.telefone ? `<button class="btn-acao" style="background:#25D366; color:#fff;" onclick="reenviarTokenPorWhatsapp(${ent.id})"><i class="fa-brands fa-whatsapp"></i></button>` : ''}
                 </td>
             </tr>
         `;
@@ -2033,6 +2034,7 @@ async function alternarStatusEntregador(id, novoStatus) {
 
 function abrirModalEntregador() {
     document.getElementById("entregador-nome").value = "";
+    document.getElementById("entregador-telefone").value = "";
     document.getElementById("entregador-erro").style.display = "none";
     document.getElementById("entregador-form").style.display = "block";
     document.getElementById("entregador-token-gerado").style.display = "none";
@@ -2044,8 +2046,11 @@ function fecharModalEntregador() {
     document.getElementById("modal-entregador").style.display = "none";
 }
 
+let ultimoEntregadorGerado = null; // { nome, telefone, token } — pra montar o link do WhatsApp
+
 async function salvarEntregador() {
     const nome = document.getElementById("entregador-nome").value.trim();
+    const telefone = document.getElementById("entregador-telefone").value.trim();
     const erroEl = document.getElementById("entregador-erro");
     const btn = document.getElementById("btn-salvar-entregador");
     erroEl.style.display = "none";
@@ -2067,7 +2072,7 @@ async function salvarEntregador() {
         const res = await fetch(`${SUPABASE_URL}/rest/v1/entregadores`, {
             method: 'POST',
             headers: headersAutenticados('application/json'),
-            body: JSON.stringify({ loja_id: lojaAtual.id, nome, token, ativo: true })
+            body: JSON.stringify({ loja_id: lojaAtual.id, nome, telefone: telefone || null, token, ativo: true })
         });
 
         if (!res.ok) {
@@ -2079,9 +2084,12 @@ async function salvarEntregador() {
 
         carregarEntregadores();
 
+        ultimoEntregadorGerado = { nome, telefone, token };
+
         document.getElementById("entregador-form").style.display = "none";
         document.getElementById("titulo-modal-entregador").innerText = "Entregador Cadastrado";
         document.getElementById("texto-token-gerado").innerText = token;
+        document.getElementById("btn-enviar-token-whatsapp").style.display = telefone ? "flex" : "none";
         document.getElementById("entregador-token-gerado").style.display = "block";
     } catch (erro) {
         erroEl.innerText = "Erro de conexão ao gerar o código.";
@@ -2091,6 +2099,43 @@ async function salvarEntregador() {
         btn.innerText = textoOriginal;
         btn.disabled = false;
     }
+}
+
+// Abre o WhatsApp (app no celular, Web no computador) já com o número e a
+// mensagem prontos — mesmo truque usado no site do cliente pra mandar pedido.
+function abrirWhatsappComTexto(telefone, mensagem) {
+    const numeroLimpo = String(telefone || '').replace(/\D/g, '');
+    if (!numeroLimpo) return;
+    const textoCodificado = encodeURIComponent(mensagem);
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    if (isMobile) {
+        window.location.href = `whatsapp://send?phone=${numeroLimpo}&text=${textoCodificado}`;
+    } else {
+        window.open(`https://api.whatsapp.com/send?phone=${numeroLimpo}&text=${textoCodificado}`, '_blank');
+    }
+}
+
+function mensagemConviteEntregador(nome, token) {
+    const urlEntregador = `https://${lojaAtual.subdominio}.mathshub.com.br/entregador.html`;
+    return `Oi, ${nome}! Você foi cadastrado(a) como entregador(a) da ${lojaAtual.nome}.\n\n` +
+        `Acesse: ${urlEntregador}\n` +
+        `Seu código de acesso: ${token}\n\n` +
+        `É só colar esse código lá pra entrar.`;
+}
+
+// Manda o link de entregador.html + o código de acesso pronto no WhatsApp do
+// entregador, pra ele não precisar copiar/colar nem o dono digitar na mão.
+function enviarTokenPorWhatsapp() {
+    if (!ultimoEntregadorGerado || !ultimoEntregadorGerado.telefone) return;
+    abrirWhatsappComTexto(ultimoEntregadorGerado.telefone, mensagemConviteEntregador(ultimoEntregadorGerado.nome, ultimoEntregadorGerado.token));
+}
+
+// Mesma coisa, mas pra reenviar depois pra alguém que já está na tabela
+// (perdeu o código, trocou de celular, etc.).
+function reenviarTokenPorWhatsapp(entregadorId) {
+    const ent = listaDeEntregadoresGlobal.find(e => e.id === entregadorId);
+    if (!ent || !ent.telefone) return;
+    abrirWhatsappComTexto(ent.telefone, mensagemConviteEntregador(ent.nome, ent.token));
 }
 
 // ==========================================

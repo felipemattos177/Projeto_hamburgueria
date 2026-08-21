@@ -973,6 +973,8 @@ async function enviarParaWhatsApp() {
             if (pagamento === "Dinheiro") {
                 const troco = document.getElementById("troco-dinheiro").value;
                 textoPedido += `💳 *Pagamento:* Dinheiro (Troco para R$ ${troco})\n\n`;
+            } else if (pagamento.toUpperCase() === "PIX" && configLoja.chave_pix && configLoja.chave_pix.trim() !== "") {
+                textoPedido += `💳 *Pagamento:* Pix\n🔑 *Chave Pix:* ${configLoja.chave_pix}\n\n`;
             } else {
                 textoPedido += `💳 *Pagamento:* ${pagamento}\n\n`;
             }

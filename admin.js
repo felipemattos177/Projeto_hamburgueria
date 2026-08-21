@@ -445,6 +445,8 @@ function definirPeriodoPadrao(idInicio, idFim) {
     if (elFim && !elFim.value) elFim.value = paraISO(hoje);
 }
 
+let entregasDetalhesCache = {};
+
 async function carregarRelatorioEntregas() {
     if (!(await garantirSessaoOuRelogar())) return;
 
@@ -453,7 +455,7 @@ async function carregarRelatorioEntregas() {
     const tbody = document.getElementById("tabela-entregas");
     if (!dataInicio || !dataFim || !tbody) return;
 
-    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;">Carregando...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Carregando...</td></tr>';
 
     try {
         const res = await fetch(
@@ -467,6 +469,7 @@ async function carregarRelatorioEntregas() {
         let totalRepasse = 0;
         let html = "";
         const porEntregador = {};
+        entregasDetalhesCache = {};
 
         pedidos.forEach(p => {
             const repasse = Number(p.valor_repasse_entregador) || 0;
@@ -477,29 +480,21 @@ async function carregarRelatorioEntregas() {
             porEntregador[nomeEnt].qtd++;
             porEntregador[nomeEnt].total += repasse;
 
-            const horaPedido = p.data_pedido ? formatarDataHoraBr(p.data_pedido, { hour: '2-digit', minute: '2-digit' }) : '-';
-            const horaSaiu = p.saiu_em ? formatarDataHoraBr(p.saiu_em, { hour: '2-digit', minute: '2-digit' }) : '-';
-            const horaEntregue = p.entregue_em ? formatarDataHoraBr(p.entregue_em, { hour: '2-digit', minute: '2-digit' }) : '-';
-            const tempoPreparo = duracaoEntre(p.data_pedido, p.saiu_em);
-            const tempoEntrega = duracaoEntre(p.saiu_em, p.entregue_em);
             const tempoTotal = duracaoEntre(p.data_pedido, p.entregue_em);
+            entregasDetalhesCache[p.id] = { ...p, nomeEnt, repasse };
             html += `
                 <tr>
                     <td>#${p.id}</td>
                     <td>${escaparHtml(p.nome_cliente)}</td>
                     <td>${escaparHtml(nomeEnt)}</td>
-                    <td>${horaPedido}</td>
-                    <td>${horaSaiu}</td>
-                    <td>${horaEntregue}</td>
-                    <td>${tempoPreparo}</td>
-                    <td>${tempoEntrega}</td>
                     <td>${tempoTotal}</td>
                     <td>R$ ${repasse.toFixed(2).replace('.', ',')}</td>
+                    <td><button class="btn-detalhes-entrega" onclick="abrirDetalhesEntrega(${p.id})">Mais detalhes</button></td>
                 </tr>
             `;
         });
 
-        tbody.innerHTML = html || '<tr><td colspan="10" style="text-align:center;">Nenhuma entrega nesse período.</td></tr>';
+        tbody.innerHTML = html || '<tr><td colspan="6" style="text-align:center;">Nenhuma entrega nesse período.</td></tr>';
         document.getElementById("entregas-total-qtd").innerText = pedidos.length;
         document.getElementById("entregas-total-repasse").innerText = `R$ ${totalRepasse.toFixed(2).replace('.', ',')}`;
 
@@ -510,9 +505,42 @@ async function carregarRelatorioEntregas() {
         }).join('');
         tbodyResumo.innerHTML = linhasResumo || '<tr><td colspan="3" style="text-align:center;">Nenhuma entrega nesse período.</td></tr>';
     } catch (erro) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--vermelho);">Erro ao carregar entregas.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color: var(--vermelho);">Erro ao carregar entregas.</td></tr>';
         console.error(erro);
     }
+}
+
+function abrirDetalhesEntrega(pedidoId) {
+    const p = entregasDetalhesCache[pedidoId];
+    if (!p) return;
+
+    document.getElementById("detalhes-entrega-numero").innerText = `#${p.id}`;
+
+    const passos = [
+        { titulo: "Pedido feito", hora: p.data_pedido, anterior: null },
+        { titulo: "Saiu para entrega", hora: p.saiu_em, anterior: p.data_pedido },
+        { titulo: "Entregue", hora: p.entregue_em, anterior: p.saiu_em }
+    ];
+
+    const html = passos.map(passo => {
+        const feito = !!passo.hora;
+        const hora = feito ? formatarDataHoraBr(passo.hora, { hour: '2-digit', minute: '2-digit' }) : "Ainda não aconteceu";
+        const duracao = (feito && passo.anterior) ? `+ ${duracaoEntre(passo.anterior, passo.hora)}` : "";
+        return `
+            <li class="timeline-passo${feito ? '' : ' pendente'}">
+                <div class="titulo">${passo.titulo}</div>
+                <div class="hora">${hora}</div>
+                ${duracao ? `<div class="duracao">${duracao}</div>` : ""}
+            </li>
+        `;
+    }).join('');
+
+    document.getElementById("detalhes-entrega-timeline").innerHTML = html;
+    document.getElementById("modal-detalhes-entrega").style.display = "flex";
+}
+
+function fecharModalDetalhesEntrega() {
+    document.getElementById("modal-detalhes-entrega").style.display = "none";
 }
 
 // ==========================================

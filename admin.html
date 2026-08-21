@@ -144,6 +144,18 @@
         .modal-conteudo input:focus, .modal-conteudo select:focus { outline: none; border-color: var(--laranja-fogo); background: #fff; }
         .modal-botoes { display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; }
         .btn-cancelar { background-color: #eef0f4; color: #344054; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; }
+        .btn-detalhes-entrega { background: none; border: 1px solid var(--borda); color: var(--texto-suave); padding: 6px 12px; border-radius: 7px; cursor: pointer; font-size: 12.5px; font-weight: 600; font-family: inherit; white-space: nowrap; }
+        .btn-detalhes-entrega:hover { background: #f4f5f9; color: var(--texto); }
+        .timeline-entrega { list-style: none; margin: 0; padding: 0; }
+        .timeline-passo { position: relative; padding: 0 0 22px 30px; }
+        .timeline-passo:last-child { padding-bottom: 0; }
+        .timeline-passo::before { content: ''; position: absolute; left: 5px; top: 4px; width: 11px; height: 11px; border-radius: 50%; background: var(--laranja-fogo); }
+        .timeline-passo::after { content: ''; position: absolute; left: 10px; top: 15px; bottom: 0; width: 2px; background: var(--borda); }
+        .timeline-passo:last-child::after { display: none; }
+        .timeline-passo.pendente::before { background: var(--borda); }
+        .timeline-passo .titulo { font-weight: 700; font-size: 14px; color: var(--texto); }
+        .timeline-passo .hora { font-size: 13px; color: var(--texto-suave); }
+        .timeline-passo .duracao { font-size: 12.5px; color: var(--laranja-fogo); font-weight: 600; margin-top: 2px; }
         .box-add-ingrediente { background: #fafbfc; padding: 15px; border-radius: 10px; margin-bottom: 15px; border: 1px solid var(--borda); }
 
         /* ===== KANBAN DE PEDIDOS ===== */
@@ -537,17 +549,13 @@
                             <th>Pedido</th>
                             <th>Cliente</th>
                             <th>Entregador</th>
-                            <th>Pedido às</th>
-                            <th>Saiu às</th>
-                            <th>Entregue às</th>
-                            <th>Tempo Preparo</th>
-                            <th>Tempo Entrega</th>
                             <th>Tempo Total</th>
                             <th>Repasse</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody id="tabela-entregas">
-                        <tr><td colspan="10" style="text-align: center;">Selecione um período.</td></tr>
+                        <tr><td colspan="6" style="text-align: center;">Selecione um período.</td></tr>
                     </tbody>
                 </table>
                 </div>
@@ -842,6 +850,16 @@
             <div class="modal-botoes">
                 <button class="btn-cancelar" onclick="fecharModalIngrediente()">Cancelar</button>
                 <button class="btn-novo" onclick="salvarNovoIngrediente()">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-detalhes-entrega" class="modal-overlay">
+        <div class="modal-conteudo">
+            <h2>Pedido <span id="detalhes-entrega-numero"></span></h2>
+            <ul class="timeline-entrega" id="detalhes-entrega-timeline"></ul>
+            <div class="modal-botoes">
+                <button class="btn-cancelar" onclick="fecharModalDetalhesEntrega()">Fechar</button>
             </div>
         </div>
     </div>

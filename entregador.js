@@ -8,6 +8,7 @@ const HEADERS_ANON = { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABA
 
 let lojaAtual = null; // { id, subdominio, nome, ativo }
 let entregadorAtual = null; // { entregador_id, nome, token }
+let nomeLojaExibicao = null; // nome_loja configurado pelo admin, se houver — senão cai no lojas.nome
 
 function escaparHtml(texto) {
     if (texto === null || texto === undefined) return "";
@@ -54,10 +55,48 @@ async function resolverLoja() {
         const elLogin = document.getElementById("login-nome-loja-entregador");
         if (elLogin) elLogin.innerText = `Entregas — ${lojaAtual.nome}`;
         document.title = `Entregador - ${lojaAtual.nome}`;
+
+        await aplicarIdentidadeVisualEntregador();
+
         return true;
     } catch (erro) {
         mostrarTelaIndisponivel("Erro de conexão", "Não foi possível conectar ao servidor.");
         return false;
+    }
+}
+
+// Mesma identidade visual (nome, logo, cor) que o painel do cliente e o admin já usam.
+async function aplicarIdentidadeVisualEntregador() {
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracoes?loja_id=eq.${lojaAtual.id}&select=nome_loja,logo_url,cor_principal`, {
+            headers: HEADERS_ANON
+        });
+        const dados = await res.json();
+        if (!dados || dados.length === 0) return;
+        const config = dados[0];
+
+        nomeLojaExibicao = config.nome_loja || lojaAtual.nome;
+        const elLogin = document.getElementById("login-nome-loja-entregador");
+        if (elLogin) elLogin.innerText = `Entregas — ${nomeLojaExibicao}`;
+        document.title = `Entregador - ${nomeLojaExibicao}`;
+
+        if (config.logo_url && config.logo_url.trim() !== "") {
+            [["login-logo-img", "login-logo-icone"], ["topo-logo-img", "topo-logo-icone"]].forEach(([idImg, idIcone]) => {
+                const img = document.getElementById(idImg);
+                const icone = document.getElementById(idIcone);
+                if (img && icone) {
+                    img.src = config.logo_url;
+                    img.style.display = "inline-block";
+                    icone.style.display = "none";
+                }
+            });
+        }
+
+        if (config.cor_principal) {
+            document.documentElement.style.setProperty('--laranja-fogo', config.cor_principal);
+        }
+    } catch (erro) {
+        console.error("Erro ao aplicar identidade visual:", erro);
     }
 }
 
@@ -156,7 +195,7 @@ function iniciarPainelEntregador() {
     document.getElementById("app-entregador-container").style.display = "block";
 
     document.getElementById("nome-entregador-topo").innerText = entregadorAtual.nome || "Entregador";
-    document.getElementById("nome-loja-topo").innerText = lojaAtual.nome;
+    document.getElementById("nome-loja-topo").innerText = nomeLojaExibicao || lojaAtual.nome;
 
     carregarDadosEntregador();
     intervaloDadosEntregador = setInterval(carregarDadosEntregador, 4000);

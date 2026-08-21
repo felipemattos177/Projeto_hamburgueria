@@ -89,7 +89,10 @@
 
     <div id="tela-login-entregador">
         <form class="login-card" onsubmit="fazerLoginEntregador(event)">
-            <div class="login-icone"><i class="fa-solid fa-motorcycle"></i></div>
+            <div class="login-icone">
+                <img id="login-logo-img" src="" alt="" style="display:none; width:100%; height:100%; object-fit:cover; border-radius:14px;">
+                <i class="fa-solid fa-motorcycle" id="login-logo-icone"></i>
+            </div>
             <h1><span id="login-nome-loja-entregador">Área do Entregador</span></h1>
             <p class="subtitulo">Cole o código que a loja te passou</p>
             <div id="login-erro-entregador"></div>
@@ -102,7 +105,10 @@
     <div id="app-entregador-container" style="display: none;">
         <div class="topo">
             <div class="topo-brand">
-                <div class="topo-brand-icone"><i class="fa-solid fa-motorcycle"></i></div>
+                <div class="topo-brand-icone">
+                    <img id="topo-logo-img" src="" alt="" style="display:none; width:100%; height:100%; object-fit:cover; border-radius:9px;">
+                    <i class="fa-solid fa-motorcycle" id="topo-logo-icone"></i>
+                </div>
                 <div>
                     <strong id="nome-entregador-topo">Entregador</strong>
                     <span id="nome-loja-topo">Loja</span>

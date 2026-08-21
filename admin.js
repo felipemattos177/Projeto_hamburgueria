@@ -47,10 +47,51 @@ async function resolverLoja() {
         if (elLogin) elLogin.innerText = `${lojaAtual.nome} Admin`;
         if (elTabs) elTabs.innerText = `${lojaAtual.nome} Admin`;
 
+        await aplicarIdentidadeVisualAdmin();
+
         return true;
     } catch (erro) {
         mostrarTelaLojaIndisponivel("Erro de conexão", "Não foi possível conectar ao servidor.");
         return false;
+    }
+}
+
+// Mesma identidade visual (nome, logo, cor) que o painel do cliente já usa —
+// aplicada aqui pra não ficar preso ao ícone/nome padrão em nenhuma loja.
+// Roda antes do login (chave pública), então nenhuma loja fica sem sua cara.
+async function aplicarIdentidadeVisualAdmin() {
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracoes?loja_id=eq.${lojaAtual.id}&select=nome_loja,logo_url,cor_principal`, {
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+        });
+        const dados = await res.json();
+        if (!dados || dados.length === 0) return;
+        const config = dados[0];
+
+        const nomeExibicao = config.nome_loja || lojaAtual.nome;
+        const elLogin = document.getElementById("login-nome-loja");
+        const elTabs = document.getElementById("tabs-nome-loja");
+        if (elLogin) elLogin.innerText = `${nomeExibicao} Admin`;
+        if (elTabs) elTabs.innerText = `${nomeExibicao} Admin`;
+        document.title = `Painel de Gestão - ${nomeExibicao}`;
+
+        if (config.logo_url && config.logo_url.trim() !== "") {
+            [["login-logo-img", "login-logo-icone"], ["sidebar-logo-img", "sidebar-logo-icone"]].forEach(([idImg, idIcone]) => {
+                const img = document.getElementById(idImg);
+                const icone = document.getElementById(idIcone);
+                if (img && icone) {
+                    img.src = config.logo_url;
+                    img.style.display = "inline-block";
+                    icone.style.display = "none";
+                }
+            });
+        }
+
+        if (config.cor_principal) {
+            document.documentElement.style.setProperty('--laranja-fogo', config.cor_principal);
+        }
+    } catch (erro) {
+        console.error("Erro ao aplicar identidade visual:", erro);
     }
 }
 
@@ -2217,7 +2258,9 @@ async function salvarConfiguracoesLoja() {
         });
 
         if (!res.ok) throw new Error("Falha ao salvar no banco de dados.");
-        
+
+        aplicarIdentidadeVisualAdmin(); // reflete nome/logo/cor novos na hora, sem precisar relogar
+
         alert("✅ Configurações salvas com sucesso! Áudio e Imagem separados.");
         
         if(inputArquivo) inputArquivo.value = "";

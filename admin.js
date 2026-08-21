@@ -1002,6 +1002,29 @@ function mudarAbaAdmin(idAba, botaoClicado) {
     // Mostra a aba clicada e foca o botão
     document.getElementById(idAba).classList.add('ativa');
     if(botaoClicado) botaoClicado.classList.add('ativa');
+
+    atualizarDadosDaAba(idAba);
+}
+
+// Toda vez que troca de aba, busca os dados de novo no banco — evita ficar
+// vendo informação desatualizada de quando o painel foi aberto pela última vez.
+function atualizarDadosDaAba(idAba) {
+    if (idAba === 'view-estoque') {
+        carregarProdutos();
+        carregarEstoque();
+    } else if (idAba === 'view-pedidos') {
+        carregarPedidosAdmin();
+    } else if (idAba === 'view-dashboard') {
+        carregarDashboard();
+    } else if (idAba === 'view-entregas') {
+        carregarEntregadores().then(carregarRelatorioEntregas); // nomes primeiro, senão cai no genérico
+    } else if (idAba === 'view-financeiro') {
+        carregarRelatorioFinanceiro();
+    } else if (idAba === 'view-entregadores') {
+        carregarEntregadores();
+    } else if (idAba === 'view-config') {
+        carregarConfiguracoesAdmin();
+    }
 }
 
 // Evita XSS: qualquer texto vindo do banco (nome de cliente, produto, ingrediente)

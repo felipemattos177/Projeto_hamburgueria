@@ -1771,13 +1771,20 @@ function montarCupomImpressao(pedido, itens, nomeProdutoPorId, adicionaisPorItem
 }
 
 // ==========================================
-// MÓDULO 10: ENTREGADORES
+// MÓDULO 10: ENTREGADORES (acesso por código, sem conta no Supabase Auth)
 // ==========================================
 let listaDeEntregadoresGlobal = [];
 
-function nomeEntregadorPorId(userId) {
-    const encontrado = listaDeEntregadoresGlobal.find(e => e.user_id === userId);
+function nomeEntregadorPorId(entregadorId) {
+    const encontrado = listaDeEntregadoresGlobal.find(e => e.id === entregadorId);
     return encontrado ? encontrado.nome : "Entregador";
+}
+
+function gerarTokenEntregador() {
+    const caracteres = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // sem 0/O/1/I pra evitar confusão na hora de digitar
+    const valores = new Uint32Array(8);
+    crypto.getRandomValues(valores);
+    return Array.from(valores, v => caracteres[v % caracteres.length]).join('');
 }
 
 async function carregarEntregadores() {
@@ -1811,19 +1818,19 @@ function renderizarTabelaEntregadores(entregadores) {
         tbody.innerHTML += `
             <tr>
                 <td><strong>${escaparHtml(ent.nome)}</strong></td>
-                <td>${escaparHtml(ent.email || '-')}</td>
+                <td style="font-family: monospace; letter-spacing: 1px;">${escaparHtml(ent.token)}</td>
                 <td><span class="status-badge ${badgeClass}">${badgeTexto}</span></td>
                 <td>
-                    <button class="btn-acao btn-toggle" onclick="alternarStatusEntregador('${ent.user_id}', ${!ent.ativo})">${botaoTexto}</button>
+                    <button class="btn-acao btn-toggle" onclick="alternarStatusEntregador(${ent.id}, ${!ent.ativo})">${botaoTexto}</button>
                 </td>
             </tr>
         `;
     });
 }
 
-async function alternarStatusEntregador(userId, novoStatus) {
+async function alternarStatusEntregador(id, novoStatus) {
     if (!(await garantirSessaoOuRelogar())) return;
-    await fetch(`${SUPABASE_URL}/rest/v1/entregadores?user_id=eq.${userId}`, {
+    await fetch(`${SUPABASE_URL}/rest/v1/entregadores?id=eq.${id}`, {
         method: 'PATCH',
         headers: headersAutenticados('application/json'),
         body: JSON.stringify({ ativo: novoStatus })
@@ -1833,8 +1840,10 @@ async function alternarStatusEntregador(userId, novoStatus) {
 
 function abrirModalEntregador() {
     document.getElementById("entregador-nome").value = "";
-    document.getElementById("entregador-email").value = "";
-    document.getElementById("entregador-user-id").value = "";
+    document.getElementById("entregador-erro").style.display = "none";
+    document.getElementById("entregador-form").style.display = "block";
+    document.getElementById("entregador-token-gerado").style.display = "none";
+    document.getElementById("titulo-modal-entregador").innerText = "Cadastrar Entregador";
     document.getElementById("modal-entregador").style.display = "flex";
 }
 
@@ -1844,34 +1853,50 @@ function fecharModalEntregador() {
 
 async function salvarEntregador() {
     const nome = document.getElementById("entregador-nome").value.trim();
-    const email = document.getElementById("entregador-email").value.trim();
-    const userId = document.getElementById("entregador-user-id").value.trim();
+    const erroEl = document.getElementById("entregador-erro");
+    const btn = document.getElementById("btn-salvar-entregador");
+    erroEl.style.display = "none";
 
-    if (!nome || !userId) {
-        alert("Preencha o nome e o UID do usuário.");
+    if (!nome) {
+        erroEl.innerText = "Preencha o nome do entregador.";
+        erroEl.style.display = "block";
         return;
     }
 
     if (!(await garantirSessaoOuRelogar())) return;
 
+    const textoOriginal = btn.innerText;
+    btn.innerText = "Gerando...";
+    btn.disabled = true;
+
     try {
+        const token = gerarTokenEntregador();
         const res = await fetch(`${SUPABASE_URL}/rest/v1/entregadores`, {
             method: 'POST',
-            headers: { ...headersAutenticados('application/json'), 'Prefer': 'resolution=merge-duplicates' },
-            body: JSON.stringify({ user_id: userId, loja_id: lojaAtual.id, nome, email: email || null, ativo: true })
+            headers: headersAutenticados('application/json'),
+            body: JSON.stringify({ loja_id: lojaAtual.id, nome, token, ativo: true })
         });
 
         if (!res.ok) {
             const erro = await res.json();
-            alert(`Erro ao salvar: ${erro.message || "verifique se o UID está correto"}`);
+            erroEl.innerText = erro.message || "Erro ao gerar o código.";
+            erroEl.style.display = "block";
             return;
         }
 
-        fecharModalEntregador();
         carregarEntregadores();
+
+        document.getElementById("entregador-form").style.display = "none";
+        document.getElementById("titulo-modal-entregador").innerText = "Entregador Cadastrado";
+        document.getElementById("texto-token-gerado").innerText = token;
+        document.getElementById("entregador-token-gerado").style.display = "block";
     } catch (erro) {
-        alert("Erro de conexão ao salvar entregador.");
+        erroEl.innerText = "Erro de conexão ao gerar o código.";
+        erroEl.style.display = "block";
         console.error(erro);
+    } finally {
+        btn.innerText = textoOriginal;
+        btn.disabled = false;
     }
 }
 

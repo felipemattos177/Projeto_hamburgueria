@@ -4,8 +4,10 @@
 const SUPABASE_URL = "https://tjievzloufqptabbvumz.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqaWV2emxvdWZxcHRhYmJ2dW16Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY3NTY1NjIsImV4cCI6MjEwMjMzMjU2Mn0.HAIHej243RMeLMBueFjcN0-99y41BEbb3v4PgCj1Vs4";
 
+const HEADERS_ANON = { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' };
+
 let lojaAtual = null; // { id, subdominio, nome, ativo }
-let entregadorAtual = null; // { user_id, nome }
+let entregadorAtual = null; // { entregador_id, nome, token }
 
 function escaparHtml(texto) {
     if (texto === null || texto === undefined) return "";
@@ -15,6 +17,10 @@ function escaparHtml(texto) {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
+}
+
+function formatarMoeda(v) {
+    return `R$ ${(Number(v) || 0).toFixed(2).replace('.', ',')}`;
 }
 
 // ==========================================
@@ -31,7 +37,7 @@ async function resolverLoja() {
     const slug = obterSlugDaLoja();
     try {
         const res = await fetch(`${SUPABASE_URL}/rest/v1/lojas?select=*&subdominio=eq.${encodeURIComponent(slug)}&limit=1`, {
-            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+            headers: HEADERS_ANON
         });
         const dados = await res.json();
 
@@ -68,96 +74,65 @@ function mostrarTelaIndisponivel(titulo, mensagem) {
 }
 
 // ==========================================
-// AUTENTICAÇÃO
+// "LOGIN" POR TOKEN (sem conta no Supabase Auth)
 // ==========================================
 const CHAVE_SESSAO_ENTREGADOR = "hamburgueria_entregador_sessao";
 
-function salvarSessao(dadosToken) {
-    const sessaoAnterior = carregarSessao();
-    const sessao = {
-        access_token: dadosToken.access_token,
-        refresh_token: dadosToken.refresh_token,
-        expira_em: Math.floor(Date.now() / 1000) + dadosToken.expires_in,
-        user_id: (dadosToken.user && dadosToken.user.id) ? dadosToken.user.id : (sessaoAnterior ? sessaoAnterior.user_id : null)
-    };
-    localStorage.setItem(CHAVE_SESSAO_ENTREGADOR, JSON.stringify(sessao));
-    return sessao;
+function salvarSessaoLocal(dados) {
+    localStorage.setItem(CHAVE_SESSAO_ENTREGADOR, JSON.stringify(dados));
 }
 
-function carregarSessao() {
+function carregarSessaoLocal() {
     const bruto = localStorage.getItem(CHAVE_SESSAO_ENTREGADOR);
     return bruto ? JSON.parse(bruto) : null;
 }
 
-function limparSessao() {
+function limparSessaoLocal() {
     localStorage.removeItem(CHAVE_SESSAO_ENTREGADOR);
 }
 
-function sessaoExpirada(sessao) {
-    if (!sessao) return true;
-    return Math.floor(Date.now() / 1000) >= (sessao.expira_em - 90);
-}
-
-function headersAutenticados(contentType) {
-    const sessao = carregarSessao();
-    const token = (sessao && sessao.access_token) ? sessao.access_token : SUPABASE_KEY;
-    const headers = { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${token}` };
-    if (contentType) headers['Content-Type'] = contentType;
-    return headers;
-}
-
-async function verificarAcessoEntregador(userId) {
-    try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/entregadores?select=user_id,nome,loja_id,ativo&user_id=eq.${userId}`, {
-            headers: headersAutenticados()
-        });
-        const dados = await res.json();
-        if (dados.length > 0 && dados[0].loja_id === lojaAtual.id && dados[0].ativo !== false) {
-            entregadorAtual = dados[0];
-            return true;
-        }
-        return false;
-    } catch (erro) {
-        return false;
-    }
+async function chamarRpcEntregador(nomeFuncao, parametrosExtras) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${nomeFuncao}`, {
+        method: 'POST',
+        headers: HEADERS_ANON,
+        body: JSON.stringify({
+            p_loja_id: lojaAtual.id,
+            p_token: entregadorAtual ? entregadorAtual.token : undefined,
+            ...parametrosExtras
+        })
+    });
+    return res;
 }
 
 async function fazerLoginEntregador(event) {
     if (event) event.preventDefault();
-    const email = document.getElementById("login-email-entregador").value.trim();
-    const senha = document.getElementById("login-senha-entregador").value;
+    const token = document.getElementById("login-token-entregador").value.trim();
     const erroEl = document.getElementById("login-erro-entregador");
     const btn = document.getElementById("btn-login-entregador");
 
     erroEl.style.display = "none";
+    if (!token) return;
+
     const textoOriginal = btn.innerText;
     btn.innerText = "Entrando...";
     btn.disabled = true;
 
     try {
-        const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/entregador_login`, {
             method: 'POST',
-            headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password: senha })
+            headers: HEADERS_ANON,
+            body: JSON.stringify({ p_loja_id: lojaAtual.id, p_token: token })
         });
         const dados = await res.json();
 
-        if (!res.ok) {
-            erroEl.innerText = "E-mail ou senha inválidos.";
+        if (!res.ok || !dados || dados.length === 0) {
+            erroEl.innerText = "Código inválido. Confira com a loja e tente de novo.";
             erroEl.style.display = "block";
             return;
         }
 
-        salvarSessao(dados);
-
-        const temAcesso = await verificarAcessoEntregador(dados.user.id);
-        if (!temAcesso) {
-            limparSessao();
-            erroEl.innerText = "Esta conta não tem acesso a esta loja.";
-            erroEl.style.display = "block";
-            return;
-        }
-
+        entregadorAtual = { entregador_id: dados[0].entregador_id, nome: dados[0].nome, token };
+        salvarSessaoLocal(entregadorAtual);
         iniciarPainelEntregador();
     } catch (erro) {
         erroEl.innerText = "Erro de conexão. Tente novamente.";
@@ -170,53 +145,11 @@ async function fazerLoginEntregador(event) {
 }
 
 function sairEntregador() {
-    limparSessao();
+    limparSessaoLocal();
     location.reload();
 }
 
-async function renovarSessaoSeNecessario() {
-    const sessao = carregarSessao();
-    if (!sessao) return false;
-    if (!sessaoExpirada(sessao)) return true;
-
-    try {
-        const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
-            method: 'POST',
-            headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refresh_token: sessao.refresh_token })
-        });
-        if (!res.ok) { limparSessao(); return false; }
-        salvarSessao(await res.json());
-        return true;
-    } catch (erro) {
-        limparSessao();
-        return false;
-    }
-}
-
 let intervaloDadosEntregador = null;
-let intervaloRenovarSessaoEntregador = null;
-
-function pararIntervalosEntregador() {
-    if (intervaloDadosEntregador) clearInterval(intervaloDadosEntregador);
-    if (intervaloRenovarSessaoEntregador) clearInterval(intervaloRenovarSessaoEntregador);
-}
-
-async function garantirSessaoOuRelogar() {
-    const ok = await renovarSessaoSeNecessario();
-    if (!ok) {
-        pararIntervalosEntregador();
-        limparSessao();
-        document.getElementById("app-entregador-container").style.display = "none";
-        document.getElementById("tela-login-entregador").style.display = "flex";
-        const erroEl = document.getElementById("login-erro-entregador");
-        if (erroEl) {
-            erroEl.innerText = "Sua sessão expirou. Faça login novamente.";
-            erroEl.style.display = "block";
-        }
-    }
-    return ok;
-}
 
 function iniciarPainelEntregador() {
     document.getElementById("tela-login-entregador").style.display = "none";
@@ -226,50 +159,42 @@ function iniciarPainelEntregador() {
     document.getElementById("nome-loja-topo").innerText = lojaAtual.nome;
 
     carregarDadosEntregador();
-
     intervaloDadosEntregador = setInterval(carregarDadosEntregador, 4000);
-    intervaloRenovarSessaoEntregador = setInterval(renovarSessaoSeNecessario, 60 * 1000);
-}
-
-async function verificarSessaoAoAbrir() {
-    const sessao = carregarSessao();
-    if (sessao && await renovarSessaoSeNecessario()) {
-        const sessaoAtual = carregarSessao();
-        const temAcesso = sessaoAtual.user_id ? await verificarAcessoEntregador(sessaoAtual.user_id) : false;
-        if (temAcesso) {
-            iniciarPainelEntregador();
-        } else {
-            limparSessao();
-        }
-    }
 }
 
 // ==========================================
 // DADOS E AÇÕES
 // ==========================================
-function formatarMoeda(v) {
-    return `R$ ${(Number(v) || 0).toFixed(2).replace('.', ',')}`;
-}
-
 async function carregarDadosEntregador() {
-    if (!(await garantirSessaoOuRelogar())) return;
-
     try {
         const hojeInicio = new Date();
         hojeInicio.setHours(0, 0, 0, 0);
-        const hojeISO = hojeInicio.toISOString();
 
         const [resPreparo, resMinhas, resEntreguesHoje] = await Promise.all([
-            fetch(`${SUPABASE_URL}/rest/v1/pedidos?select=*&loja_id=eq.${lojaAtual.id}&status=eq.${encodeURIComponent('Em Preparo')}&order=id.asc`, { headers: headersAutenticados() }),
-            fetch(`${SUPABASE_URL}/rest/v1/pedidos?select=*&loja_id=eq.${lojaAtual.id}&entregador_id=eq.${entregadorAtual.user_id}&status=eq.${encodeURIComponent('Saiu para Entrega')}&order=id.asc`, { headers: headersAutenticados() }),
-            fetch(`${SUPABASE_URL}/rest/v1/pedidos?select=id&loja_id=eq.${lojaAtual.id}&entregador_id=eq.${entregadorAtual.user_id}&status=eq.Entregue&entregue_em=gte.${hojeISO}`, { headers: headersAutenticados() })
+            chamarRpcEntregador('entregador_pedidos_em_preparo'),
+            chamarRpcEntregador('entregador_minhas_entregas'),
+            chamarRpcEntregador('entregador_entregues_hoje')
         ]);
+
+        if (!resPreparo.ok || !resMinhas.ok || !resEntreguesHoje.ok) {
+            // Token foi desativado enquanto o entregador estava com a tela aberta
+            if (intervaloDadosEntregador) clearInterval(intervaloDadosEntregador);
+            limparSessaoLocal();
+            document.getElementById("app-entregador-container").style.display = "none";
+            document.getElementById("tela-login-entregador").style.display = "flex";
+            const erroEl = document.getElementById("login-erro-entregador");
+            if (erroEl) {
+                erroEl.innerText = "Seu acesso foi desativado. Fale com a loja.";
+                erroEl.style.display = "block";
+            }
+            return;
+        }
 
         const pedidosPreparo = await resPreparo.json();
         const minhasEntregas = await resMinhas.json();
         const entreguesHoje = await resEntreguesHoje.json();
 
-        document.getElementById("resumo-entregues").innerText = entreguesHoje.length;
+        document.getElementById("resumo-entregues").innerText = entreguesHoje;
         document.getElementById("resumo-andamento").innerText = minhasEntregas.length;
         document.getElementById("resumo-aguardando").innerText = pedidosPreparo.length;
 
@@ -339,27 +264,12 @@ function renderizarMinhasEntregas(pedidos) {
 }
 
 async function pegarPedido(pedidoId) {
-    if (!(await garantirSessaoOuRelogar())) return;
-
     try {
-        const res = await fetch(
-            `${SUPABASE_URL}/rest/v1/pedidos?id=eq.${pedidoId}&entregador_id=is.null`,
-            {
-                method: 'PATCH',
-                headers: { ...headersAutenticados('application/json'), 'Prefer': 'return=representation' },
-                body: JSON.stringify({
-                    entregador_id: entregadorAtual.user_id,
-                    status: 'Saiu para Entrega',
-                    saiu_em: new Date().toISOString()
-                })
-            }
-        );
-
-        const resultado = await res.json();
-        if (!res.ok || !resultado || resultado.length === 0) {
+        const res = await chamarRpcEntregador('entregador_pegar_pedido', { p_pedido_id: pedidoId });
+        const conseguiu = await res.json();
+        if (!res.ok || conseguiu !== true) {
             alert("Esse pedido já foi assumido por outro entregador.");
         }
-
         carregarDadosEntregador();
     } catch (erro) {
         alert("Erro ao assumir o pedido. Tente de novo.");
@@ -368,20 +278,8 @@ async function pegarPedido(pedidoId) {
 }
 
 async function marcarComoEntregue(pedidoId) {
-    if (!(await garantirSessaoOuRelogar())) return;
-
     try {
-        await fetch(
-            `${SUPABASE_URL}/rest/v1/pedidos?id=eq.${pedidoId}&entregador_id=eq.${entregadorAtual.user_id}`,
-            {
-                method: 'PATCH',
-                headers: headersAutenticados('application/json'),
-                body: JSON.stringify({
-                    status: 'Entregue',
-                    entregue_em: new Date().toISOString()
-                })
-            }
-        );
+        await chamarRpcEntregador('entregador_marcar_entregue', { p_pedido_id: pedidoId });
         carregarDadosEntregador();
     } catch (erro) {
         alert("Erro ao marcar como entregue. Tente de novo.");
@@ -395,7 +293,12 @@ async function marcarComoEntregue(pedidoId) {
 async function iniciarEntregador() {
     const lojaOk = await resolverLoja();
     if (!lojaOk) return;
-    await verificarSessaoAoAbrir();
+
+    const sessaoSalva = carregarSessaoLocal();
+    if (sessaoSalva && sessaoSalva.token) {
+        entregadorAtual = sessaoSalva;
+        iniciarPainelEntregador();
+    }
 }
 
 iniciarEntregador();

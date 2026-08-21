@@ -611,7 +611,7 @@
                     <thead>
                         <tr>
                             <th>Nome</th>
-                            <th>E-mail</th>
+                            <th>Código de Acesso</th>
                             <th>Status</th>
                             <th>Ações</th>
                         </tr>
@@ -833,20 +833,25 @@
 
     <div id="modal-entregador" class="modal-overlay">
         <div class="modal-conteudo">
-            <h2>Cadastrar Entregador</h2>
-            <p style="font-size: 13.5px; color: var(--texto-suave); margin-top: 0;">
-                Crie o login no Supabase (Authentication → Users → Add user, com "Auto Confirm User" marcado),
-                copie o <strong>User UID</strong> dele e cole abaixo.
-            </p>
-            <label>Nome do Entregador</label>
-            <input type="text" id="entregador-nome" placeholder="Ex: João">
-            <label>E-mail (só pra exibição aqui no painel)</label>
-            <input type="email" id="entregador-email" placeholder="joao@email.com">
-            <label>UID do usuário</label>
-            <input type="text" id="entregador-user-id" placeholder="Ex: 0487b354-..." style="margin-bottom: 0;">
-            <div class="modal-botoes">
-                <button class="btn-cancelar" onclick="fecharModalEntregador()">Cancelar</button>
-                <button class="btn-novo" onclick="salvarEntregador()">Salvar</button>
+            <h2 id="titulo-modal-entregador">Cadastrar Entregador</h2>
+
+            <div id="entregador-form">
+                <p style="font-size: 13.5px; color: var(--texto-suave); margin-top: 0;">
+                    Digite o nome — um código de acesso é gerado na hora, sem precisar de e-mail nem senha.
+                </p>
+                <div id="entregador-erro" style="display:none; color: var(--vermelho); background: var(--vermelho-suave); padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; text-align: center;"></div>
+                <label>Nome do Entregador</label>
+                <input type="text" id="entregador-nome" placeholder="Ex: João" style="margin-bottom: 0;">
+                <div class="modal-botoes">
+                    <button class="btn-cancelar" onclick="fecharModalEntregador()">Cancelar</button>
+                    <button class="btn-novo" id="btn-salvar-entregador" onclick="salvarEntregador()">Gerar Código</button>
+                </div>
+            </div>
+
+            <div id="entregador-token-gerado" style="display:none; text-align: center;">
+                <p style="font-size: 13.5px; color: var(--texto-suave);">Passa esse código pro entregador — é só o que ele precisa pra entrar em <strong>entregador.html</strong>:</p>
+                <div id="texto-token-gerado" style="font-size: 24px; font-weight: 800; letter-spacing: 2px; background: var(--laranja-suave); color: var(--laranja-fogo); padding: 14px; border-radius: 10px; margin-bottom: 16px;"></div>
+                <button class="btn-novo" style="width: 100%; justify-content: center;" onclick="fecharModalEntregador()">Concluído</button>
             </div>
         </div>
     </div>

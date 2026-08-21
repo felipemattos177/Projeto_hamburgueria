@@ -1574,6 +1574,14 @@ function renderizarKanban(pedidos) {
             obsHtml = `<div style="background: #332a00; color: #ffc107; padding: 8px 10px; border-radius: 6px; margin-top: 8px; font-size: 13px; white-space: pre-line;"><i class="fa-solid fa-pen"></i> ${escaparHtml(ped.observacoes)}</div>`;
         }
 
+        // encodeURIComponent já escapa tudo com segurança pra ir dentro do href,
+        // então é seguro mesmo o endereço sendo texto livre digitado pelo cliente.
+        let linkMapsHtml = "";
+        if (ped.tipo_entrega !== 'retirada' && ped.endereco_entrega) {
+            const urlMaps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ped.endereco_entrega)}`;
+            linkMapsHtml = `<a class="btn-imprimir-pedido" style="display:block; text-align:center; text-decoration:none; box-sizing:border-box;" href="${urlMaps}" target="_blank" rel="noopener"><i class="fa-solid fa-location-dot"></i> Abrir no Maps</a>`;
+        }
+
         const cardHtml = `
             <div class="card-pedido ${statusFormatado.toLowerCase().replace(/ /g, '-')}">
                 <div class="card-header">
@@ -1590,6 +1598,7 @@ function renderizarKanban(pedidos) {
                 </div>
                 ${obsHtml}
                 ${botoesAcaoKanban(ped.id, statusFormatado)}
+                ${linkMapsHtml}
                 <button class="btn-imprimir-pedido" onclick="imprimirPedido(${ped.id})"><i class="fa-solid fa-print"></i> Imprimir cupom</button>
             </div>
         `;

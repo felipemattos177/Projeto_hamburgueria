@@ -169,7 +169,6 @@
         .kpi-card { flex: 1 1 130px; background: var(--bg-card); border: 1px solid var(--borda); border-radius: var(--raio); box-shadow: var(--sombra); padding: 12px 14px; text-align: center; border-top: 3px solid var(--cor-kpi, var(--laranja-fogo)); }
         .kpi-card .kpi-valor { font-size: 30px; font-weight: 800; color: var(--texto); line-height: 1.1; }
         .kpi-card .kpi-rotulo { font-size: 11.5px; font-weight: 600; color: var(--texto-suave); margin-top: 4px; text-transform: uppercase; letter-spacing: .3px; }
-        .kpi-strip-tempos .kpi-card .kpi-valor { font-size: 22px; }
         .coluna { flex: 1; min-width: 300px; background: #eef0f5; border-radius: var(--raio); padding: 14px; display: flex; flex-direction: column; max-height: calc(100vh - 220px); }
         .coluna h2 { font-size: 14px; font-weight: 700; text-align: left; margin: 0 0 14px; padding: 0 4px; display: flex; align-items: center; gap: 8px; color: var(--texto); }
         .coluna-pedidos { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 2px; }
@@ -432,19 +431,11 @@
                         <div class="kpi-rotulo">Entregues Hoje</div>
                     </div>
                 </div>
-                <div class="kpi-strip kpi-strip-tempos">
-                    <div class="kpi-card" style="--cor-kpi: var(--azul);">
-                        <div class="kpi-valor" id="kpi-tempo-preparo">--</div>
-                        <div class="kpi-rotulo">Tempo médio de Preparo</div>
-                    </div>
-                    <div class="kpi-card" style="--cor-kpi: var(--azul);">
-                        <div class="kpi-valor" id="kpi-tempo-entrega">--</div>
-                        <div class="kpi-rotulo">Tempo médio de Entrega</div>
-                    </div>
-                    <div class="kpi-card" style="--cor-kpi: var(--azul);">
-                        <div class="kpi-valor" id="kpi-tempo-total">--</div>
-                        <div class="kpi-rotulo">Tempo médio Total</div>
-                    </div>
+                <div class="barra-tempo">
+                    <strong><i class="fa-solid fa-stopwatch" style="color: var(--azul);"></i> Tempo médio hoje:</strong>
+                    <span>Preparo <strong style="color: var(--texto);" id="kpi-tempo-preparo">--</strong></span>
+                    <span>Entrega <strong style="color: var(--texto);" id="kpi-tempo-entrega">--</strong></span>
+                    <span>Total <strong style="color: var(--texto);" id="kpi-tempo-total">--</strong></span>
                 </div>
 
                 <div class="painel-board">

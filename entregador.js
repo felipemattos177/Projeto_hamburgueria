@@ -20,6 +20,13 @@ function escaparHtml(texto) {
         .replace(/'/g, "&#39;");
 }
 
+// O endereço é salvo como "Rua, Número - Bairro (ponto de referência)". Pro
+// texto na tela isso ajuda o entregador, mas mandar pro Maps faz a busca dar
+// errado — então pra montar o link tiramos só essa parte entre parênteses.
+function enderecoParaMaps(endereco) {
+    return String(endereco || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+}
+
 function formatarMoeda(v) {
     return `R$ ${(Number(v) || 0).toFixed(2).replace('.', ',')}`;
 }
@@ -284,7 +291,7 @@ function renderizarMinhasEntregas(pedidos) {
     container.innerHTML = pedidos.map(ped => {
         const totalNum = parseFloat(ped.total) || 0;
         const linkMaps = ped.endereco_entrega
-            ? `<a class="btn-acao-entregador btn-maps" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ped.endereco_entrega)}" target="_blank" rel="noopener"><i class="fa-solid fa-location-dot"></i> Abrir no Maps</a>`
+            ? `<a class="btn-acao-entregador btn-maps" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(enderecoParaMaps(ped.endereco_entrega))}" target="_blank" rel="noopener"><i class="fa-solid fa-location-dot"></i> Abrir no Maps</a>`
             : '';
         return `
             <div class="card-pedido-entregador">

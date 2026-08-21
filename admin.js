@@ -1042,6 +1042,13 @@ function escaparHtml(texto) {
         .replace(/'/g, "&#39;");
 }
 
+// O endereço é salvo como "Rua, Número - Bairro (ponto de referência)". Pro
+// texto na tela isso ajuda quem entrega, mas mandar pro Maps faz a busca dar
+// errado — então pra montar o link tiramos só essa parte entre parênteses.
+function enderecoParaMaps(endereco) {
+    return String(endereco || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+}
+
 // O Supabase às vezes devolve o horário sem indicar o fuso (ex: "2026-08-21T09:48:00").
 // Sem isso, o navegador interpreta como horário local e o horário exibido fica errado.
 // Forçamos UTC quando a string não traz fuso, e sempre exibimos convertido pro horário de Brasília.
@@ -1825,7 +1832,7 @@ function renderizarKanban(pedidos) {
         // então é seguro mesmo o endereço sendo texto livre digitado pelo cliente.
         let linkMapsHtml = "";
         if (ped.tipo_entrega !== 'retirada' && ped.endereco_entrega) {
-            const urlMaps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ped.endereco_entrega)}`;
+            const urlMaps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(enderecoParaMaps(ped.endereco_entrega))}`;
             linkMapsHtml = `<a class="btn-imprimir-pedido" style="display:block; text-align:center; text-decoration:none; box-sizing:border-box;" href="${urlMaps}" target="_blank" rel="noopener"><i class="fa-solid fa-location-dot"></i> Abrir no Maps</a>`;
         }
 

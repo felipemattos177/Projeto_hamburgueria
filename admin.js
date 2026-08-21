@@ -397,7 +397,7 @@ async function garantirSessaoOuRelogar() {
     return ok;
 }
 
-function iniciarPainelAdmin() {
+async function iniciarPainelAdmin() {
     document.getElementById("tela-login-admin").style.display = "none";
     document.getElementById("app-admin-container").style.display = "block";
 
@@ -418,7 +418,10 @@ function iniciarPainelAdmin() {
     carregarEstoque();
     carregarPedidosAdmin();
     carregarConfiguracoesAdmin();
-    carregarEntregadores();
+    // Espera a lista de entregadores carregar antes do relatório de entregas —
+    // senão o relatório pode calcular os nomes antes de saber quem é quem
+    // e cair no "Entregador" genérico de fallback.
+    await carregarEntregadores();
     definirPeriodoPadrao('entregas-data-inicio', 'entregas-data-fim');
     carregarRelatorioEntregas();
     definirPeriodoPadrao('financeiro-data-inicio', 'financeiro-data-fim');

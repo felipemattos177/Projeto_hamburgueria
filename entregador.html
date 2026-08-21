@@ -37,10 +37,17 @@
             position: fixed; inset: 0; z-index: 9000; display: flex; align-items: center; justify-content: center;
             background: var(--bg-header);
         }
+        #tela-carregando-inicial .marca {
+            font-size: 22px; font-weight: 800; color: #fff; letter-spacing: .3px; margin-bottom: 22px;
+        }
+        #tela-carregando-inicial .marca span { color: #ff5e00; }
         #tela-carregando-inicial .spinner {
-            width: 40px; height: 40px; border-radius: 50%;
+            width: 34px; height: 34px; border-radius: 50%; margin: 0 auto;
             border: 3px solid rgba(255,255,255,.15); border-top-color: #fff;
             animation: girar-spinner .8s linear infinite;
+        }
+        #tela-carregando-inicial .legenda {
+            color: rgba(255,255,255,.5); font-size: 12px; margin-top: 14px; letter-spacing: .08em; text-transform: uppercase;
         }
         @keyframes girar-spinner { to { transform: rotate(360deg); } }
 
@@ -101,7 +108,13 @@
 </head>
 <body>
 
-    <div id="tela-carregando-inicial"><div class="spinner"></div></div>
+    <div id="tela-carregando-inicial">
+        <div style="text-align: center;">
+            <div class="marca">Maths Hub <span>Delivery</span></div>
+            <div class="spinner"></div>
+            <div class="legenda">Carregando...</div>
+        </div>
+    </div>
 
     <div id="tela-login-entregador">
         <form class="login-card" onsubmit="fazerLoginEntregador(event)">

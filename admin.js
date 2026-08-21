@@ -401,6 +401,19 @@ function iniciarPainelAdmin() {
     document.getElementById("tela-login-admin").style.display = "none";
     document.getElementById("app-admin-container").style.display = "block";
 
+    // Destrava o autoplay do som de novo pedido: como isso acontece logo
+    // depois de um clique real (o login), o navegador libera esse elemento
+    // de áudio pra tocar sozinho mais tarde, sem precisar de outro clique.
+    const somNovoPedido = document.getElementById("som-novo-pedido");
+    if (somNovoPedido) {
+        somNovoPedido.volume = 0;
+        somNovoPedido.play().then(() => {
+            somNovoPedido.pause();
+            somNovoPedido.currentTime = 0;
+            somNovoPedido.volume = 1;
+        }).catch(() => {});
+    }
+
     carregarProdutos();
     carregarEstoque();
     carregarPedidosAdmin();
@@ -1512,39 +1525,13 @@ async function processarPedidosNovos(pedidos) {
     }
 }
 
-// Bipe de notificação gerado direto no navegador (sem depender de arquivo
-// de áudio externo) — toca um "ding-dong" curto de duas notas.
-let audioCtxNotificacao = null;
-
+// Mesmo som usado no site do cliente quando o pedido sai para entrega.
 function tocarSomNovoPedido() {
-    try {
-        if (!audioCtxNotificacao) {
-            audioCtxNotificacao = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if (audioCtxNotificacao.state === 'suspended') {
-            audioCtxNotificacao.resume();
-        }
-
-        const tocarTom = (freq, inicio, duracao) => {
-            const osc = audioCtxNotificacao.createOscillator();
-            const gain = audioCtxNotificacao.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtxNotificacao.destination);
-            osc.type = 'sine';
-            osc.frequency.value = freq;
-            const t0 = audioCtxNotificacao.currentTime + inicio;
-            gain.gain.setValueAtTime(0.0001, t0);
-            gain.gain.exponentialRampToValueAtTime(0.35, t0 + 0.02);
-            gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duracao);
-            osc.start(t0);
-            osc.stop(t0 + duracao + 0.05);
-        };
-
-        tocarTom(880, 0, 0.16);
-        tocarTom(1175, 0.18, 0.24);
-    } catch (erro) {
-        console.log("Não foi possível tocar o alerta sonoro:", erro);
-    }
+    const som = document.getElementById("som-novo-pedido");
+    if (!som) return;
+    som.volume = 1;
+    som.currentTime = 0;
+    som.play().catch(erro => console.log("Navegador bloqueou o áudio automático:", erro));
 }
 
 function renderizarKanban(pedidos) {

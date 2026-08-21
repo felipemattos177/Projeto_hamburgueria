@@ -877,6 +877,20 @@ async function enviarParaWhatsApp() {
         return;
     }
 
+    // ==========================================================
+    // TRUQUE: DESBLOQUEIA O ÁUDIO PARA O CELULAR (Permissão Imediata)
+    // ==========================================================
+    const somFogo = document.getElementById("som-fogo");
+    if (somFogo) {
+        somFogo.volume = 0; // Coloca no mudo
+        somFogo.play().then(() => {
+            somFogo.pause(); // Pausa imediatamente na mesma hora
+            somFogo.volume = 1; // Volta o volume ao normal
+            somFogo.currentTime = 0;
+        }).catch(e => console.log("Aguardando liberação de áudio..."));
+    }
+    // ==========================================================
+
     const nome = document.getElementById("nome-cliente").value;
     const rua = document.getElementById("rua-cliente").value;
     const numero = document.getElementById("numero-cliente").value;
@@ -954,12 +968,17 @@ async function enviarParaWhatsApp() {
         }
 
         // =========================================================
-        // EFEITO VISUAL (Pedido salvo com sucesso!) — sem som, só a animação
+        // EFEITOS VISUAIS E SONOROS (Pedido salvo com sucesso!)
         // =========================================================
         const fogoOverlay = document.getElementById("fogo-overlay");
 
         if (fogoOverlay) {
             fogoOverlay.style.display = "flex";
+        }
+
+        if (somFogo) {
+            somFogo.currentTime = 0;
+            somFogo.play().catch(erroAudio => console.log("Navegador aguardando interação ou bloqueou áudio:", erroAudio));
         }
 
         // Aguarda 2,5 segundos com o fogo estralando antes de ir para o WhatsApp
@@ -1007,9 +1026,12 @@ async function enviarParaWhatsApp() {
             renderizarCardapio(); 
             navegarPara('inicio');
             
-            // Remove o fogo da tela
+            // Remove o fogo e pausa o áudio
             if (fogoOverlay) {
                 fogoOverlay.style.display = "none";
+            }
+            if (somFogo) {
+                somFogo.pause();
             }
 
             const numeroLimpo = configLoja.numero_whatsapp ? String(configLoja.numero_whatsapp).replace(/\D/g, '') : "";
@@ -1038,9 +1060,10 @@ async function enviarParaWhatsApp() {
         mostrarAviso("Falha de comunicação ao tentar enviar seu pedido.", "Erro de Conexão");
         if (btnFinalizar) { btnFinalizar.innerText = textoOriginalBotao; btnFinalizar.disabled = false; }
         
-        // Garante a limpeza da tela caso ocorra falha crítica na conexão
+        // Garante a limpeza da tela e do som caso ocorra falha crítica na conexão
         const fogoOverlay = document.getElementById("fogo-overlay");
         if (fogoOverlay) fogoOverlay.style.display = "none";
+        if (somFogo) somFogo.pause();
     }
 }
 
@@ -1442,6 +1465,24 @@ async function carregarIdentidadeVisual() {
                 try { localStorage.removeItem(chaveLocalStorage('cor_principal')); } catch (e) {}
             }
 
+            // ==========================================================
+            // 4. CARREGAR O ÁUDIO DO BANCO (NOVO)
+            // ==========================================================
+            if (config.audio_fogo && config.audio_fogo.trim() !== "") {
+                const somFogo = document.getElementById("som-fogo");
+                if (somFogo) {
+                    somFogo.src = config.audio_fogo; // Puxa do Supabase
+                    somFogo.load(); // Atualiza o áudio na memória
+                }
+            } else {
+                // Se não tiver áudio no banco, tenta tocar um local de garantia
+                const somFogo = document.getElementById("som-fogo");
+                if (somFogo) {
+                    somFogo.src = "fogo.mp3";
+                    somFogo.load();
+                }
+            }
+            // ==========================================================
         }
     } catch (erro) {
         console.error("Erro ao carregar a identidade visual da loja:", erro);

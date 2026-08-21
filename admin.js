@@ -2292,6 +2292,9 @@ async function salvarConfiguracoesLoja() {
     let urlDoLogo = document.getElementById("admin-logo-loja").value;
     const inputLogo = document.getElementById("admin-file-logo");
 
+    const inputAudio = document.getElementById("admin-file-audio-fogo");
+    let urlDoAudio = null;
+
     try {
         // ==========================================================
         // 1. UPLOAD DA IMAGEM (Vai para o bucket 'imagens')
@@ -2332,6 +2335,29 @@ async function salvarConfiguracoesLoja() {
         }
 
         // ==========================================================
+        // 1.5. UPLOAD DO ÁUDIO (Vai para o bucket separado 'audios')
+        // ==========================================================
+        if (inputAudio && inputAudio.files.length > 0) {
+            const arquivoAudio = inputAudio.files[0];
+            const nomeUnicoAudio = `${lojaAtual.subdominio}/som_fogo-${Date.now()}.mp3`;
+
+            // Agora envia corretamente para o bucket 'audios'
+            const resUploadAudio = await fetch(`${SUPABASE_URL}/storage/v1/object/audios/${nomeUnicoAudio}`, {
+                method: 'POST',
+                headers: headersAutenticados(arquivoAudio.type),
+                body: arquivoAudio
+            });
+
+            if (!resUploadAudio.ok) {
+                const erroSupabase = await resUploadAudio.text();
+                console.error("Erro no áudio:", erroSupabase);
+                throw new Error("Falha ao subir o áudio. Verifique as Políticas do Storage (Passo 2).");
+            }
+
+            urlDoAudio = `${SUPABASE_URL}/storage/v1/object/public/audios/${nomeUnicoAudio}`;
+        }
+
+        // ==========================================================
         // 2. SALVANDO NA TABELA 'CONFIGURACOES'
         // ==========================================================
         const corpoDb = {
@@ -2356,6 +2382,10 @@ async function salvarConfiguracoesLoja() {
             logo_url: urlDoLogo
         };
 
+        if (urlDoAudio) {
+            corpoDb.audio_fogo = urlDoAudio;
+        }
+
         const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracoes?loja_id=eq.${lojaAtual.id}`, {
             method: 'PATCH',
             headers: headersAutenticados('application/json'),
@@ -2370,6 +2400,7 @@ async function salvarConfiguracoesLoja() {
         
         if(inputArquivo) inputArquivo.value = "";
         if(inputLogo) inputLogo.value = "";
+        if(inputAudio) inputAudio.value = "";
 
     } catch (erro) {
         alert("Erro ao salvar: " + erro.message);

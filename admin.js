@@ -503,7 +503,7 @@ async function carregarRelatorioEntregas() {
 
     try {
         const res = await fetch(
-            `${SUPABASE_URL}/rest/v1/pedidos?select=id,nome_cliente,data_pedido,saiu_em,entregue_em,valor_repasse_entregador,entregador_id` +
+            `${SUPABASE_URL}/rest/v1/pedidos?select=id,numero_pedido,nome_cliente,data_pedido,saiu_em,entregue_em,valor_repasse_entregador,entregador_id` +
             `&loja_id=eq.${lojaAtual.id}&tipo_entrega=eq.entrega` +
             `&data_pedido=gte.${dataInicio}T00:00:00-03:00&data_pedido=lte.${dataFim}T23:59:59-03:00&order=data_pedido.desc`,
             { headers: headersAutenticados() }
@@ -528,7 +528,7 @@ async function carregarRelatorioEntregas() {
             entregasDetalhesCache[p.id] = { ...p, nomeEnt, repasse };
             html += `
                 <tr>
-                    <td>#${p.id}</td>
+                    <td>#${p.numero_pedido || p.id}</td>
                     <td>${escaparHtml(p.nome_cliente)}</td>
                     <td>${escaparHtml(nomeEnt)}</td>
                     <td>${tempoTotal}</td>
@@ -558,7 +558,7 @@ function abrirDetalhesEntrega(pedidoId) {
     const p = entregasDetalhesCache[pedidoId];
     if (!p) return;
 
-    document.getElementById("detalhes-entrega-numero").innerText = `#${p.id}`;
+    document.getElementById("detalhes-entrega-numero").innerText = `#${p.numero_pedido || p.id}`;
 
     const passos = [
         { titulo: "Pedido feito", hora: p.data_pedido, anterior: null },
@@ -602,7 +602,7 @@ async function carregarRelatorioFinanceiro() {
 
     try {
         const res = await fetch(
-            `${SUPABASE_URL}/rest/v1/pedidos?select=id,nome_cliente,data_pedido,forma_pagamento,tipo_entrega,total` +
+            `${SUPABASE_URL}/rest/v1/pedidos?select=id,numero_pedido,nome_cliente,data_pedido,forma_pagamento,tipo_entrega,total` +
             `&loja_id=eq.${lojaAtual.id}` +
             `&data_pedido=gte.${dataInicio}T00:00:00-03:00&data_pedido=lte.${dataFim}T23:59:59-03:00&order=data_pedido.desc`,
             { headers: headersAutenticados() }
@@ -630,7 +630,7 @@ async function carregarRelatorioFinanceiro() {
             const dataFormatada = p.data_pedido ? formatarDataHoraBr(p.data_pedido) : '-';
             html += `
                 <tr>
-                    <td>#${p.id}</td>
+                    <td>#${p.numero_pedido || p.id}</td>
                     <td>${escaparHtml(p.nome_cliente)}</td>
                     <td>${dataFormatada}</td>
                     <td>${escaparHtml(pagamento)}</td>
@@ -1806,7 +1806,7 @@ function renderizarKanban(pedidos) {
         const cardHtml = `
             <div class="card-pedido ${statusFormatado.toLowerCase().replace(/ /g, '-')}">
                 <div class="card-header">
-                    <span class="pedido-id">#${ped.id}</span>
+                    <span class="pedido-id">#${ped.numero_pedido || ped.id}</span>
                     <span class="pedido-tempo"><i class="fa-regular fa-clock"></i> ${dataFormatada}</span>
                 </div>
                 <div class="info-cliente">
@@ -2001,7 +2001,7 @@ function montarCupomImpressao(pedido, itens, nomeProdutoPorId, adicionaisPorItem
 
     area.innerHTML = `
         <div class="cupom-loja">${escaparHtml(nomeLoja)}</div>
-        <div class="cupom-sub">Pedido #${pedido.id}</div>
+        <div class="cupom-sub">Pedido #${pedido.numero_pedido || pedido.id}</div>
         <div class="cupom-sub">${dataFormatada}</div>
         <div class="cupom-sep"></div>
 

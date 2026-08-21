@@ -1085,7 +1085,7 @@ async function carregarHistoricoPedidos() {
             html += `
                 <div style="background: #222; border-radius: 8px; padding: 15px; margin-bottom: 12px; border: 1px solid #333;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                        <strong style="color: var(--laranja-fogo, #ff5e00);">Pedido #${p.id}</strong>
+                        <strong style="color: var(--laranja-fogo, #ff5e00);">Pedido #${p.numero_pedido || p.id}</strong>
                         <span style="color: #aaa; font-size: 12px;">${dataFormatada}</span>
                     </div>
                     <div style="color: #fff; font-size: 14px; margin-bottom: 5px;">Status: <strong>${escaparHtml(p.status) || 'Pendente'}</strong></div>
@@ -1379,7 +1379,7 @@ async function rastrearPedidosEmAndamento() {
                 }
 
                 // 2. Dispara o Alerta Visual na Tela do Cliente
-                mostrarAviso(`Seu pedido #${pedidoDb.id} acabou de sair para entrega! 🛵 Prepare-se para receber.`, "Saiu para Entrega!", "sucesso");
+                mostrarAviso(`Seu pedido #${pedidoDb.numero_pedido || pedidoDb.id} acabou de sair para entrega! 🛵 Prepare-se para receber.`, "Saiu para Entrega!", "sucesso");
                 
                 // 3. Atualiza o histórico do cliente na tela
                 carregarHistoricoPedidos();

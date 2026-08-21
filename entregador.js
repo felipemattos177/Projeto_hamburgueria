@@ -257,7 +257,7 @@ function renderizarEmPreparo(pedidos) {
         return `
             <div class="card-pedido-entregador">
                 <div class="cabecalho">
-                    <span class="pedido-id">#${ped.id}</span>
+                    <span class="pedido-id">#${ped.numero_pedido || ped.id}</span>
                     <span class="pedido-hora">${tipoTexto}</span>
                 </div>
                 <div class="info">
@@ -286,7 +286,7 @@ function renderizarMinhasEntregas(pedidos) {
         return `
             <div class="card-pedido-entregador">
                 <div class="cabecalho">
-                    <span class="pedido-id">#${ped.id}</span>
+                    <span class="pedido-id">#${ped.numero_pedido || ped.id}</span>
                     <span class="pedido-hora">Pgto: ${escaparHtml(ped.forma_pagamento) || '-'}</span>
                 </div>
                 <div class="info">

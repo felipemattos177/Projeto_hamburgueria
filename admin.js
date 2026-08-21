@@ -1118,11 +1118,15 @@ function renderizarTabelaProdutos(produtos) {
         const botaoTexto = produto.ativo ? "Pausar" : "Ativar";
 
         tbody.innerHTML += `
-            <tr>
+            <tr draggable="true" data-produto-id="${produto.id}"
+                ondragstart="dragStartProduto(event, ${produto.id})"
+                ondragover="dragOverProduto(event)"
+                ondrop="dropProduto(event, ${produto.id})"
+                ondragend="dragEndProduto(event)">
+                <td class="drag-handle-cell" title="Arraste pra reordenar"><i class="fa-solid fa-grip-vertical"></i></td>
                 <td>#${produto.id}</td>
                 <td><strong>${escaparHtml(produto.nome)}</strong></td>
                 <td>${escaparHtml(produto.categoria)}</td>
-                <td>${produto.ordem ?? 0}</td>
                 <td>R$ ${produto.preco.toFixed(2).replace('.', ',')}</td>
                 <td><span class="status-badge ${badgeClass}">${badgeTexto}</span></td>
                 <td>
@@ -1142,6 +1146,59 @@ function renderizarTabelaProdutos(produtos) {
             </tr>
         `;
     });
+}
+
+// ==========================================
+// ARRASTAR E SOLTAR PRA REORDENAR OS PRODUTOS
+// ==========================================
+let produtoArrastadoId = null;
+
+function dragStartProduto(event, id) {
+    produtoArrastadoId = id;
+    event.dataTransfer.effectAllowed = 'move';
+    event.currentTarget.classList.add('arrastando');
+}
+
+function dragOverProduto(event) {
+    event.preventDefault(); // sem isso o navegador não deixa soltar aqui
+}
+
+function dragEndProduto(event) {
+    event.currentTarget.classList.remove('arrastando');
+}
+
+async function dropProduto(event, idAlvo) {
+    event.preventDefault();
+    if (produtoArrastadoId === null || produtoArrastadoId === idAlvo) return;
+
+    const lista = [...listaDeProdutosGlobal];
+    const idxOrigem = lista.findIndex(p => p.id === produtoArrastadoId);
+    const idxAlvo = lista.findIndex(p => p.id === idAlvo);
+    if (idxOrigem === -1 || idxAlvo === -1) return;
+
+    const [movido] = lista.splice(idxOrigem, 1);
+    lista.splice(idxAlvo, 0, movido);
+    lista.forEach((p, i) => { p.ordem = i; });
+
+    listaDeProdutosGlobal = lista;
+    renderizarTabelaProdutos(lista); // já mostra a nova ordem na hora, sem esperar o banco
+
+    try {
+        const respostas = await Promise.all(lista.map(p =>
+            fetch(`${SUPABASE_URL}/rest/v1/produtos?id=eq.${p.id}`, {
+                method: 'PATCH',
+                headers: headersAutenticados('application/json'),
+                body: JSON.stringify({ ordem: p.ordem })
+            })
+        ));
+        if (respostas.some(r => !r.ok)) throw new Error("Falha ao salvar a nova ordem.");
+    } catch (erro) {
+        console.error(erro);
+        alert("Não deu pra salvar a nova ordem. Recarregando a lista original.");
+        carregarProdutos();
+    }
+
+    produtoArrastadoId = null;
 }
 
 async function mudarStatusProduto(id, novoStatus) {

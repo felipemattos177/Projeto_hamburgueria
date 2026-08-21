@@ -116,6 +116,9 @@
         tbody tr:last-child td { border-bottom: none; }
         tbody tr:hover { background: #fafafc; }
         th { background-color: #fafbfc; color: var(--texto-suave); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+        .drag-handle-cell { width: 32px; text-align: center; color: var(--texto-claro); cursor: grab; }
+        tr[draggable="true"]:active { cursor: grabbing; }
+        tr.arrastando { opacity: .4; background: var(--laranja-suave); }
 
         .status-badge { padding: 4px 11px; border-radius: 20px; font-size: 12px; font-weight: 600; }
         .status-ativo { background-color: var(--verde-suave); color: var(--verde); }
@@ -366,10 +369,10 @@
                 <table>
                     <thead>
                         <tr>
+                            <th></th>
                             <th>ID</th>
                             <th>Nome do Produto</th>
                             <th>Categoria</th>
-                            <th>Ordem</th>
                             <th>Preço</th>
                             <th>Status</th>
                             <th>Ações</th>

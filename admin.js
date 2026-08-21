@@ -1473,7 +1473,7 @@ async function carregarPedidosAdmin() {
         }
 
         const pedidos = await res.json();
-        await processarImpressaoAutomatica(pedidos);
+        await processarPedidosNovos(pedidos);
         renderizarKanban(pedidos);
     } catch (erro) {
         document.getElementById("col-pendentes").innerHTML = `<p style="color:#ff4757; text-align:center; margin-top:20px;"><b>Erro no Script:</b> ${erro.message}</p>`;
@@ -1481,10 +1481,10 @@ async function carregarPedidosAdmin() {
 }
 
 // null = ainda não sabemos quais pedidos pendentes já existiam antes de a
-// página carregar; evita imprimir tudo de uma vez ao abrir o painel.
+// página carregar; evita disparar som/impressão de tudo de uma vez ao abrir o painel.
 let idsPedidosVistosAutoImpressao = null;
 
-async function processarImpressaoAutomatica(pedidos) {
+async function processarPedidosNovos(pedidos) {
     const idsPendentesAtuais = pedidos
         .filter(p => String(p.status || 'Pendente').trim().toLowerCase() === 'pendente')
         .map(p => p.id);
@@ -1494,20 +1494,56 @@ async function processarImpressaoAutomatica(pedidos) {
         return;
     }
 
-    const toggleImpressao = document.getElementById("admin-impressao-automatica");
-    if (!toggleImpressao || !toggleImpressao.checked) {
-        // Mesmo desligado, mantém o controle em dia — senão, ao religar o
-        // toggle, todo pedido acumulado nesse meio-tempo dispararia de vez.
-        idsPendentesAtuais.forEach(id => idsPedidosVistosAutoImpressao.add(id));
-        return;
-    }
+    const idsNovos = idsPendentesAtuais.filter(id => !idsPedidosVistosAutoImpressao.has(id));
+    if (idsNovos.length === 0) return;
 
-    for (const id of idsPendentesAtuais) {
-        if (!idsPedidosVistosAutoImpressao.has(id)) {
-            idsPedidosVistosAutoImpressao.add(id);
+    idsNovos.forEach(id => idsPedidosVistosAutoImpressao.add(id));
+
+    // Alerta sonoro toca sempre que chega pedido novo, independente da
+    // impressão automática estar ligada ou não.
+    tocarSomNovoPedido();
+
+    const toggleImpressao = document.getElementById("admin-impressao-automatica");
+    if (toggleImpressao && toggleImpressao.checked) {
+        for (const id of idsNovos) {
             await atualizarStatusPedido(id, 'Em Preparo');
             await imprimirPedido(id);
         }
+    }
+}
+
+// Bipe de notificação gerado direto no navegador (sem depender de arquivo
+// de áudio externo) — toca um "ding-dong" curto de duas notas.
+let audioCtxNotificacao = null;
+
+function tocarSomNovoPedido() {
+    try {
+        if (!audioCtxNotificacao) {
+            audioCtxNotificacao = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtxNotificacao.state === 'suspended') {
+            audioCtxNotificacao.resume();
+        }
+
+        const tocarTom = (freq, inicio, duracao) => {
+            const osc = audioCtxNotificacao.createOscillator();
+            const gain = audioCtxNotificacao.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtxNotificacao.destination);
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            const t0 = audioCtxNotificacao.currentTime + inicio;
+            gain.gain.setValueAtTime(0.0001, t0);
+            gain.gain.exponentialRampToValueAtTime(0.35, t0 + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duracao);
+            osc.start(t0);
+            osc.stop(t0 + duracao + 0.05);
+        };
+
+        tocarTom(880, 0, 0.16);
+        tocarTom(1175, 0.18, 0.24);
+    } catch (erro) {
+        console.log("Não foi possível tocar o alerta sonoro:", erro);
     }
 }
 

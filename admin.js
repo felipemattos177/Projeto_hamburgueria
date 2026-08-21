@@ -1081,7 +1081,7 @@ function hojeBrString() {
 async function carregarProdutos() {
     if (!(await garantirSessaoOuRelogar())) return;
     try {
-        const resposta = await fetch(`${SUPABASE_URL}/rest/v1/produtos?select=*&loja_id=eq.${lojaAtual.id}&order=id.asc`, {
+        const resposta = await fetch(`${SUPABASE_URL}/rest/v1/produtos?select=*&loja_id=eq.${lojaAtual.id}&order=ordem.asc,id.asc`, {
             method: 'GET',
             headers: headersAutenticados()
         });
@@ -1122,6 +1122,7 @@ function renderizarTabelaProdutos(produtos) {
                 <td>#${produto.id}</td>
                 <td><strong>${escaparHtml(produto.nome)}</strong></td>
                 <td>${escaparHtml(produto.categoria)}</td>
+                <td>${produto.ordem ?? 0}</td>
                 <td>R$ ${produto.preco.toFixed(2).replace('.', ',')}</td>
                 <td><span class="status-badge ${badgeClass}">${badgeTexto}</span></td>
                 <td>
@@ -1161,7 +1162,11 @@ function abrirModalAdmin() {
     document.getElementById("novo-nome").value = "";
     document.getElementById("novo-descricao").value = "";
     document.getElementById("novo-preco").value = "";
-    
+
+    // Começa depois de tudo que já existe, pra não pular a fila sem querer
+    const maiorOrdem = listaDeProdutosGlobal.reduce((max, p) => Math.max(max, Number(p.ordem) || 0), 0);
+    document.getElementById("novo-ordem").value = maiorOrdem + 1;
+
     // Volta o select de categoria pro padrão e ESCONDE a caixa de criar nova
     const selectCat = document.getElementById("novo-categoria");
     if(selectCat && selectCat.options.length > 0) selectCat.selectedIndex = 0;
@@ -1192,7 +1197,8 @@ function editarProduto(id) {
     document.getElementById("novo-descricao").value = produto.descricao || "";
     document.getElementById("novo-preco").value = produto.preco || "";
     document.getElementById("novo-categoria").value = produto.categoria || "";
-    
+    document.getElementById("novo-ordem").value = produto.ordem ?? 0;
+
     // ESCONDE O CAMPO TEXTO (limpando a sujeira de ações anteriores)
     const novaCatTexto = document.getElementById("nova-categoria-texto");
     if(novaCatTexto) {
@@ -1276,7 +1282,8 @@ async function salvarNovoProduto() {
             urlDaImagem = `${SUPABASE_URL}/storage/v1/object/public/imagens/${nomeUnico}`;
         }
 
-        const payload = { nome, descricao, preco, categoria, imagem: urlDaImagem, loja_id: lojaAtual.id };
+        const ordem = parseInt(document.getElementById("novo-ordem").value, 10) || 0;
+        const payload = { nome, descricao, preco, categoria, ordem, imagem: urlDaImagem, loja_id: lojaAtual.id };
         
         let url = `${SUPABASE_URL}/rest/v1/produtos`;
         let metodo = 'POST'; 

@@ -201,7 +201,7 @@ function calcularUsoIngredienteNoCarrinho(ingredienteId) {
 // === 2. EXTRAÇÃO DE DADOS AO VIVO ===
 async function carregarCardapioDoBanco() {
     try {
-        const resposta = await fetchSupabase(`/rest/v1/cardapio_inteligente?select=*&ativo=eq.true&loja_id=eq.${lojaAtual.id}`);
+        const resposta = await fetchSupabase(`/rest/v1/cardapio_inteligente?select=*&ativo=eq.true&loja_id=eq.${lojaAtual.id}&order=ordem.asc,id.asc`);
         if (!resposta.ok) throw new Error(`Erro na API: HTTP ${resposta.status}`);
         const dados = await resposta.json();
 

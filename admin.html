@@ -369,13 +369,14 @@
                             <th>ID</th>
                             <th>Nome do Produto</th>
                             <th>Categoria</th>
+                            <th>Ordem</th>
                             <th>Preço</th>
                             <th>Status</th>
                             <th>Ações</th>
                         </tr>
                     </thead>
                     <tbody id="tabela-produtos">
-                        <tr><td colspan="6" style="text-align: center;">Carregando produtos...</td></tr>
+                        <tr><td colspan="7" style="text-align: center;">Carregando produtos...</td></tr>
                     </tbody>
                 </table>
 
@@ -820,6 +821,10 @@
                 <!-- O JS preenche aqui -->
             </select>
             <input type="text" id="nova-categoria-texto" placeholder="Digite o nome da nova categoria (Ex: Porções)" style="display: none;">
+
+            <label>Ordem de Exibição</label>
+            <input type="number" id="novo-ordem" placeholder="0" step="1">
+            <p style="font-size: 11.5px; color: var(--texto-claro); margin: -10px 0 15px;">Quanto menor o número, mais cedo aparece pro cliente. Também define a ordem das categorias (a categoria aparece na posição do seu primeiro produto).</p>
 
             <label>Foto do Lanche (Opcional)</label>
             <input type="file" id="novo-file-imagem" accept="image/*" style="padding: 8px;">

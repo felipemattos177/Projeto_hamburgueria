@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Área do Entregador</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --laranja-fogo: #ff5e00;
+            --laranja-suave: #fff2ea;
+            --bg-app: #f4f5f9;
+            --bg-header: #15171f;
+            --bg-card: #ffffff;
+            --texto: #171923;
+            --texto-suave: #667085;
+            --texto-claro: #98a2b3;
+            --borda: #e7e9ef;
+            --verde: #16a34a;
+            --verde-suave: #dcfce7;
+            --vermelho: #dc2626;
+            --vermelho-suave: #fee2e2;
+            --azul: #2563eb;
+            --azul-suave: #dbeafe;
+            --sombra: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
+            --sombra-lg: 0 10px 30px rgba(16,24,40,.12);
+            --raio: 12px;
+        }
+        * { box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-app); margin: 0; color: var(--texto); -webkit-font-smoothing: antialiased; }
+
+        #tela-login-entregador {
+            position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px;
+            background:
+                radial-gradient(circle at 15% 15%, rgba(255,94,0,.18), transparent 45%),
+                radial-gradient(circle at 85% 85%, rgba(37,99,235,.15), transparent 45%),
+                var(--bg-header);
+            z-index: 5000;
+        }
+        .login-card { background: var(--bg-card); padding: 40px 34px; border-radius: 18px; width: 100%; max-width: 360px; box-shadow: var(--sombra-lg); }
+        .login-icone { width: 52px; height: 52px; border-radius: 14px; background: var(--laranja-fogo); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 22px; margin: 0 auto 18px; }
+        .login-card h1 { color: var(--texto); font-size: 18px; font-weight: 700; margin: 0 0 4px; text-align: center; }
+        .login-card p.subtitulo { color: var(--texto-suave); font-size: 13px; text-align: center; margin: 0 0 24px; }
+        .login-card label { font-size: 13px; font-weight: 500; color: var(--texto-suave); margin-bottom: 6px; display: block; }
+        .login-card input { width: 100%; padding: 12px 14px; margin-bottom: 16px; border: 1px solid var(--borda); border-radius: 9px; background: #fbfbfd; color: var(--texto); font-size: 14px; font-family: inherit; }
+        .login-card input:focus { outline: none; border-color: var(--laranja-fogo); background: #fff; }
+        .login-card button { width: 100%; background: var(--laranja-fogo); color: #fff; border: none; padding: 13px; border-radius: 9px; font-weight: 600; font-size: 14px; cursor: pointer; transition: .15s; }
+        .login-card button:hover { filter: brightness(1.08); }
+        #login-erro-entregador { color: var(--vermelho); background: var(--vermelho-suave); padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; display: none; text-align: center; }
+
+        .topo { background: var(--bg-header); color: #fff; padding: 18px 20px; display: flex; justify-content: space-between; align-items: center; }
+        .topo-brand { display: flex; align-items: center; gap: 12px; }
+        .topo-brand-icone { width: 36px; height: 36px; border-radius: 9px; background: var(--laranja-fogo); display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+        .topo-brand div strong { display: block; font-size: 15px; font-weight: 700; }
+        .topo-brand div span { font-size: 11.5px; color: #9aa0b4; }
+        .btn-sair { background: transparent; color: #b6b9c6; border: 1px solid rgba(255,255,255,.18); padding: 9px 16px; border-radius: 8px; font-weight: 500; cursor: pointer; font-size: 13.5px; transition: .15s; font-family: inherit; flex-shrink: 0; }
+        .btn-sair:hover { background: rgba(255,255,255,.08); color: #fff; }
+
+        .conteudo { max-width: 640px; margin: 0 auto; padding: 20px 16px 60px; }
+
+        .grid-resumo { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+        .card-resumo { background: var(--bg-card); border-radius: var(--raio); border: 1px solid var(--borda); box-shadow: var(--sombra); padding: 14px; text-align: center; }
+        .card-resumo .valor { font-size: 24px; font-weight: 800; color: var(--texto); }
+        .card-resumo .rotulo { font-size: 11.5px; color: var(--texto-suave); font-weight: 600; margin-top: 2px; }
+
+        .secao-titulo { font-size: 15px; font-weight: 700; color: var(--texto); margin: 24px 0 12px; display: flex; align-items: center; gap: 8px; }
+        .secao-titulo .icone-secao { width: 28px; height: 28px; border-radius: 8px; background: var(--laranja-suave); color: var(--laranja-fogo); display: inline-flex; align-items: center; justify-content: center; font-size: 13px; }
+
+        .card-pedido-entregador { background: var(--bg-card); border-radius: var(--raio); border: 1px solid var(--borda); box-shadow: var(--sombra); padding: 15px; margin-bottom: 12px; }
+        .card-pedido-entregador .cabecalho { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .card-pedido-entregador .pedido-id { font-weight: 800; font-size: 15px; }
+        .card-pedido-entregador .pedido-hora { font-size: 12px; color: var(--texto-claro); }
+        .card-pedido-entregador .info { font-size: 13.5px; color: var(--texto-suave); line-height: 1.6; margin-bottom: 10px; }
+        .card-pedido-entregador .info strong { color: var(--texto); }
+        .card-pedido-entregador .total { color: var(--verde); font-weight: 700; font-size: 14px; }
+
+        .btn-acao-entregador { width: 100%; padding: 12px; border: none; border-radius: 9px; font-weight: 600; cursor: pointer; font-size: 14px; margin-top: 6px; text-align: center; text-decoration: none; display: block; transition: .15s; }
+        .btn-pegar { background: var(--laranja-fogo); color: #fff; }
+        .btn-pegar:hover { filter: brightness(1.08); }
+        .btn-maps { background: var(--azul-suave); color: var(--azul); }
+        .btn-entregue { background: var(--verde-suave); color: var(--verde); }
+        .btn-entregue:hover { filter: brightness(.96); }
+
+        .vazio { color: var(--texto-claro); font-size: 13.5px; text-align: center; padding: 20px; background: var(--bg-card); border-radius: var(--raio); border: 1px dashed var(--borda); }
+    </style>
+</head>
+<body>
+
+    <div id="tela-login-entregador">
+        <form class="login-card" onsubmit="fazerLoginEntregador(event)">
+            <div class="login-icone"><i class="fa-solid fa-motorcycle"></i></div>
+            <h1><span id="login-nome-loja-entregador">Área do Entregador</span></h1>
+            <p class="subtitulo">Entre com sua conta pra ver as entregas</p>
+            <div id="login-erro-entregador"></div>
+            <label>E-mail</label>
+            <input type="email" id="login-email-entregador" placeholder="seu@email.com" autocomplete="username" required>
+            <label>Senha</label>
+            <input type="password" id="login-senha-entregador" placeholder="••••••••" autocomplete="current-password" required>
+            <button type="submit" id="btn-login-entregador">Entrar</button>
+        </form>
+    </div>
+
+    <div id="app-entregador-container" style="display: none;">
+        <div class="topo">
+            <div class="topo-brand">
+                <div class="topo-brand-icone"><i class="fa-solid fa-motorcycle"></i></div>
+                <div>
+                    <strong id="nome-entregador-topo">Entregador</strong>
+                    <span id="nome-loja-topo">Loja</span>
+                </div>
+            </div>
+            <button class="btn-sair" onclick="sairEntregador()"><i class="fa-solid fa-right-from-bracket"></i> Sair</button>
+        </div>
+
+        <div class="conteudo">
+            <div class="grid-resumo">
+                <div class="card-resumo">
+                    <div class="valor" id="resumo-entregues">0</div>
+                    <div class="rotulo">Entregues hoje</div>
+                </div>
+                <div class="card-resumo">
+                    <div class="valor" id="resumo-andamento">0</div>
+                    <div class="rotulo">Em andamento</div>
+                </div>
+                <div class="card-resumo">
+                    <div class="valor" id="resumo-aguardando">0</div>
+                    <div class="rotulo">Em preparo</div>
+                </div>
+            </div>
+
+            <div class="secao-titulo"><span class="icone-secao"><i class="fa-solid fa-motorcycle"></i></span> Minhas entregas em andamento</div>
+            <div id="lista-minhas-entregas"><div class="vazio">Nenhuma entrega em andamento.</div></div>
+
+            <div class="secao-titulo"><span class="icone-secao"><i class="fa-solid fa-fire-burner"></i></span> Pedidos em preparo</div>
+            <div id="lista-em-preparo"><div class="vazio">Nenhum pedido em preparo no momento.</div></div>
+        </div>
+    </div>
+
+    <script src="entregador.js"></script>
+</body>
+</html>

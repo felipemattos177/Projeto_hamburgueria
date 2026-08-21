@@ -317,6 +317,7 @@
                 <button class="tab-btn" onclick="mudarAbaAdmin('view-dashboard', this)"><i class="fa-solid fa-gauge-high"></i> Dashboard</button>
                 <button class="tab-btn" onclick="mudarAbaAdmin('view-entregas', this)"><i class="fa-solid fa-hand-holding-dollar"></i> Entregas</button>
                 <button class="tab-btn" onclick="mudarAbaAdmin('view-financeiro', this)"><i class="fa-solid fa-chart-line"></i> Financeiro</button>
+                <button class="tab-btn" onclick="mudarAbaAdmin('view-entregadores', this)"><i class="fa-solid fa-motorcycle"></i> Entregadores</button>
                 <button class="tab-btn" onclick="mudarAbaAdmin('view-config', this)"><i class="fa-solid fa-gear"></i> Configurações</button>
             </nav>
 
@@ -597,6 +598,31 @@
             </div>
 
             <!-- ========================================== -->
+            <!-- ENTREGADORES                                -->
+            <!-- ========================================== -->
+            <div id="view-entregadores" class="view-section">
+
+                <div class="header-admin">
+                    <h1><span class="icone-secao"><i class="fa-solid fa-motorcycle"></i></span> Entregadores</h1>
+                    <button class="btn-novo" onclick="abrirModalEntregador()"><i class="fa-solid fa-plus"></i> Novo Entregador</button>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>E-mail</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabela-entregadores">
+                        <tr><td colspan="4" style="text-align: center;">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- ========================================== -->
             <!-- ABA 3: CONFIGURAÇÕES DA LOJA               -->
             <!-- ========================================== -->
             <div id="view-config" class="view-section">
@@ -801,6 +827,26 @@
             <div class="modal-botoes">
                 <button class="btn-cancelar" onclick="fecharModalIngrediente()">Cancelar</button>
                 <button class="btn-novo" onclick="salvarNovoIngrediente()">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-entregador" class="modal-overlay">
+        <div class="modal-conteudo">
+            <h2>Cadastrar Entregador</h2>
+            <p style="font-size: 13.5px; color: var(--texto-suave); margin-top: 0;">
+                Crie o login no Supabase (Authentication → Users → Add user, com "Auto Confirm User" marcado),
+                copie o <strong>User UID</strong> dele e cole abaixo.
+            </p>
+            <label>Nome do Entregador</label>
+            <input type="text" id="entregador-nome" placeholder="Ex: João">
+            <label>E-mail (só pra exibição aqui no painel)</label>
+            <input type="email" id="entregador-email" placeholder="joao@email.com">
+            <label>UID do usuário</label>
+            <input type="text" id="entregador-user-id" placeholder="Ex: 0487b354-..." style="margin-bottom: 0;">
+            <div class="modal-botoes">
+                <button class="btn-cancelar" onclick="fecharModalEntregador()">Cancelar</button>
+                <button class="btn-novo" onclick="salvarEntregador()">Salvar</button>
             </div>
         </div>
     </div>

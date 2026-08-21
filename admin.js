@@ -422,6 +422,7 @@ function iniciarPainelAdmin() {
     carregarRelatorioEntregas();
     definirPeriodoPadrao('financeiro-data-inicio', 'financeiro-data-fim');
     carregarRelatorioFinanceiro();
+    carregarEntregadores();
     definirPeriodoPadrao('dash-data-inicio', 'dash-data-fim');
     carregarDashboard();
 
@@ -1594,6 +1595,7 @@ function renderizarKanban(pedidos) {
                         ? '<i class="fa-solid fa-store"></i> Retirada na loja<br>'
                         : (ped.endereco_entrega ? `<i class="fa-solid fa-location-dot"></i> ${escaparHtml(ped.endereco_entrega)}<br>` : '')}
                     Pgto: ${escaparHtml(ped.forma_pagamento) || '-'}<br>
+                    ${ped.entregador_id ? `<i class="fa-solid fa-motorcycle"></i> ${escaparHtml(nomeEntregadorPorId(ped.entregador_id))}<br>` : ''}
                     <span style="color: #2ed573; font-weight: bold;">R$ ${totalNum.toFixed(2).replace('.', ',')}</span>
                 </div>
                 ${obsHtml}
@@ -1766,6 +1768,111 @@ function montarCupomImpressao(pedido, itens, nomeProdutoPorId, adicionaisPorItem
         <div class="cupom-sep"></div>
         <div class="cupom-footer">Obrigado pela preferência! 🔥</div>
     `;
+}
+
+// ==========================================
+// MÓDULO 10: ENTREGADORES
+// ==========================================
+let listaDeEntregadoresGlobal = [];
+
+function nomeEntregadorPorId(userId) {
+    const encontrado = listaDeEntregadoresGlobal.find(e => e.user_id === userId);
+    return encontrado ? encontrado.nome : "Entregador";
+}
+
+async function carregarEntregadores() {
+    if (!(await garantirSessaoOuRelogar())) return;
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/entregadores?select=*&loja_id=eq.${lojaAtual.id}&order=nome.asc`, {
+            headers: headersAutenticados()
+        });
+        listaDeEntregadoresGlobal = await res.json();
+        renderizarTabelaEntregadores(listaDeEntregadoresGlobal);
+    } catch (erro) {
+        console.error("Erro ao carregar entregadores:", erro);
+    }
+}
+
+function renderizarTabelaEntregadores(entregadores) {
+    const tbody = document.getElementById("tabela-entregadores");
+    if (!tbody) return;
+    tbody.innerHTML = "";
+
+    if (entregadores.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Nenhum entregador cadastrado ainda.</td></tr>';
+        return;
+    }
+
+    entregadores.forEach(ent => {
+        const badgeClass = ent.ativo ? "status-ativo" : "status-inativo";
+        const badgeTexto = ent.ativo ? "Ativo" : "Inativo";
+        const botaoTexto = ent.ativo ? "Desativar" : "Ativar";
+
+        tbody.innerHTML += `
+            <tr>
+                <td><strong>${escaparHtml(ent.nome)}</strong></td>
+                <td>${escaparHtml(ent.email || '-')}</td>
+                <td><span class="status-badge ${badgeClass}">${badgeTexto}</span></td>
+                <td>
+                    <button class="btn-acao btn-toggle" onclick="alternarStatusEntregador('${ent.user_id}', ${!ent.ativo})">${botaoTexto}</button>
+                </td>
+            </tr>
+        `;
+    });
+}
+
+async function alternarStatusEntregador(userId, novoStatus) {
+    if (!(await garantirSessaoOuRelogar())) return;
+    await fetch(`${SUPABASE_URL}/rest/v1/entregadores?user_id=eq.${userId}`, {
+        method: 'PATCH',
+        headers: headersAutenticados('application/json'),
+        body: JSON.stringify({ ativo: novoStatus })
+    });
+    carregarEntregadores();
+}
+
+function abrirModalEntregador() {
+    document.getElementById("entregador-nome").value = "";
+    document.getElementById("entregador-email").value = "";
+    document.getElementById("entregador-user-id").value = "";
+    document.getElementById("modal-entregador").style.display = "flex";
+}
+
+function fecharModalEntregador() {
+    document.getElementById("modal-entregador").style.display = "none";
+}
+
+async function salvarEntregador() {
+    const nome = document.getElementById("entregador-nome").value.trim();
+    const email = document.getElementById("entregador-email").value.trim();
+    const userId = document.getElementById("entregador-user-id").value.trim();
+
+    if (!nome || !userId) {
+        alert("Preencha o nome e o UID do usuário.");
+        return;
+    }
+
+    if (!(await garantirSessaoOuRelogar())) return;
+
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/entregadores`, {
+            method: 'POST',
+            headers: { ...headersAutenticados('application/json'), 'Prefer': 'resolution=merge-duplicates' },
+            body: JSON.stringify({ user_id: userId, loja_id: lojaAtual.id, nome, email: email || null, ativo: true })
+        });
+
+        if (!res.ok) {
+            const erro = await res.json();
+            alert(`Erro ao salvar: ${erro.message || "verifique se o UID está correto"}`);
+            return;
+        }
+
+        fecharModalEntregador();
+        carregarEntregadores();
+    } catch (erro) {
+        alert("Erro de conexão ao salvar entregador.");
+        console.error(erro);
+    }
 }
 
 // ==========================================

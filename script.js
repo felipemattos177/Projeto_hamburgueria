@@ -1245,6 +1245,13 @@ async function renderizarRodape() {
     footer.innerHTML = `
         <div style="margin-bottom: 8px;">&copy; ${ano} ${escaparHtml(configLoja.nome_loja || lojaAtual.nome)}. Identidade e conteúdo reservados.</div>
         <div style="margin-bottom: 8px;">Tecnologia por <a href="https://mathshub.com.br" target="_blank" style="color: var(--laranja-fogo, #ff5e00); text-decoration: none; font-weight: bold;">Maths Labs</a> 🚀</div>
+        <div style="margin-bottom: 8px; font-size: 12px;">
+            <a href="politica-de-privacidade.html" style="color: #888; text-decoration: none;">Política de Privacidade</a>
+            &nbsp;·&nbsp;
+            <a href="termos-de-uso.html" style="color: #888; text-decoration: none;">Termos de Uso</a>
+            &nbsp;·&nbsp;
+            <a href="politica-de-cookies.html" style="color: #888; text-decoration: none;">Cookies</a>
+        </div>
         <div id="versao-app" style="font-size: 11px; color: #555; margin-top: 10px;">Sincronizando versão...</div>
     `;
     document.body.appendChild(footer);

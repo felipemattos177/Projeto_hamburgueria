@@ -4,6 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel de Gestão</title>
+    <script>
+        // Aplica a última cor conhecida da loja ANTES da página desenhar o
+        // primeiro quadro (sem esperar a consulta na rede) — evita o laranja
+        // padrão aparecer por uma fração de segundo em quem já visitou antes.
+        try {
+            var corSalvaAntes = localStorage.getItem('cor_principal_loja');
+            if (corSalvaAntes) document.documentElement.style.setProperty('--laranja-fogo', corSalvaAntes);
+        } catch (e) {}
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>

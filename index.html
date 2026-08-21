@@ -14,6 +14,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Maths_hub Delivery</title>
+    <script>
+        // Aplica a última cor conhecida da loja ANTES da página desenhar o
+        // primeiro quadro (sem esperar a consulta na rede) — evita o laranja
+        // padrão aparecer por uma fração de segundo em quem já visitou antes.
+        // Chave com o mesmo prefixo por loja que chaveLocalStorage() usa no
+        // resto do site, senão duas lojas testadas em ?loja= colidem.
+        try {
+            var _params = new URLSearchParams(window.location.search);
+            var _slug = (_params.get("loja") || window.location.hostname.split(".")[0]).toLowerCase();
+            var corSalvaAntes = localStorage.getItem('loja_' + _slug + '_cor_principal');
+            if (corSalvaAntes) document.documentElement.style.setProperty('--laranja-fogo', corSalvaAntes);
+        } catch (e) {}
+    </script>
     
     <!-- Fontes e Ícones -->
     <link rel="preconnect" href="https://fonts.googleapis.com">

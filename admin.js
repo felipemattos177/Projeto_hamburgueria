@@ -89,6 +89,9 @@ async function aplicarIdentidadeVisualAdmin() {
 
         if (config.cor_principal) {
             document.documentElement.style.setProperty('--laranja-fogo', config.cor_principal);
+            try { localStorage.setItem('cor_principal_loja', config.cor_principal); } catch (e) {}
+        } else {
+            try { localStorage.removeItem('cor_principal_loja'); } catch (e) {}
         }
     } catch (erro) {
         console.error("Erro ao aplicar identidade visual:", erro);

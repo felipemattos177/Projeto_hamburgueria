@@ -1444,6 +1444,9 @@ async function carregarIdentidadeVisual() {
             // 3. Trocando a Cor Principal (A Mágica!)
             if(config.cor_principal) {
                 document.documentElement.style.setProperty('--laranja-fogo', config.cor_principal);
+                try { localStorage.setItem(chaveLocalStorage('cor_principal'), config.cor_principal); } catch (e) {}
+            } else {
+                try { localStorage.removeItem(chaveLocalStorage('cor_principal')); } catch (e) {}
             }
 
             // ==========================================================

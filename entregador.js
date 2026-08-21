@@ -331,6 +331,12 @@ async function marcarComoEntregue(pedidoId) {
 // ==========================================
 async function iniciarEntregador() {
     const lojaOk = await resolverLoja();
+
+    // Nome/logo/cor da loja já estão aplicados nesse ponto (ou a tela de
+    // "loja não encontrada" já tomou conta da página) — pode tirar o spinner.
+    const telaCarregando = document.getElementById("tela-carregando-inicial");
+    if (telaCarregando) telaCarregando.style.display = "none";
+
     if (!lojaOk) return;
 
     const sessaoSalva = carregarSessaoLocal();

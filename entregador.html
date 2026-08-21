@@ -30,6 +30,20 @@
         * { box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; background-color: var(--bg-app); margin: 0; color: var(--texto); -webkit-font-smoothing: antialiased; }
 
+        /* Cobre a tela até sabermos o nome/logo/cor certos da loja — sem
+           isso, com internet lenta dá pra ver o ícone/cor genéricos por um
+           instante antes de trocar pelos da loja, o que passa impressão ruim. */
+        #tela-carregando-inicial {
+            position: fixed; inset: 0; z-index: 9000; display: flex; align-items: center; justify-content: center;
+            background: var(--bg-header);
+        }
+        #tela-carregando-inicial .spinner {
+            width: 40px; height: 40px; border-radius: 50%;
+            border: 3px solid rgba(255,255,255,.15); border-top-color: #fff;
+            animation: girar-spinner .8s linear infinite;
+        }
+        @keyframes girar-spinner { to { transform: rotate(360deg); } }
+
         #tela-login-entregador {
             position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px;
             background:
@@ -86,6 +100,8 @@
     </style>
 </head>
 <body>
+
+    <div id="tela-carregando-inicial"><div class="spinner"></div></div>
 
     <div id="tela-login-entregador">
         <form class="login-card" onsubmit="fazerLoginEntregador(event)">

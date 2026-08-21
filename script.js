@@ -1551,13 +1551,22 @@ function checarRetornoLoginGoogle() {
 // sem isso não tem como filtrar cardápio, pedidos, nem configurações.
 async function iniciarApp() {
     const lojaOk = await resolverLoja();
-    if (!lojaOk) return;
+
+    if (!lojaOk) {
+        // "loja não encontrada/inativa" já tomou conta da página nesse caso.
+        const telaCarregando = document.getElementById("tela-carregando-inicial");
+        if (telaCarregando) telaCarregando.style.display = "none";
+        return;
+    }
 
     // 1. Roda o verificador do Google imediatamente ao abrir o site
     checarRetornoLoginGoogle();
 
-    // 2. Carrega a Identidade Visual Dinâmica
-    carregarIdentidadeVisual();
+    // 2. Carrega a Identidade Visual Dinâmica — só tira o spinner depois
+    // dela terminar, pra ninguém ver o nome/cor genéricos por um instante.
+    await carregarIdentidadeVisual();
+    const telaCarregando = document.getElementById("tela-carregando-inicial");
+    if (telaCarregando) telaCarregando.style.display = "none";
 
     // 3. Inicializa as configurações e horários da hamburgueria
     carregarConfiguracoes();

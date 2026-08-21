@@ -1699,9 +1699,9 @@ function montarCupomImpressao(pedido, itens, nomeProdutoPorId, adicionaisPorItem
     let itensHtml = "";
     itens.forEach(item => {
         const nomeProd = nomeProdutoPorId[item.produto_id] || `Produto #${item.produto_id}`;
-        itensHtml += `<div class="cupom-linha"><span>1x ${escaparHtml(nomeProd)}</span><span>R$ ${Number(item.preco_unitario).toFixed(2).replace('.', ',')}</span></div>`;
+        itensHtml += `<div class="cupom-linha"><span class="cupom-item-nome">1x ${escaparHtml(nomeProd)}</span><span>R$ ${Number(item.preco_unitario).toFixed(2).replace('.', ',')}</span></div>`;
         (adicionaisPorItem[item.id] || []).forEach(add => {
-            itensHtml += `<div class="cupom-linha"><span>&nbsp;&nbsp;+ ${add.quantidade}x ${escaparHtml(add.nome)}</span><span>R$ ${(Number(add.preco) * Number(add.quantidade)).toFixed(2).replace('.', ',')}</span></div>`;
+            itensHtml += `<div class="cupom-add"><div class="cupom-linha" style="margin-bottom:0;"><span>+ ${add.quantidade}x ${escaparHtml(add.nome)}</span><span>R$ ${(Number(add.preco) * Number(add.quantidade)).toFixed(2).replace('.', ',')}</span></div></div>`;
         });
         if (item.observacao) {
             itensHtml += `<div class="cupom-obs">Obs: ${escaparHtml(item.observacao)}</div>`;
@@ -1709,21 +1709,30 @@ function montarCupomImpressao(pedido, itens, nomeProdutoPorId, adicionaisPorItem
     });
 
     area.innerHTML = `
-        <div class="cupom-centro cupom-titulo">${escaparHtml(nomeLoja)}</div>
-        <div class="cupom-centro">Pedido #${pedido.id} — ${dataFormatada}</div>
+        <div class="cupom-loja">${escaparHtml(nomeLoja)}</div>
+        <div class="cupom-sub">Pedido #${pedido.id}</div>
+        <div class="cupom-sub">${dataFormatada}</div>
         <div class="cupom-sep"></div>
-        <div class="cupom-linha"><strong>${tipoEntregaTexto}</strong></div>
-        <div class="cupom-linha"><span>Cliente:</span><span>${escaparHtml(pedido.nome_cliente || '-')}</span></div>
-        ${pedido.telefone_cliente ? `<div class="cupom-linha"><span>Telefone:</span><span>${escaparHtml(pedido.telefone_cliente)}</span></div>` : ''}
-        ${pedido.endereco_entrega ? `<div class="cupom-obs">${escaparHtml(pedido.endereco_entrega)}</div>` : ''}
+
+        <div class="cupom-secao-titulo">${tipoEntregaTexto}</div>
+        <div class="cupom-linha"><span>Cliente</span><span>${escaparHtml(pedido.nome_cliente || '-')}</span></div>
+        ${pedido.telefone_cliente ? `<div class="cupom-linha"><span>Telefone</span><span>${escaparHtml(pedido.telefone_cliente)}</span></div>` : ''}
+        ${pedido.endereco_entrega ? `<div class="cupom-obs" style="margin-top: 1mm;">${escaparHtml(pedido.endereco_entrega)}</div>` : ''}
         <div class="cupom-sep"></div>
+
+        <div class="cupom-secao-titulo">Itens do Pedido</div>
         ${itensHtml}
         <div class="cupom-sep"></div>
+
         ${valorEntrega > 0 ? `<div class="cupom-linha"><span>Taxa de entrega</span><span>R$ ${valorEntrega.toFixed(2).replace('.', ',')}</span></div>` : ''}
-        <div class="cupom-linha cupom-titulo"><span>TOTAL</span><span>R$ ${Number(pedido.total).toFixed(2).replace('.', ',')}</span></div>
+        <div class="cupom-linha grande"><span>TOTAL</span><span>R$ ${Number(pedido.total).toFixed(2).replace('.', ',')}</span></div>
         <div class="cupom-sep"></div>
-        <div class="cupom-linha"><span>Pagamento:</span><span>${escaparHtml(pedido.forma_pagamento || '-')}</span></div>
-        ${pedido.observacoes ? `<div class="cupom-sep"></div><div class="cupom-obs">${escaparHtml(pedido.observacoes).replace(/\n/g, '<br>')}</div>` : ''}
+
+        <div class="cupom-linha"><span>Pagamento</span><span>${escaparHtml(pedido.forma_pagamento || '-')}</span></div>
+        ${pedido.observacoes ? `<div class="cupom-sep"></div><div class="cupom-secao-titulo">Observações</div><div class="cupom-obs">${escaparHtml(pedido.observacoes).replace(/\n/g, '<br>')}</div>` : ''}
+
+        <div class="cupom-sep"></div>
+        <div class="cupom-footer">Obrigado pela preferência! 🔥</div>
     `;
 }
 

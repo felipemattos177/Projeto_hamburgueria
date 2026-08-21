@@ -215,14 +215,23 @@
 
         #area-impressao { display: none; }
         @media print {
+            @page { margin: 0; }
             body * { visibility: hidden; }
             #area-impressao, #area-impressao * { visibility: visible; }
-            #area-impressao { display: block; position: absolute; top: 0; left: 0; width: 76mm; padding: 4mm; font-family: 'Courier New', monospace; font-size: 12px; color: #000; }
-            #area-impressao .cupom-linha { display: flex; justify-content: space-between; gap: 6px; }
-            #area-impressao .cupom-sep { border-top: 1px dashed #000; margin: 6px 0; }
-            #area-impressao .cupom-centro { text-align: center; }
-            #area-impressao .cupom-titulo { font-weight: bold; font-size: 14px; }
-            #area-impressao .cupom-obs { padding-left: 10px; font-style: italic; }
+            #area-impressao {
+                display: block; position: absolute; top: 0; left: 0; width: 76mm; padding: 5mm 4mm;
+                font-family: Arial, Helvetica, sans-serif; font-size: 15px; line-height: 1.5; color: #000;
+            }
+            #area-impressao .cupom-loja { font-size: 21px; font-weight: 800; text-align: center; letter-spacing: .3px; margin-bottom: 1mm; }
+            #area-impressao .cupom-sub { text-align: center; font-size: 13px; color: #333; }
+            #area-impressao .cupom-sep { border-top: 1.5px dashed #000; margin: 3.5mm 0; }
+            #area-impressao .cupom-secao-titulo { font-size: 12.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2mm; }
+            #area-impressao .cupom-linha { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 2mm; }
+            #area-impressao .cupom-linha.grande { font-size: 19px; font-weight: 800; margin-top: 2mm; }
+            #area-impressao .cupom-item-nome { font-weight: 700; }
+            #area-impressao .cupom-add { padding-left: 4mm; font-size: 13.5px; color: #333; margin-bottom: 1.5mm; }
+            #area-impressao .cupom-obs { padding-left: 4mm; font-style: italic; font-size: 13.5px; color: #333; margin-bottom: 2.5mm; }
+            #area-impressao .cupom-footer { text-align: center; margin-top: 5mm; font-size: 13.5px; font-weight: 600; }
         }
 
         @media (max-width: 880px) {

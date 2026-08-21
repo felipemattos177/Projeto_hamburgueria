@@ -2072,16 +2072,25 @@ async function carregarClientes() {
     if (!(await garantirSessaoOuRelogar())) return;
     const tbody = document.getElementById("tabela-clientes");
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Carregando...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Carregando...</td></tr>';
 
     try {
-        const res = await fetch(
-            `${SUPABASE_URL}/rest/v1/pedidos?select=nome_cliente,telefone_cliente,cliente_id,total&loja_id=eq.${lojaAtual.id}&order=id.asc`,
-            { headers: headersAutenticados() }
-        );
-        const pedidos = await res.json();
+        const [resPedidos, resClientes] = await Promise.all([
+            fetch(`${SUPABASE_URL}/rest/v1/pedidos?select=nome_cliente,telefone_cliente,cliente_id,total&loja_id=eq.${lojaAtual.id}&order=id.asc`, { headers: headersAutenticados() }),
+            fetch(`${SUPABASE_URL}/rest/v1/clientes?select=cliente_id,nome,telefone&loja_id=eq.${lojaAtual.id}`, { headers: headersAutenticados() })
+        ]);
+        const pedidos = await resPedidos.json();
+        const cadastrados = resClientes.ok ? await resClientes.json() : [];
 
         const porCliente = {};
+
+        // Primeiro quem só cadastrou o perfil (nunca pediu) — "possível cliente".
+        cadastrados.forEach(c => {
+            if (!c.cliente_id) return;
+            porCliente[c.cliente_id] = { nome: c.nome || "Cliente", telefone: c.telefone || "-", qtd: 0, total: 0 };
+        });
+
+        // Depois os pedidos de verdade, que têm prioridade sobre o cadastro do perfil.
         pedidos.forEach(p => {
             const chave = p.cliente_id || p.telefone_cliente || p.nome_cliente;
             if (!chave) return;
@@ -2103,7 +2112,7 @@ async function carregarClientes() {
 
         renderizarTabelaClientes(clientesCache);
     } catch (erro) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color: var(--vermelho);">Erro ao carregar clientes.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--vermelho);">Erro ao carregar clientes.</td></tr>';
         console.error(erro);
     }
 }
@@ -2113,18 +2122,24 @@ function renderizarTabelaClientes(clientes) {
     if (!tbody) return;
 
     if (clientes.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Nenhum cliente encontrado.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Nenhum cliente encontrado.</td></tr>';
         return;
     }
 
-    tbody.innerHTML = clientes.map(c => `
+    tbody.innerHTML = clientes.map(c => {
+        const statusHtml = c.qtd > 0
+            ? `<span class="status-badge status-ativo">Cliente</span>`
+            : `<span class="status-badge" style="background: var(--laranja-suave); color: var(--laranja-fogo);">Possível cliente</span>`;
+        return `
         <tr>
             <td>${escaparHtml(c.nome)}</td>
             <td>${escaparHtml(c.telefone)}</td>
+            <td>${statusHtml}</td>
             <td>${c.qtd}</td>
             <td>R$ ${c.total.toFixed(2).replace('.', ',')}</td>
         </tr>
-    `).join('');
+    `;
+    }).join('');
 }
 
 function filtrarTabelaClientes() {

@@ -1240,9 +1240,36 @@ function navegarPara(aba) {
 
 function salvarPerfil() {
     const perfil = { nome: document.getElementById("perfil-nome").value, telefone: document.getElementById("perfil-telefone").value, rua: document.getElementById("perfil-rua").value, numero: document.getElementById("perfil-numero").value, bairro: document.getElementById("perfil-bairro").value, complemento: document.getElementById("perfil-complemento").value };
-    localStorage.setItem(chaveLocalStorage("perfil"), JSON.stringify(perfil)); 
-    mostrarAviso("Seus dados de entrega foram salvos com sucesso!", "Tudo Certo!", "sucesso"); 
-    navegarPara('inicio'); 
+    localStorage.setItem(chaveLocalStorage("perfil"), JSON.stringify(perfil));
+    mostrarAviso("Seus dados de entrega foram salvos com sucesso!", "Tudo Certo!", "sucesso");
+    navegarPara('inicio');
+
+    // Manda pro banco da loja também — assim quem só cadastra o perfil e
+    // nunca chega a pedir também aparece pro admin, como "possível cliente".
+    salvarClienteNoBanco(perfil);
+}
+
+async function salvarClienteNoBanco(perfil) {
+    if (!perfil.nome && !perfil.telefone) return; // nada de útil pra guardar
+    try {
+        const endereco = [perfil.rua, perfil.numero].filter(Boolean).join(', ')
+            + (perfil.bairro ? ' - ' + perfil.bairro : '')
+            + (perfil.complemento ? ' (' + perfil.complemento + ')' : '');
+
+        await fetchSupabase(`/rest/v1/rpc/salvar_perfil_cliente`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                p_loja_id: lojaAtual.id,
+                p_cliente_id: obterOuCriarClienteId(),
+                p_nome: perfil.nome || null,
+                p_telefone: perfil.telefone || null,
+                p_endereco: endereco.trim() || null
+            })
+        });
+    } catch (erro) {
+        console.error("Erro ao salvar cliente no banco:", erro);
+    }
 }
 
 function carregarPerfilNaTela() {

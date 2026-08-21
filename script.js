@@ -76,6 +76,16 @@ function escaparHtml(texto) {
         .replace(/'/g, "&#39;");
 }
 
+// O Supabase às vezes devolve o horário sem indicar o fuso (ex: "2026-08-21T09:48:00").
+// Sem isso, o navegador interpreta como horário local e o horário exibido fica errado.
+// Forçamos UTC quando a string não traz fuso, e sempre exibimos convertido pro horário de Brasília.
+function formatarDataHoraBr(valorTimestamp, opcoes) {
+    if (!valorTimestamp) return '-';
+    const temFuso = /[Zz]|[+-]\d{2}:?\d{2}$/.test(valorTimestamp);
+    const data = new Date(temFuso ? valorTimestamp : valorTimestamp + 'Z');
+    return data.toLocaleString('pt-BR', Object.assign({ timeZone: 'America/Sao_Paulo' }, opcoes));
+}
+
 // === FUNÇÃO DE AVISOS PERSONALIZADOS ===
 function mostrarAviso(mensagem, titulo = "Ops!", tipo = "aviso") {
     let caixa = document.getElementById("caixa-aviso-custom");
@@ -1071,7 +1081,7 @@ async function carregarHistoricoPedidos() {
 
         let html = "";
         pedidos.forEach(p => {
-            const dataFormatada = new Date(p.data_pedido).toLocaleString('pt-BR');
+            const dataFormatada = formatarDataHoraBr(p.data_pedido);
             html += `
                 <div style="background: #222; border-radius: 8px; padding: 15px; margin-bottom: 12px; border: 1px solid #333;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">

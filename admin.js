@@ -453,13 +453,13 @@ async function carregarRelatorioEntregas() {
     const tbody = document.getElementById("tabela-entregas");
     if (!dataInicio || !dataFim || !tbody) return;
 
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Carregando...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;">Carregando...</td></tr>';
 
     try {
         const res = await fetch(
-            `${SUPABASE_URL}/rest/v1/pedidos?select=id,nome_cliente,data_pedido,valor_repasse_entregador,entregador_id` +
+            `${SUPABASE_URL}/rest/v1/pedidos?select=id,nome_cliente,data_pedido,saiu_em,entregue_em,valor_repasse_entregador,entregador_id` +
             `&loja_id=eq.${lojaAtual.id}&tipo_entrega=eq.entrega` +
-            `&data_pedido=gte.${dataInicio}T00:00:00&data_pedido=lte.${dataFim}T23:59:59&order=data_pedido.desc`,
+            `&data_pedido=gte.${dataInicio}T00:00:00-03:00&data_pedido=lte.${dataFim}T23:59:59-03:00&order=data_pedido.desc`,
             { headers: headersAutenticados() }
         );
         const pedidos = await res.json();
@@ -477,19 +477,29 @@ async function carregarRelatorioEntregas() {
             porEntregador[nomeEnt].qtd++;
             porEntregador[nomeEnt].total += repasse;
 
-            const dataFormatada = p.data_pedido ? new Date(p.data_pedido).toLocaleDateString('pt-BR') : '-';
+            const horaPedido = p.data_pedido ? formatarDataHoraBr(p.data_pedido, { hour: '2-digit', minute: '2-digit' }) : '-';
+            const horaSaiu = p.saiu_em ? formatarDataHoraBr(p.saiu_em, { hour: '2-digit', minute: '2-digit' }) : '-';
+            const horaEntregue = p.entregue_em ? formatarDataHoraBr(p.entregue_em, { hour: '2-digit', minute: '2-digit' }) : '-';
+            const tempoPreparo = duracaoEntre(p.data_pedido, p.saiu_em);
+            const tempoEntrega = duracaoEntre(p.saiu_em, p.entregue_em);
+            const tempoTotal = duracaoEntre(p.data_pedido, p.entregue_em);
             html += `
                 <tr>
                     <td>#${p.id}</td>
                     <td>${escaparHtml(p.nome_cliente)}</td>
                     <td>${escaparHtml(nomeEnt)}</td>
-                    <td>${dataFormatada}</td>
+                    <td>${horaPedido}</td>
+                    <td>${horaSaiu}</td>
+                    <td>${horaEntregue}</td>
+                    <td>${tempoPreparo}</td>
+                    <td>${tempoEntrega}</td>
+                    <td>${tempoTotal}</td>
                     <td>R$ ${repasse.toFixed(2).replace('.', ',')}</td>
                 </tr>
             `;
         });
 
-        tbody.innerHTML = html || '<tr><td colspan="5" style="text-align:center;">Nenhuma entrega nesse período.</td></tr>';
+        tbody.innerHTML = html || '<tr><td colspan="10" style="text-align:center;">Nenhuma entrega nesse período.</td></tr>';
         document.getElementById("entregas-total-qtd").innerText = pedidos.length;
         document.getElementById("entregas-total-repasse").innerText = `R$ ${totalRepasse.toFixed(2).replace('.', ',')}`;
 
@@ -522,7 +532,7 @@ async function carregarRelatorioFinanceiro() {
         const res = await fetch(
             `${SUPABASE_URL}/rest/v1/pedidos?select=id,nome_cliente,data_pedido,forma_pagamento,tipo_entrega,total` +
             `&loja_id=eq.${lojaAtual.id}` +
-            `&data_pedido=gte.${dataInicio}T00:00:00&data_pedido=lte.${dataFim}T23:59:59&order=data_pedido.desc`,
+            `&data_pedido=gte.${dataInicio}T00:00:00-03:00&data_pedido=lte.${dataFim}T23:59:59-03:00&order=data_pedido.desc`,
             { headers: headersAutenticados() }
         );
         const pedidos = await res.json();
@@ -545,7 +555,7 @@ async function carregarRelatorioFinanceiro() {
             porTipo[tipo].qtd++;
             porTipo[tipo].total += valor;
 
-            const dataFormatada = p.data_pedido ? new Date(p.data_pedido).toLocaleString('pt-BR') : '-';
+            const dataFormatada = p.data_pedido ? formatarDataHoraBr(p.data_pedido) : '-';
             html += `
                 <tr>
                     <td>#${p.id}</td>
@@ -653,7 +663,7 @@ async function carregarDashboard() {
         const resPedidos = await fetch(
             `${SUPABASE_URL}/rest/v1/pedidos?select=id,nome_cliente,telefone_cliente,cliente_id,data_pedido,total,forma_pagamento,tipo_entrega` +
             `&loja_id=eq.${lojaAtual.id}` +
-            `&data_pedido=gte.${dataInicio}T00:00:00&data_pedido=lte.${dataFim}T23:59:59&order=data_pedido.asc`,
+            `&data_pedido=gte.${dataInicio}T00:00:00-03:00&data_pedido=lte.${dataFim}T23:59:59-03:00&order=data_pedido.asc`,
             { headers: headersAutenticados() }
         );
         const pedidos = await resPedidos.json();
@@ -671,7 +681,7 @@ async function carregarDashboard() {
         const resAnterior = await fetch(
             `${SUPABASE_URL}/rest/v1/pedidos?select=total` +
             `&loja_id=eq.${lojaAtual.id}` +
-            `&data_pedido=gte.${paraISO(inicioAnteriorDate)}T00:00:00&data_pedido=lte.${paraISO(fimAnteriorDate)}T23:59:59`,
+            `&data_pedido=gte.${paraISO(inicioAnteriorDate)}T00:00:00-03:00&data_pedido=lte.${paraISO(fimAnteriorDate)}T23:59:59-03:00`,
             { headers: headersAutenticados() }
         );
         const pedidosAnterior = await resAnterior.json();
@@ -704,7 +714,7 @@ async function carregarDashboard() {
 
         const horasPico = new Array(24).fill(0);
         pedidos.forEach(p => {
-            if (p.data_pedido) horasPico[new Date(p.data_pedido).getHours()]++;
+            if (p.data_pedido) horasPico[horaBr(p.data_pedido)]++;
         });
 
         const porProduto = {};
@@ -819,10 +829,10 @@ function renderizarGraficoFaturamento(pedidos) {
     const buckets = {};
     pedidos.forEach(p => {
         if (!p.data_pedido) return;
-        const d = new Date(p.data_pedido);
+        const d = partesDataBr(p.data_pedido);
         const chave = dashGranularidade === 'mes'
-            ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-            : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            ? `${d.ano}-${d.mes}`
+            : `${d.ano}-${d.mes}-${d.dia}`;
         buckets[chave] = (buckets[chave] || 0) + (Number(p.total) || 0);
     });
 
@@ -932,6 +942,48 @@ function escaparHtml(texto) {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
+}
+
+// O Supabase às vezes devolve o horário sem indicar o fuso (ex: "2026-08-21T09:48:00").
+// Sem isso, o navegador interpreta como horário local e o horário exibido fica errado.
+// Forçamos UTC quando a string não traz fuso, e sempre exibimos convertido pro horário de Brasília.
+function formatarDataHoraBr(valorTimestamp, opcoes) {
+    if (!valorTimestamp) return '-';
+    const temFuso = /[Zz]|[+-]\d{2}:?\d{2}$/.test(valorTimestamp);
+    const data = new Date(temFuso ? valorTimestamp : valorTimestamp + 'Z');
+    return data.toLocaleString('pt-BR', Object.assign({ timeZone: 'America/Sao_Paulo' }, opcoes));
+}
+
+// Hora (0-23) de um timestamp do banco, sempre no fuso de Brasília — usado pro cálculo de horário de pico.
+function horaBr(valorTimestamp) {
+    if (!valorTimestamp) return 0;
+    const temFuso = /[Zz]|[+-]\d{2}:?\d{2}$/.test(valorTimestamp);
+    const data = new Date(temFuso ? valorTimestamp : valorTimestamp + 'Z');
+    return parseInt(data.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo', hour: '2-digit', hour12: false }), 10) % 24;
+}
+
+// Ano/mês/dia de um timestamp do banco, sempre no fuso de Brasília — usado pra agrupar o gráfico por dia/mês.
+function partesDataBr(valorTimestamp) {
+    const temFuso = /[Zz]|[+-]\d{2}:?\d{2}$/.test(valorTimestamp);
+    const data = new Date(temFuso ? valorTimestamp : valorTimestamp + 'Z');
+    const partes = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(data);
+    const obj = {};
+    partes.forEach(p => obj[p.type] = p.value);
+    return { ano: obj.year, mes: obj.month, dia: obj.day };
+}
+
+// Diferença entre dois timestamps do banco, formatada como "Xh Ymin" ou "Ymin".
+function duracaoEntre(inicioStr, fimStr) {
+    if (!inicioStr || !fimStr) return '-';
+    const temFusoI = /[Zz]|[+-]\d{2}:?\d{2}$/.test(inicioStr);
+    const temFusoF = /[Zz]|[+-]\d{2}:?\d{2}$/.test(fimStr);
+    const inicio = new Date(temFusoI ? inicioStr : inicioStr + 'Z');
+    const fim = new Date(temFusoF ? fimStr : fimStr + 'Z');
+    const minutosTotais = Math.round((fim - inicio) / 60000);
+    if (minutosTotais < 0) return '-';
+    const horas = Math.floor(minutosTotais / 60);
+    const minutos = minutosTotais % 60;
+    return horas > 0 ? `${horas}h ${minutos}min` : `${minutos}min`;
 }
 
 // ==========================================
@@ -1578,11 +1630,9 @@ function renderizarKanban(pedidos) {
         if (statusBanco === 'em preparo') statusFormatado = "Em Preparo";
         else if (statusBanco === 'saiu para entrega') statusFormatado = "Saiu para Entrega";
 
-        let dataFormatada = "--:--";
-        if (ped.created_at) {
-            const d = new Date(ped.created_at);
-            dataFormatada = d.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
-        }
+        const dataFormatada = ped.created_at
+            ? formatarDataHoraBr(ped.created_at, { hour: '2-digit', minute: '2-digit' })
+            : "--:--";
 
         const totalNum = parseFloat(ped.total) || 0;
 
@@ -1647,16 +1697,20 @@ function botoesAcaoKanban(id, status) {
 
 async function atualizarStatusPedido(id, novoStatus) {
     let previsao = null;
-    
+
     if (novoStatus === 'Em Preparo') {
         const inputTempo = document.getElementById("input-tempo-preparo");
         const tempoFila = inputTempo ? inputTempo.value : "40";
-        previsao = tempoFila + " min"; 
+        previsao = tempoFila + " min";
     }
 
-    const corpo = previsao 
-        ? { status: novoStatus, previsao_entrega: previsao }
-        : { status: novoStatus };
+    const corpo = { status: novoStatus };
+    if (previsao) corpo.previsao_entrega = previsao;
+    // Quando o admin move o pedido direto pelo Kanban (sem passar pelo app do
+    // entregador), esses timestamps também precisam ser gravados — senão fica
+    // sem registro de quando saiu/chegou pra calcular tempo de entrega depois.
+    if (novoStatus === 'Saiu para Entrega') corpo.saiu_em = new Date().toISOString();
+    if (novoStatus === 'Entregue') corpo.entregue_em = new Date().toISOString();
 
     try {
         await fetch(`${SUPABASE_URL}/rest/v1/pedidos?id=eq.${id}`, {
@@ -1741,7 +1795,7 @@ function montarCupomImpressao(pedido, itens, nomeProdutoPorId, adicionaisPorItem
     const area = document.getElementById("area-impressao");
     if (!area) return;
 
-    const dataFormatada = pedido.data_pedido ? new Date(pedido.data_pedido).toLocaleString('pt-BR') : '';
+    const dataFormatada = pedido.data_pedido ? formatarDataHoraBr(pedido.data_pedido) : '';
     const nomeLoja = (lojaAtual && lojaAtual.nome) || "Pedido";
     const tipoEntregaTexto = pedido.tipo_entrega === 'retirada' ? 'RETIRADA NA LOJA' : 'ENTREGA';
     const valorEntrega = Number(pedido.valor_entrega) || 0;

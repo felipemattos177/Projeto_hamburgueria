@@ -472,6 +472,7 @@ async function iniciarPainelAdmin() {
     carregarRelatorioFinanceiro();
     definirPeriodoPadrao('dash-data-inicio', 'dash-data-fim');
     carregarDashboard();
+    carregarClientes();
 
     intervaloPedidosAdmin = setInterval(carregarPedidosAdmin, 3000);
     intervaloProdutosEstoqueAdmin = setInterval(() => { carregarProdutos(); carregarEstoque(); }, 5000);
@@ -1023,6 +1024,8 @@ function atualizarDadosDaAba(idAba) {
         carregarEntregadores().then(carregarRelatorioEntregas); // nomes primeiro, senão cai no genérico
     } else if (idAba === 'view-financeiro') {
         carregarRelatorioFinanceiro();
+    } else if (idAba === 'view-clientes') {
+        carregarClientes();
     } else if (idAba === 'view-entregadores') {
         carregarEntregadores();
     } else if (idAba === 'view-config') {
@@ -2058,6 +2061,80 @@ function montarCupomImpressao(pedido, itens, nomeProdutoPorId, adicionaisPorItem
         <div class="cupom-sep"></div>
         <div class="cupom-footer">Obrigado pela preferência! 🔥</div>
     `;
+}
+
+// ==========================================
+// MÓDULO 9: MEUS CLIENTES
+// ==========================================
+let clientesCache = [];
+
+async function carregarClientes() {
+    if (!(await garantirSessaoOuRelogar())) return;
+    const tbody = document.getElementById("tabela-clientes");
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Carregando...</td></tr>';
+
+    try {
+        const res = await fetch(
+            `${SUPABASE_URL}/rest/v1/pedidos?select=nome_cliente,telefone_cliente,cliente_id,total&loja_id=eq.${lojaAtual.id}&order=id.asc`,
+            { headers: headersAutenticados() }
+        );
+        const pedidos = await res.json();
+
+        const porCliente = {};
+        pedidos.forEach(p => {
+            const chave = p.cliente_id || p.telefone_cliente || p.nome_cliente;
+            if (!chave) return;
+            if (!porCliente[chave]) porCliente[chave] = { nome: p.nome_cliente || "Cliente", telefone: p.telefone_cliente || "-", qtd: 0, total: 0 };
+            porCliente[chave].qtd++;
+            porCliente[chave].total += Number(p.total) || 0;
+            // Fica sempre com o nome/telefone do pedido mais recente (a busca já vem ordenada por id).
+            if (p.nome_cliente) porCliente[chave].nome = p.nome_cliente;
+            if (p.telefone_cliente) porCliente[chave].telefone = p.telefone_cliente;
+        });
+
+        clientesCache = Object.values(porCliente).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+
+        const elTotal = document.getElementById("clientes-total-qtd");
+        if (elTotal) elTotal.innerText = clientesCache.length;
+
+        const buscaEl = document.getElementById("clientes-busca");
+        if (buscaEl) buscaEl.value = "";
+
+        renderizarTabelaClientes(clientesCache);
+    } catch (erro) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color: var(--vermelho);">Erro ao carregar clientes.</td></tr>';
+        console.error(erro);
+    }
+}
+
+function renderizarTabelaClientes(clientes) {
+    const tbody = document.getElementById("tabela-clientes");
+    if (!tbody) return;
+
+    if (clientes.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Nenhum cliente encontrado.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = clientes.map(c => `
+        <tr>
+            <td>${escaparHtml(c.nome)}</td>
+            <td>${escaparHtml(c.telefone)}</td>
+            <td>${c.qtd}</td>
+            <td>R$ ${c.total.toFixed(2).replace('.', ',')}</td>
+        </tr>
+    `).join('');
+}
+
+function filtrarTabelaClientes() {
+    const termo = document.getElementById("clientes-busca").value.trim().toLowerCase();
+    if (!termo) { renderizarTabelaClientes(clientesCache); return; }
+
+    const filtrados = clientesCache.filter(c =>
+        c.nome.toLowerCase().includes(termo) || String(c.telefone).toLowerCase().includes(termo)
+    );
+    renderizarTabelaClientes(filtrados);
 }
 
 // ==========================================

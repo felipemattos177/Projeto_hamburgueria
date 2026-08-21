@@ -380,6 +380,7 @@
                 <button class="tab-btn" onclick="mudarAbaAdmin('view-dashboard', this)"><i class="fa-solid fa-gauge-high"></i> Dashboard</button>
                 <button class="tab-btn" onclick="mudarAbaAdmin('view-entregas', this)"><i class="fa-solid fa-hand-holding-dollar"></i> Entregas</button>
                 <button class="tab-btn" onclick="mudarAbaAdmin('view-financeiro', this)"><i class="fa-solid fa-chart-line"></i> Financeiro</button>
+                <button class="tab-btn" onclick="mudarAbaAdmin('view-clientes', this)"><i class="fa-solid fa-users"></i> Meus Clientes</button>
                 <button class="tab-btn" onclick="mudarAbaAdmin('view-entregadores', this)"><i class="fa-solid fa-motorcycle"></i> Entregadores</button>
                 <button class="tab-btn" onclick="mudarAbaAdmin('view-config', this)"><i class="fa-solid fa-gear"></i> Configurações</button>
             </nav>
@@ -704,6 +705,44 @@
                         <tr><td colspan="6" style="text-align: center;">Selecione um período.</td></tr>
                     </tbody>
                 </table>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- MEUS CLIENTES                               -->
+            <!-- ========================================== -->
+            <div id="view-clientes" class="view-section">
+
+                <div class="header-admin">
+                    <h1><span class="icone-secao"><i class="fa-solid fa-users"></i></span> Meus Clientes</h1>
+                </div>
+
+                <div class="grid-config" style="margin-bottom: 20px;">
+                    <div class="card-config" style="--cor-card: var(--laranja-fogo);">
+                        <h3 style="margin-bottom: 6px;"><i class="fa-solid fa-users" style="color: var(--laranja-fogo);"></i> Clientes Cadastrados</h3>
+                        <div id="clientes-total-qtd" style="font-size: 28px; font-weight: 800; color: var(--texto);">0</div>
+                    </div>
+                </div>
+
+                <div class="barra-tempo">
+                    <strong><i class="fa-solid fa-magnifying-glass"></i> Buscar:</strong>
+                    <input type="text" id="clientes-busca" placeholder="Nome ou telefone..." oninput="filtrarTabelaClientes()" style="width: auto; flex: 1; min-width: 180px; padding: 8px 12px; border-radius: 7px; border: 1px solid var(--borda); font-family: inherit; font-size: 14px;">
+                </div>
+
+                <div style="overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Telefone</th>
+                            <th>Pedidos</th>
+                            <th>Total Gasto</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabela-clientes">
+                        <tr><td colspan="4" style="text-align: center;">Carregando...</td></tr>
+                    </tbody>
+                </table>
+                </div>
             </div>
 
             <!-- ========================================== -->

@@ -1249,8 +1249,8 @@ function salvarPerfil() {
     salvarClienteNoBanco(perfil);
 }
 
-async function salvarClienteNoBanco(perfil) {
-    if (!perfil.nome && !perfil.telefone) return; // nada de útil pra guardar
+async function salvarClienteNoBanco(perfil, email) {
+    if (!perfil.nome && !perfil.telefone && !email) return; // nada de útil pra guardar
     try {
         const endereco = [perfil.rua, perfil.numero].filter(Boolean).join(', ')
             + (perfil.bairro ? ' - ' + perfil.bairro : '')
@@ -1264,7 +1264,8 @@ async function salvarClienteNoBanco(perfil) {
                 p_cliente_id: obterOuCriarClienteId(),
                 p_nome: perfil.nome || null,
                 p_telefone: perfil.telefone || null,
-                p_endereco: endereco.trim() || null
+                p_endereco: endereco.trim() || null,
+                p_email: email || null
             })
         });
     } catch (erro) {
@@ -1564,6 +1565,11 @@ function checarRetornoLoginGoogle() {
                 let perfilExistente = JSON.parse(localStorage.getItem(chaveLocalStorage("perfil")) || "{}");
                 perfilExistente.nome = nomeGoogle;
                 localStorage.setItem(chaveLocalStorage("perfil"), JSON.stringify(perfilExistente));
+
+                // Já registra a pessoa pro admin nesse instante — sem isso, quem faz
+                // login com Google e não chega a clicar "Salvar" no perfil depois
+                // ficava de fora do "Meus Clientes" (mesmo já tendo um e-mail real).
+                salvarClienteNoBanco(perfilExistente, usuarioGoogle.email);
 
                 // Atualiza as caixas de texto na tela do cliente
                 carregarPerfilNaTela();

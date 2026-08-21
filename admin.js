@@ -2072,29 +2072,31 @@ async function carregarClientes() {
     if (!(await garantirSessaoOuRelogar())) return;
     const tbody = document.getElementById("tabela-clientes");
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Carregando...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Carregando...</td></tr>';
 
     try {
         const [resPedidos, resClientes] = await Promise.all([
             fetch(`${SUPABASE_URL}/rest/v1/pedidos?select=nome_cliente,telefone_cliente,cliente_id,total&loja_id=eq.${lojaAtual.id}&order=id.asc`, { headers: headersAutenticados() }),
-            fetch(`${SUPABASE_URL}/rest/v1/clientes?select=cliente_id,nome,telefone&loja_id=eq.${lojaAtual.id}`, { headers: headersAutenticados() })
+            fetch(`${SUPABASE_URL}/rest/v1/clientes?select=cliente_id,nome,telefone,email&loja_id=eq.${lojaAtual.id}`, { headers: headersAutenticados() })
         ]);
         const pedidos = await resPedidos.json();
         const cadastrados = resClientes.ok ? await resClientes.json() : [];
 
         const porCliente = {};
 
-        // Primeiro quem só cadastrou o perfil (nunca pediu) — "possível cliente".
+        // Primeiro quem só cadastrou o perfil (ou logou com Google) sem nunca
+        // pedir — "possível cliente". É daqui que sai o e-mail, quando tem.
         cadastrados.forEach(c => {
             if (!c.cliente_id) return;
-            porCliente[c.cliente_id] = { nome: c.nome || "Cliente", telefone: c.telefone || "-", qtd: 0, total: 0 };
+            porCliente[c.cliente_id] = { nome: c.nome || "Cliente", telefone: c.telefone || "-", email: c.email || "-", qtd: 0, total: 0 };
         });
 
-        // Depois os pedidos de verdade, que têm prioridade sobre o cadastro do perfil.
+        // Depois os pedidos de verdade, que têm prioridade sobre o cadastro do perfil
+        // pro nome/telefone (mas não mexem no e-mail, que só vem do cadastro).
         pedidos.forEach(p => {
             const chave = p.cliente_id || p.telefone_cliente || p.nome_cliente;
             if (!chave) return;
-            if (!porCliente[chave]) porCliente[chave] = { nome: p.nome_cliente || "Cliente", telefone: p.telefone_cliente || "-", qtd: 0, total: 0 };
+            if (!porCliente[chave]) porCliente[chave] = { nome: p.nome_cliente || "Cliente", telefone: p.telefone_cliente || "-", email: "-", qtd: 0, total: 0 };
             porCliente[chave].qtd++;
             porCliente[chave].total += Number(p.total) || 0;
             // Fica sempre com o nome/telefone do pedido mais recente (a busca já vem ordenada por id).
@@ -2112,7 +2114,7 @@ async function carregarClientes() {
 
         renderizarTabelaClientes(clientesCache);
     } catch (erro) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--vermelho);">Erro ao carregar clientes.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color: var(--vermelho);">Erro ao carregar clientes.</td></tr>';
         console.error(erro);
     }
 }
@@ -2122,7 +2124,7 @@ function renderizarTabelaClientes(clientes) {
     if (!tbody) return;
 
     if (clientes.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Nenhum cliente encontrado.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Nenhum cliente encontrado.</td></tr>';
         return;
     }
 
@@ -2134,6 +2136,7 @@ function renderizarTabelaClientes(clientes) {
         <tr>
             <td>${escaparHtml(c.nome)}</td>
             <td>${escaparHtml(c.telefone)}</td>
+            <td>${escaparHtml(c.email)}</td>
             <td>${statusHtml}</td>
             <td>${c.qtd}</td>
             <td>R$ ${c.total.toFixed(2).replace('.', ',')}</td>
@@ -2147,7 +2150,9 @@ function filtrarTabelaClientes() {
     if (!termo) { renderizarTabelaClientes(clientesCache); return; }
 
     const filtrados = clientesCache.filter(c =>
-        c.nome.toLowerCase().includes(termo) || String(c.telefone).toLowerCase().includes(termo)
+        c.nome.toLowerCase().includes(termo)
+        || String(c.telefone).toLowerCase().includes(termo)
+        || String(c.email).toLowerCase().includes(termo)
     );
     renderizarTabelaClientes(filtrados);
 }

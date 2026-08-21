@@ -725,7 +725,7 @@
 
                 <div class="barra-tempo">
                     <strong><i class="fa-solid fa-magnifying-glass"></i> Buscar:</strong>
-                    <input type="text" id="clientes-busca" placeholder="Nome ou telefone..." oninput="filtrarTabelaClientes()" style="width: auto; flex: 1; min-width: 180px; padding: 8px 12px; border-radius: 7px; border: 1px solid var(--borda); font-family: inherit; font-size: 14px;">
+                    <input type="text" id="clientes-busca" placeholder="Nome, telefone ou e-mail..." oninput="filtrarTabelaClientes()" style="width: auto; flex: 1; min-width: 180px; padding: 8px 12px; border-radius: 7px; border: 1px solid var(--borda); font-family: inherit; font-size: 14px;">
                 </div>
 
                 <div style="overflow-x: auto;">
@@ -734,13 +734,14 @@
                         <tr>
                             <th>Nome</th>
                             <th>Telefone</th>
+                            <th>E-mail</th>
                             <th>Status</th>
                             <th>Pedidos</th>
                             <th>Total Gasto</th>
                         </tr>
                     </thead>
                     <tbody id="tabela-clientes">
-                        <tr><td colspan="5" style="text-align: center;">Carregando...</td></tr>
+                        <tr><td colspan="6" style="text-align: center;">Carregando...</td></tr>
                     </tbody>
                 </table>
                 </div>

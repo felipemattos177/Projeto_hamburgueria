@@ -418,11 +418,11 @@ function iniciarPainelAdmin() {
     carregarEstoque();
     carregarPedidosAdmin();
     carregarConfiguracoesAdmin();
+    carregarEntregadores();
     definirPeriodoPadrao('entregas-data-inicio', 'entregas-data-fim');
     carregarRelatorioEntregas();
     definirPeriodoPadrao('financeiro-data-inicio', 'financeiro-data-fim');
     carregarRelatorioFinanceiro();
-    carregarEntregadores();
     definirPeriodoPadrao('dash-data-inicio', 'dash-data-fim');
     carregarDashboard();
 
@@ -457,7 +457,7 @@ async function carregarRelatorioEntregas() {
 
     try {
         const res = await fetch(
-            `${SUPABASE_URL}/rest/v1/pedidos?select=id,nome_cliente,data_pedido,valor_entrega,valor_repasse_entregador` +
+            `${SUPABASE_URL}/rest/v1/pedidos?select=id,nome_cliente,data_pedido,valor_repasse_entregador,entregador_id` +
             `&loja_id=eq.${lojaAtual.id}&tipo_entrega=eq.entrega` +
             `&data_pedido=gte.${dataInicio}T00:00:00&data_pedido=lte.${dataFim}T23:59:59&order=data_pedido.desc`,
             { headers: headersAutenticados() }
@@ -466,16 +466,25 @@ async function carregarRelatorioEntregas() {
 
         let totalRepasse = 0;
         let html = "";
+        const porEntregador = {};
+
         pedidos.forEach(p => {
-            totalRepasse += Number(p.valor_repasse_entregador) || 0;
+            const repasse = Number(p.valor_repasse_entregador) || 0;
+            totalRepasse += repasse;
+
+            const nomeEnt = p.entregador_id ? nomeEntregadorPorId(p.entregador_id) : "Sem entregador";
+            if (!porEntregador[nomeEnt]) porEntregador[nomeEnt] = { qtd: 0, total: 0 };
+            porEntregador[nomeEnt].qtd++;
+            porEntregador[nomeEnt].total += repasse;
+
             const dataFormatada = p.data_pedido ? new Date(p.data_pedido).toLocaleDateString('pt-BR') : '-';
             html += `
                 <tr>
                     <td>#${p.id}</td>
                     <td>${escaparHtml(p.nome_cliente)}</td>
+                    <td>${escaparHtml(nomeEnt)}</td>
                     <td>${dataFormatada}</td>
-                    <td>R$ ${Number(p.valor_entrega || 0).toFixed(2).replace('.', ',')}</td>
-                    <td>R$ ${Number(p.valor_repasse_entregador || 0).toFixed(2).replace('.', ',')}</td>
+                    <td>R$ ${repasse.toFixed(2).replace('.', ',')}</td>
                 </tr>
             `;
         });
@@ -483,6 +492,13 @@ async function carregarRelatorioEntregas() {
         tbody.innerHTML = html || '<tr><td colspan="5" style="text-align:center;">Nenhuma entrega nesse período.</td></tr>';
         document.getElementById("entregas-total-qtd").innerText = pedidos.length;
         document.getElementById("entregas-total-repasse").innerText = `R$ ${totalRepasse.toFixed(2).replace('.', ',')}`;
+
+        const tbodyResumo = document.getElementById("tabela-repasse-entregador");
+        const linhasResumo = Object.keys(porEntregador).map(nome => {
+            const dados = porEntregador[nome];
+            return `<tr><td>${escaparHtml(nome)}</td><td>${dados.qtd}</td><td>R$ ${dados.total.toFixed(2).replace('.', ',')}</td></tr>`;
+        }).join('');
+        tbodyResumo.innerHTML = linhasResumo || '<tr><td colspan="3" style="text-align:center;">Nenhuma entrega nesse período.</td></tr>';
     } catch (erro) {
         tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--vermelho);">Erro ao carregar entregas.</td></tr>';
         console.error(erro);

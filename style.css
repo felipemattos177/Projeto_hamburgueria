@@ -169,6 +169,29 @@ h1, h2, h3, .logo {
     background-position: center;
 }
 
+/* Skeleton de carregamento do cardápio (enquanto busca no banco) */
+.skeleton-card {
+    background-color: var(--fundo-secundario);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    height: 104px;
+}
+.skeleton-imagem, .skeleton-linha {
+    background: linear-gradient(90deg, #2a2a2a 25%, #3a3a3a 37%, #2a2a2a 63%);
+    background-size: 400% 100%;
+    animation: skeleton-pulse 1.4s ease infinite;
+    border-radius: 4px;
+}
+.skeleton-imagem { width: 120px; border-radius: 0; flex-shrink: 0; }
+.skeleton-info { flex: 1; padding: 15px; display: flex; flex-direction: column; justify-content: center; gap: 10px; }
+.skeleton-linha { height: 12px; }
+.skeleton-linha.curta { width: 45%; }
+@keyframes skeleton-pulse {
+    0% { background-position: 100% 50%; }
+    100% { background-position: 0 50%; }
+}
+
 .produto-info {
     padding: 15px;
     flex: 1;

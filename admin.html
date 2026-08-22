@@ -202,6 +202,8 @@
         .btn-despachar { background: var(--verde-suave); color: var(--verde); }
         .btn-entregue { background: #eef0f4; color: #344054; }
         .btn-acao-kanban:hover { filter: brightness(.97); }
+        .btn-acao-kanban:disabled { cursor: not-allowed; opacity: .7; }
+        .btn-acao-kanban.carregando i { animation: girar-spinner .8s linear infinite; }
 
         .coluna-pedidos::-webkit-scrollbar { width: 6px; }
         .coluna-pedidos::-webkit-scrollbar-thumb { background: #c7cbd6; border-radius: 10px; }

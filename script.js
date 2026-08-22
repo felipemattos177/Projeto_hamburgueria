@@ -203,8 +203,27 @@ function calcularUsoIngredienteNoCarrinho(ingredienteId) {
     return usoTotal;
 }
 
+// Mostra placeholders "pulsando" no lugar dos cards enquanto o cardápio
+// ainda não chegou do banco — melhor que a tela ficar vazia/parada.
+function mostrarSkeletonCardapio() {
+    const lista = document.getElementById("lista-produtos");
+    if (!lista) return;
+    const cardSkeleton = `
+        <div class="skeleton-card">
+            <div class="skeleton-imagem"></div>
+            <div class="skeleton-info">
+                <div class="skeleton-linha curta"></div>
+                <div class="skeleton-linha"></div>
+                <div class="skeleton-linha curta"></div>
+            </div>
+        </div>
+    `;
+    lista.innerHTML = cardSkeleton.repeat(5);
+}
+
 // === 2. EXTRAÇÃO DE DADOS AO VIVO ===
 async function carregarCardapioDoBanco() {
+    mostrarSkeletonCardapio();
     try {
         const resposta = await fetchSupabase(`/rest/v1/cardapio_inteligente?select=*&ativo=eq.true&loja_id=eq.${lojaAtual.id}&order=ordem.asc,id.asc`);
         if (!resposta.ok) throw new Error(`Erro na API: HTTP ${resposta.status}`);
@@ -244,6 +263,8 @@ async function carregarCardapioDoBanco() {
         renderizarCardapio();
     } catch (erro) {
         console.error("Falha na extração dos dados:", erro);
+        const lista = document.getElementById("lista-produtos");
+        if (lista) lista.innerHTML = `<p style="color: #aaa; text-align: center; padding: 30px 10px; grid-column: 1 / -1;">Não foi possível carregar o cardápio agora. Tenta recarregar a página.</p>`;
     }
 }
 

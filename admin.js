@@ -1909,16 +1909,18 @@ function botoesAcaoKanban(id, status) {
     const tempoFila = inputTempo ? inputTempo.value : "40";
 
     if (status === "Pendente") {
-        return `<button class="btn-acao-kanban btn-aceitar" onclick="atualizarStatusPedido(${id}, 'Em Preparo')"><i class="fa-solid fa-fire"></i> Aceitar (~${tempoFila}m)</button>`;
+        return `<button class="btn-acao-kanban btn-aceitar" onclick="atualizarStatusPedido(${id}, 'Em Preparo', this)"><i class="fa-solid fa-fire"></i> Aceitar (~${tempoFila}m)</button>`;
     } else if (status === "Em Preparo") {
-        return `<button class="btn-acao-kanban btn-despachar" onclick="atualizarStatusPedido(${id}, 'Saiu para Entrega')"><i class="fa-solid fa-motorcycle"></i> Despachar Moto</button>`;
+        return `<button class="btn-acao-kanban btn-despachar" onclick="atualizarStatusPedido(${id}, 'Saiu para Entrega', this)"><i class="fa-solid fa-motorcycle"></i> Despachar Moto</button>`;
     } else if (status === "Saiu para Entrega") {
-        return `<button class="btn-acao-kanban btn-entregue" onclick="atualizarStatusPedido(${id}, 'Entregue')"><i class="fa-solid fa-check-double"></i> Concluir Pedido</button>`;
+        return `<button class="btn-acao-kanban btn-entregue" onclick="atualizarStatusPedido(${id}, 'Entregue', this)"><i class="fa-solid fa-check-double"></i> Concluir Pedido</button>`;
     }
     return "";
 }
 
-async function atualizarStatusPedido(id, novoStatus) {
+async function atualizarStatusPedido(id, novoStatus, botao) {
+    if (botao) { botao.disabled = true; botao.classList.add("carregando"); }
+
     let previsao = null;
 
     if (novoStatus === 'Em Preparo') {
@@ -1945,6 +1947,7 @@ async function atualizarStatusPedido(id, novoStatus) {
         carregarPedidosAdmin();
     } catch (erro) {
         alert("Erro ao atualizar status do pedido.");
+        if (botao) { botao.disabled = false; botao.classList.remove("carregando"); }
     }
 }
 

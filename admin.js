@@ -2340,6 +2340,9 @@ function reenviarTokenPorWhatsapp(entregadorId) {
 // ==========================================
 
 async function carregarConfiguracoesAdmin() {
+    const elWebhook = document.getElementById("whatsapp-webhook-url");
+    if (elWebhook) elWebhook.innerText = `${window.location.origin}/api/whatsapp-webhook`;
+
     try {
         const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracoes?loja_id=eq.${lojaAtual.id}&select=*`, {
             method: 'GET',
@@ -2360,6 +2363,12 @@ async function carregarConfiguracoesAdmin() {
             document.getElementById("admin-whatsapp").value = config.numero_whatsapp || "";
             document.getElementById("admin-endereco").value = config.endereco || "";
             document.getElementById("admin-impressao-automatica").checked = config.impressao_automatica === true;
+
+            // Saudação automática no WhatsApp
+            document.getElementById("admin-whatsapp-saudacao-ativa").checked = config.whatsapp_saudacao_ativa === true;
+            document.getElementById("admin-whatsapp-mensagem").value = config.whatsapp_mensagem_saudacao || "";
+            document.getElementById("admin-whatsapp-phone-id").value = config.whatsapp_phone_id || "";
+            document.getElementById("admin-whatsapp-token").value = config.whatsapp_token || "";
 
             // Entrega
             document.getElementById("admin-taxa-entrega").value = config.taxa_entrega || 0;
@@ -2477,6 +2486,10 @@ async function salvarConfiguracoesLoja() {
             numero_whatsapp: document.getElementById("admin-whatsapp").value,
             endereco: document.getElementById("admin-endereco").value,
             impressao_automatica: document.getElementById("admin-impressao-automatica").checked,
+            whatsapp_saudacao_ativa: document.getElementById("admin-whatsapp-saudacao-ativa").checked,
+            whatsapp_mensagem_saudacao: document.getElementById("admin-whatsapp-mensagem").value,
+            whatsapp_phone_id: document.getElementById("admin-whatsapp-phone-id").value,
+            whatsapp_token: document.getElementById("admin-whatsapp-token").value,
             taxa_entrega: parseFloat(document.getElementById("admin-taxa-entrega").value) || 0,
             repasse_igual_taxa: document.getElementById("admin-repasse-igual").checked,
             valor_repasse_entregador: parseFloat(document.getElementById("admin-valor-repasse").value) || 0,

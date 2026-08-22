@@ -841,6 +841,36 @@
                         <label>Endereço</label>
                         <input type="text" id="admin-endereco" placeholder="Ex: Rua das Flores, 123 - Centro, Arapoti/PR" style="margin-bottom: 0;">
                     </div>
+
+                    <div class="card-config" style="--cor-card: var(--verde);">
+                        <h3><i class="fa-brands fa-whatsapp" style="color: var(--verde);"></i> Saudação Automática no WhatsApp</h3>
+                        <label class="toggle-linha">
+                            <input type="checkbox" id="admin-whatsapp-saudacao-ativa">
+                            Responder automaticamente a primeira mensagem de cada cliente
+                        </label>
+                        <p class="dica">Precisa do WhatsApp Business da loja conectado (veja "Como conseguir esses dados?" abaixo). Sem os dois campos preenchidos, a saudação fica desligada mesmo marcando aqui.</p>
+
+                        <label>Mensagem de Saudação</label>
+                        <textarea id="admin-whatsapp-mensagem" rows="3" placeholder="Ex: Olá! Bem-vindo(a). Peça pelo nosso site: https://sualoja.mathshub.com.br" style="width:100%; padding:10px 12px; margin-bottom:15px; border:1px solid var(--borda); border-radius:8px; font-family:inherit; font-size:14px; background:#fbfbfd; color:var(--texto); resize:vertical; box-sizing:border-box;"></textarea>
+
+                        <label>Phone Number ID (Meta)</label>
+                        <input type="text" id="admin-whatsapp-phone-id" placeholder="Ex: 123456789012345">
+                        <label>Token de Acesso (Meta)</label>
+                        <input type="password" id="admin-whatsapp-token" placeholder="Cole o token permanente aqui" style="margin-bottom: 0;">
+
+                        <details style="margin-top: 16px;">
+                            <summary style="cursor:pointer; font-size:13px; font-weight:600; color: var(--texto-suave);">Como conseguir esses dados?</summary>
+                            <div style="font-size: 12.5px; color: var(--texto-suave); line-height: 1.65; margin-top: 10px;">
+                                <ol style="padding-left: 18px; margin: 0;">
+                                    <li>Crie uma conta em <a href="https://business.facebook.com" target="_blank" rel="noopener" style="color: var(--laranja-fogo);">business.facebook.com</a> e um app em <a href="https://developers.facebook.com" target="_blank" rel="noopener" style="color: var(--laranja-fogo);">developers.facebook.com</a>, adicionando o produto "WhatsApp".</li>
+                                    <li>No painel do app, em WhatsApp &gt; Introdução, copie o <b>Phone Number ID</b> e gere um <b>Token de acesso</b> permanente (via usuário do sistema).</li>
+                                    <li>Ainda no painel, em WhatsApp &gt; Configuração, cadastre o Webhook com a URL abaixo e combine o token de verificação com quem administra a plataforma.</li>
+                                    <li>Cole o Phone Number ID e o Token aqui, marque a caixa acima e salve.</li>
+                                </ol>
+                                <p style="margin-top: 10px;"><b>URL do Webhook:</b> <code id="whatsapp-webhook-url" style="user-select: all; word-break: break-all;">carregando...</code></p>
+                            </div>
+                        </details>
+                    </div>
                 </div>
 
                 <button id="btn-salvar-config" class="btn-salvar-config" onclick="salvarConfiguracoesLoja()">

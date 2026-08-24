@@ -1086,7 +1086,16 @@
             <input type="number" id="cupom-limite-usos" placeholder="Deixe em branco = sem limite" step="1" min="1">
 
             <label>Valor Máximo de Desconto Total (R$) <span style="font-weight:400; color: var(--texto-claro);">(opcional)</span></label>
-            <input type="number" id="cupom-limite-valor" placeholder="Ex: 300 — expira ao atingir esse total descontado" step="0.01" min="0" style="margin-bottom: 0;">
+            <input type="number" id="cupom-limite-valor" placeholder="Ex: 300 — expira ao atingir esse total descontado" step="0.01" min="0">
+
+            <label class="toggle-linha">
+                <input type="checkbox" id="cupom-limite-por-cliente">
+                Limitar a 1 uso por cliente
+            </label>
+            <label class="toggle-linha" style="margin-bottom: 0;">
+                <input type="checkbox" id="cupom-publico">
+                Mostrar na vitrine de promoções do site (senão só funciona pra quem já sabe o código)
+            </label>
 
             <div class="modal-botoes">
                 <button class="btn-cancelar" onclick="fecharModalCupom()">Cancelar</button>

@@ -861,7 +861,7 @@ async function aplicarCupom() {
         const resposta = await fetchSupabase(`/rest/v1/rpc/validar_cupom`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ p_loja_id: lojaAtual.id, p_codigo: codigo, p_subtotal: subtotal })
+            body: JSON.stringify({ p_loja_id: lojaAtual.id, p_codigo: codigo, p_subtotal: subtotal, p_cliente_id: obterOuCriarClienteId() })
         });
         const resultado = await resposta.json();
         const dados = Array.isArray(resultado) ? resultado[0] : resultado;
@@ -895,6 +895,63 @@ function removerCupom() {
     if (elAplicado) elAplicado.style.display = "none";
     if (elInput) elInput.style.display = "flex";
     if (elErro) elErro.style.display = "none";
+}
+
+// ==========================================
+// VITRINE DE PROMOÇÕES (cupons marcados como públicos pela loja)
+// ==========================================
+let cuponsPublicosCache = [];
+
+async function carregarCuponsPublicos() {
+    try {
+        const resposta = await fetchSupabase(`/rest/v1/rpc/listar_cupons_publicos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ p_loja_id: lojaAtual.id })
+        });
+        cuponsPublicosCache = resposta.ok ? await resposta.json() : [];
+    } catch (erro) {
+        cuponsPublicosCache = [];
+    }
+
+    const link = document.getElementById("link-ver-promocoes");
+    if (link) link.style.display = cuponsPublicosCache.length > 0 ? "block" : "none";
+}
+
+function abrirVitrinePromocoes() {
+    const container = document.getElementById("vitrine-promocoes");
+    if (!container) return;
+
+    if (container.style.display === "block") {
+        container.style.display = "none";
+        return;
+    }
+
+    if (cuponsPublicosCache.length === 0) {
+        container.innerHTML = `<p style="color:#aaa; font-size:13px; margin:0;">Nenhuma promoção disponível no momento.</p>`;
+    } else {
+        container.innerHTML = cuponsPublicosCache.map(c => {
+            const descricao = c.tipo_desconto === 'percentual'
+                ? `${Number(c.valor_desconto)}% de desconto${c.desconto_maximo_por_pedido ? ` (até R$ ${Number(c.desconto_maximo_por_pedido).toFixed(2).replace('.', ',')})` : ''}`
+                : `R$ ${Number(c.valor_desconto).toFixed(2).replace('.', ',')} de desconto`;
+            return `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding: 8px 0; border-bottom: 1px solid #2a2a2a;">
+                    <div>
+                        <strong style="font-family: monospace; color: #fff;">${escaparHtml(c.codigo)}</strong>
+                        <div style="color:#aaa; font-size:12.5px;">${descricao}</div>
+                    </div>
+                    <button type="button" onclick="usarCupomDaVitrine('${escaparHtml(c.codigo)}')" style="background: var(--laranja-fogo, #ff5e00); color:#fff; border:none; padding:6px 12px; border-radius:6px; font-size:12.5px; font-weight:bold; cursor:pointer;">Usar</button>
+                </div>
+            `;
+        }).join('');
+    }
+    container.style.display = "block";
+}
+
+function usarCupomDaVitrine(codigo) {
+    document.getElementById("cupom-codigo-cliente").value = codigo;
+    document.getElementById("vitrine-promocoes").style.display = "none";
+    aplicarCupom();
 }
 
 function verificarTroco() {
@@ -1058,6 +1115,10 @@ async function enviarParaWhatsApp() {
                 let itemFalho = "algum ingrediente";
                 if (erroDB.details) { const partes = erroDB.details.split(','); if (partes.length > 1) itemFalho = partes[1].trim(); }
                 mostrarAviso(`O estoque de "${itemFalho}" esgotou agora mesmo! Volte e ajuste a quantidade no carrinho.`, "Estoque Esgotado");
+            } else if (erroDB.message && erroDB.message.includes("CUPOM_JA_USADO")) {
+                removerCupom();
+                renderizarCheckout();
+                mostrarAviso("Esse cupom já foi usado por você antes e só vale uma vez. Remove pra continuar sem ele.", "Cupom Já Usado");
             } else if (erroDB.message && (erroDB.message.includes("CUPOM_INVALIDO") || erroDB.message.includes("CUPOM_ESGOTADO"))) {
                 removerCupom();
                 renderizarCheckout();
@@ -1732,6 +1793,9 @@ async function iniciarApp() {
 
     // 4. Puxa os produtos do cardápio do banco de dados
     carregarCardapioDoBanco();
+
+    // 4.5. Verifica se a loja tem alguma promoção pública pra mostrar no checkout
+    carregarCuponsPublicos();
 
     // 5. Insere e atualiza a versão no rodapé
     renderizarRodape();

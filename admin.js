@@ -2215,10 +2215,14 @@ function renderizarTabelaCupons(cupons) {
         else statusHtml = `<span class="status-badge status-ativo">Ativo</span>`;
 
         const botaoTexto = c.ativo ? "Desativar" : "Ativar";
+        const selosHtml = `
+            ${c.limite_por_cliente ? `<span title="Limitado a 1 uso por cliente" style="font-size:11px; color: var(--texto-suave);"><i class="fa-solid fa-user-check"></i></span>` : ''}
+            ${c.publico ? `<span title="Aparece na vitrine de promoções" style="font-size:11px; color: var(--laranja-fogo); margin-left:4px;"><i class="fa-solid fa-store"></i></span>` : ''}
+        `;
 
         return `
         <tr>
-            <td><strong style="font-family: monospace;">${escaparHtml(c.codigo)}</strong></td>
+            <td><strong style="font-family: monospace;">${escaparHtml(c.codigo)}</strong> ${selosHtml}</td>
             <td>${descontoTexto}</td>
             <td>${tetoTexto}</td>
             <td>${usosTexto}</td>
@@ -2250,6 +2254,8 @@ function abrirModalCupom() {
     document.getElementById("cupom-teto-pedido").value = "";
     document.getElementById("cupom-limite-usos").value = "";
     document.getElementById("cupom-limite-valor").value = "";
+    document.getElementById("cupom-limite-por-cliente").checked = false;
+    document.getElementById("cupom-publico").checked = false;
     document.getElementById("cupom-erro").style.display = "none";
     alternarCampoTetoCupom();
     document.getElementById("modal-cupom").style.display = "flex";
@@ -2302,7 +2308,9 @@ async function salvarCupom() {
                 valor_desconto: valor,
                 desconto_maximo_por_pedido: (tipo === 'percentual' && tetoPedido) ? parseFloat(tetoPedido) : null,
                 limite_usos: limiteUsos ? parseInt(limiteUsos, 10) : null,
-                limite_valor_total_desconto: limiteValor ? parseFloat(limiteValor) : null
+                limite_valor_total_desconto: limiteValor ? parseFloat(limiteValor) : null,
+                limite_por_cliente: document.getElementById("cupom-limite-por-cliente").checked,
+                publico: document.getElementById("cupom-publico").checked
             })
         });
 

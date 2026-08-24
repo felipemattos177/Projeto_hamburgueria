@@ -148,6 +148,19 @@
             </section>
 
             <section class="checkout-secao">
+                <h3><i class="fa-solid fa-tags"></i> Cupom de Desconto</h3>
+                <div id="linha-cupom-aplicado" style="display: none; justify-content: space-between; align-items: center; background: #16281c; border: 1px solid #2ed573; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px;">
+                    <span style="color: #2ed573; font-weight: bold; font-size: 14px;"><i class="fa-solid fa-circle-check"></i> <span id="texto-cupom-aplicado"></span></span>
+                    <button type="button" onclick="removerCupom()" style="background: transparent; color: #ff4757; border: none; font-size: 13px; cursor: pointer; text-decoration: underline;">Remover</button>
+                </div>
+                <div id="linha-cupom-input" style="display: flex; gap: 10px;">
+                    <input type="text" id="cupom-codigo-cliente" placeholder="Digite o código" style="flex: 1; text-transform: uppercase; margin-bottom: 0;">
+                    <button type="button" id="btn-aplicar-cupom" onclick="aplicarCupom()" style="padding: 0 18px; border-radius: 8px; border: none; background: var(--laranja-fogo, #ff5e00); color: #fff; font-weight: bold; cursor: pointer;">Aplicar</button>
+                </div>
+                <div id="cupom-feedback-erro" style="display: none; color: #ff4757; font-size: 13px; margin-top: 8px;"></div>
+            </section>
+
+            <section class="checkout-secao">
                 <h3><i class="fa-solid fa-location-dot"></i> Entrega</h3>
 
                 <div style="display: flex; gap: 10px; margin-bottom: 15px;">

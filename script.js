@@ -714,6 +714,11 @@ function atualizarContadorCart() {
 }
 
 let tipoEntregaSelecionado = "entrega";
+let cupomAplicado = null; // { codigo, valorDesconto } ou null — validado no servidor, nunca calculado só no cliente
+
+function obterDescontoCupomAtual() {
+    return cupomAplicado ? cupomAplicado.valorDesconto : 0;
+}
 
 // Usado em todo lugar que precisa do total (checkout, PIX, WhatsApp) pra
 // nunca esquecer de somar a taxa de entrega em algum deles.
@@ -797,6 +802,17 @@ function renderizarCheckout() {
         </button>
     `;
 
+    const descontoAtual = obterDescontoCupomAtual();
+    if (descontoAtual > 0) {
+        somaTotal -= descontoAtual;
+        divItens.innerHTML += `
+            <div style="display: flex; justify-content: space-between; color: #2ed573; font-size: 14px; margin-top: 12px; padding-top: 10px; border-top: 1px dashed #333;">
+                <span><i class="fa-solid fa-tag"></i> Cupom ${escaparHtml(cupomAplicado.codigo)}</span>
+                <span>-R$ ${descontoAtual.toFixed(2).replace('.', ',')}</span>
+            </div>
+        `;
+    }
+
     const taxaEntregaCheckout = obterTaxaEntregaAtual();
     if (taxaEntregaCheckout > 0) {
         somaTotal += taxaEntregaCheckout;
@@ -816,9 +832,69 @@ function removerDoCarrinho(index) {
     carrinho.splice(index, 1);
     atualizarContadorCart();
     renderizarCardapio();
-    
+
+    // O carrinho mudou, então o desconto calculado antes pode não valer mais
+    // (um cupom de % muda de valor com o subtotal) — pede pra reaplicar.
+    removerCupom();
+
     if (carrinho.length === 0) navegarPara('inicio');
     else renderizarCheckout();
+}
+
+async function aplicarCupom() {
+    const input = document.getElementById("cupom-codigo-cliente");
+    const codigo = input.value.trim();
+    const erroEl = document.getElementById("cupom-feedback-erro");
+    const btn = document.getElementById("btn-aplicar-cupom");
+    erroEl.style.display = "none";
+
+    if (!codigo) return;
+
+    const subtotal = carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0);
+    if (subtotal <= 0) return;
+
+    const textoOriginal = btn.innerText;
+    btn.innerText = "...";
+    btn.disabled = true;
+
+    try {
+        const resposta = await fetchSupabase(`/rest/v1/rpc/validar_cupom`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ p_loja_id: lojaAtual.id, p_codigo: codigo, p_subtotal: subtotal })
+        });
+        const resultado = await resposta.json();
+        const dados = Array.isArray(resultado) ? resultado[0] : resultado;
+
+        if (!dados || !dados.valido) {
+            erroEl.innerText = (dados && dados.motivo) ? dados.motivo : "Não foi possível validar o cupom.";
+            erroEl.style.display = "block";
+            cupomAplicado = null;
+            return;
+        }
+
+        cupomAplicado = { codigo: codigo.toUpperCase(), valorDesconto: Number(dados.valor_desconto) };
+        document.getElementById("texto-cupom-aplicado").innerText = `Cupom ${cupomAplicado.codigo} aplicado — R$ ${cupomAplicado.valorDesconto.toFixed(2).replace('.', ',')} de desconto`;
+        document.getElementById("linha-cupom-aplicado").style.display = "flex";
+        document.getElementById("linha-cupom-input").style.display = "none";
+        renderizarCheckout();
+    } catch (erro) {
+        erroEl.innerText = "Erro ao validar o cupom. Tenta de novo.";
+        erroEl.style.display = "block";
+    } finally {
+        btn.innerText = textoOriginal;
+        btn.disabled = false;
+    }
+}
+
+function removerCupom() {
+    cupomAplicado = null;
+    const elAplicado = document.getElementById("linha-cupom-aplicado");
+    const elInput = document.getElementById("linha-cupom-input");
+    const elErro = document.getElementById("cupom-feedback-erro");
+    if (elAplicado) elAplicado.style.display = "none";
+    if (elInput) elInput.style.display = "flex";
+    if (elErro) elErro.style.display = "none";
 }
 
 function verificarTroco() {
@@ -846,7 +922,7 @@ function verificarTroco() {
             return; 
         }
 
-        const totalCalculado = carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0) + obterTaxaEntregaAtual();
+        const totalCalculado = Math.max(0, carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0) - obterDescontoCupomAtual()) + obterTaxaEntregaAtual();
 
         if (!areaPix) {
             areaPix = document.createElement("div");
@@ -931,7 +1007,7 @@ async function enviarParaWhatsApp() {
 
     const enderecoFormatado = ehEntrega ? `${rua}, ${numero} - ${bairro} ${complemento ? '(' + complemento + ')' : ''}` : "";
     const taxaEntrega = obterTaxaEntregaAtual();
-    const totalCalculado = carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0) + taxaEntrega;
+    const totalCalculado = Math.max(0, carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0) - obterDescontoCupomAtual()) + taxaEntrega;
 
     if (pagamento.toUpperCase() === "PIX" && configLoja.chave_pix && configLoja.chave_pix.trim() !== "") {
         const pixAindaValido = pixValorCopiado !== null && Math.abs(pixValorCopiado - totalCalculado) < 0.01;
@@ -966,7 +1042,8 @@ async function enviarParaWhatsApp() {
             p_carrinho: carrinho,
             p_loja_id: lojaAtual.id,
             p_tipo_entrega: tipoEntregaSelecionado,
-            p_endereco_entrega: ehEntrega ? enderecoFormatado : null
+            p_endereco_entrega: ehEntrega ? enderecoFormatado : null,
+            p_codigo_cupom: cupomAplicado ? cupomAplicado.codigo : null
         };
 
         const resSupabase = await fetchSupabase(`/rest/v1/rpc/registrar_pedido_completo`, {
@@ -981,6 +1058,10 @@ async function enviarParaWhatsApp() {
                 let itemFalho = "algum ingrediente";
                 if (erroDB.details) { const partes = erroDB.details.split(','); if (partes.length > 1) itemFalho = partes[1].trim(); }
                 mostrarAviso(`O estoque de "${itemFalho}" esgotou agora mesmo! Volte e ajuste a quantidade no carrinho.`, "Estoque Esgotado");
+            } else if (erroDB.message && (erroDB.message.includes("CUPOM_INVALIDO") || erroDB.message.includes("CUPOM_ESGOTADO"))) {
+                removerCupom();
+                renderizarCheckout();
+                mostrarAviso("Esse cupom não é mais válido (pode ter esgotado agora mesmo). Remove ou tenta outro pra continuar.", "Cupom Inválido");
             } else {
                 mostrarAviso("Ocorreu um erro ao registrar seu pedido no nosso system.", "Erro na Finalização");
             }
@@ -1037,12 +1118,17 @@ async function enviarParaWhatsApp() {
                 textoPedido += `\n🛵 *Taxa de entrega: R$ ${taxaEntrega.toFixed(2).replace('.', ',')}*\n`;
             }
 
+            if (cupomAplicado) {
+                textoPedido += `\n🏷️ *Cupom ${cupomAplicado.codigo}: -R$ ${cupomAplicado.valorDesconto.toFixed(2).replace('.', ',')}*\n`;
+            }
+
             textoPedido += `\n💰 *TOTAL DO PEDIDO: R$ ${totalCalculado.toFixed(2).replace('.', ',')}*`;
 
             if (btnFinalizar) { btnFinalizar.innerText = textoOriginalBotao; btnFinalizar.disabled = false; }
             
             // Limpa os dados do carrinho local e atualiza as telas de fundo
             carrinho = [];
+            cupomAplicado = null;
             atualizarContadorCart();
             renderizarCardapio(); 
             navegarPara('inicio');

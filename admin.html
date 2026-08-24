@@ -383,6 +383,7 @@
                 <button class="tab-btn" onclick="mudarAbaAdmin('view-entregas', this)"><i class="fa-solid fa-hand-holding-dollar"></i> Entregas</button>
                 <button class="tab-btn" onclick="mudarAbaAdmin('view-financeiro', this)"><i class="fa-solid fa-chart-line"></i> Financeiro</button>
                 <button class="tab-btn" onclick="mudarAbaAdmin('view-clientes', this)"><i class="fa-solid fa-users"></i> Meus Clientes</button>
+                <button class="tab-btn" onclick="mudarAbaAdmin('view-cupons', this)"><i class="fa-solid fa-tags"></i> Cupons</button>
                 <button class="tab-btn" onclick="mudarAbaAdmin('view-entregadores', this)"><i class="fa-solid fa-motorcycle"></i> Entregadores</button>
                 <button class="tab-btn" onclick="mudarAbaAdmin('view-config', this)"><i class="fa-solid fa-gear"></i> Configurações</button>
             </nav>
@@ -750,6 +751,36 @@
             </div>
 
             <!-- ========================================== -->
+            <!-- CUPONS DE DESCONTO                          -->
+            <!-- ========================================== -->
+            <div id="view-cupons" class="view-section">
+
+                <div class="header-admin">
+                    <h1><span class="icone-secao"><i class="fa-solid fa-tags"></i></span> Cupons de Desconto</h1>
+                    <button class="btn-novo" onclick="abrirModalCupom()"><i class="fa-solid fa-plus"></i> Novo Cupom</button>
+                </div>
+
+                <div style="overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Desconto</th>
+                            <th>Teto por pedido</th>
+                            <th>Usos</th>
+                            <th>Valor descontado</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabela-cupons">
+                        <tr><td colspan="7" style="text-align: center;">Carregando...</td></tr>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
             <!-- ENTREGADORES                                -->
             <!-- ========================================== -->
             <div id="view-entregadores" class="view-section">
@@ -1023,6 +1054,43 @@
             <ul class="timeline-entrega" id="detalhes-entrega-timeline"></ul>
             <div class="modal-botoes">
                 <button class="btn-cancelar" onclick="fecharModalDetalhesEntrega()">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-cupom" class="modal-overlay">
+        <div class="modal-conteudo">
+            <h2>Novo Cupom de Desconto</h2>
+
+            <div id="cupom-erro" style="display:none; color: var(--vermelho); background: var(--vermelho-suave); padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; text-align: center;"></div>
+
+            <label>Código do Cupom</label>
+            <input type="text" id="cupom-codigo" placeholder="Ex: DESCONTO10" style="text-transform: uppercase;">
+
+            <label>Tipo de Desconto</label>
+            <select id="cupom-tipo" onchange="alternarCampoTetoCupom()">
+                <option value="percentual">Percentual (%)</option>
+                <option value="valor_fixo">Valor fixo (R$)</option>
+            </select>
+
+            <label id="rotulo-cupom-valor">Valor do Desconto (%)</label>
+            <input type="number" id="cupom-valor" placeholder="Ex: 10" step="0.01" min="0">
+
+            <div id="bloco-teto-cupom">
+                <label>Desconto Máximo por Pedido (R$)</label>
+                <input type="number" id="cupom-teto-pedido" placeholder="Ex: 20.00" step="0.01" min="0">
+                <p style="font-size: 11.5px; color: var(--texto-claro); margin: -10px 0 15px;">Evita que o percentual "estoure" em pedidos grandes — ex: 30% num pedido de R$ 200 seria R$ 60 de desconto; com teto de R$ 20, para em R$ 20 mesmo assim.</p>
+            </div>
+
+            <label>Limite de Usos <span style="font-weight:400; color: var(--texto-claro);">(opcional)</span></label>
+            <input type="number" id="cupom-limite-usos" placeholder="Deixe em branco = sem limite" step="1" min="1">
+
+            <label>Valor Máximo de Desconto Total (R$) <span style="font-weight:400; color: var(--texto-claro);">(opcional)</span></label>
+            <input type="number" id="cupom-limite-valor" placeholder="Ex: 300 — expira ao atingir esse total descontado" step="0.01" min="0" style="margin-bottom: 0;">
+
+            <div class="modal-botoes">
+                <button class="btn-cancelar" onclick="fecharModalCupom()">Cancelar</button>
+                <button class="btn-novo" id="btn-salvar-cupom" onclick="salvarCupom()">Salvar Cupom</button>
             </div>
         </div>
     </div>

@@ -473,6 +473,7 @@ async function iniciarPainelAdmin() {
     definirPeriodoPadrao('dash-data-inicio', 'dash-data-fim');
     carregarDashboard();
     carregarClientes();
+    carregarCupons();
 
     intervaloPedidosAdmin = setInterval(carregarPedidosAdmin, 3000);
     intervaloProdutosEstoqueAdmin = setInterval(() => { carregarProdutos(); carregarEstoque(); }, 5000);
@@ -1026,6 +1027,8 @@ function atualizarDadosDaAba(idAba) {
         carregarRelatorioFinanceiro();
     } else if (idAba === 'view-clientes') {
         carregarClientes();
+    } else if (idAba === 'view-cupons') {
+        carregarCupons();
     } else if (idAba === 'view-entregadores') {
         carregarEntregadores();
     } else if (idAba === 'view-config') {
@@ -2055,6 +2058,7 @@ function montarCupomImpressao(pedido, itens, nomeProdutoPorId, adicionaisPorItem
         <div class="cupom-sep"></div>
 
         ${valorEntrega > 0 ? `<div class="cupom-linha"><span>Taxa de entrega</span><span>R$ ${valorEntrega.toFixed(2).replace('.', ',')}</span></div>` : ''}
+        ${Number(pedido.valor_desconto) > 0 ? `<div class="cupom-linha"><span>Cupom ${escaparHtml(pedido.cupom_codigo || '')}</span><span>-R$ ${Number(pedido.valor_desconto).toFixed(2).replace('.', ',')}</span></div>` : ''}
         <div class="cupom-linha grande"><span>TOTAL</span><span>R$ ${Number(pedido.total).toFixed(2).replace('.', ',')}</span></div>
         <div class="cupom-sep"></div>
 
@@ -2158,6 +2162,166 @@ function filtrarTabelaClientes() {
         || String(c.email).toLowerCase().includes(termo)
     );
     renderizarTabelaClientes(filtrados);
+}
+
+// ==========================================
+// MÓDULO 9.5: CUPONS DE DESCONTO
+// ==========================================
+let listaCuponsGlobal = [];
+
+async function carregarCupons() {
+    if (!(await garantirSessaoOuRelogar())) return;
+    const tbody = document.getElementById("tabela-cupons");
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">Carregando...</td></tr>';
+
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/cupons?select=*&loja_id=eq.${lojaAtual.id}&order=criado_em.desc`, {
+            headers: headersAutenticados()
+        });
+        listaCuponsGlobal = await res.json();
+        renderizarTabelaCupons(listaCuponsGlobal);
+    } catch (erro) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color: var(--vermelho);">Erro ao carregar cupons.</td></tr>';
+        console.error(erro);
+    }
+}
+
+function renderizarTabelaCupons(cupons) {
+    const tbody = document.getElementById("tabela-cupons");
+    if (!tbody) return;
+
+    if (cupons.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">Nenhum cupom cadastrado ainda.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = cupons.map(c => {
+        const descontoTexto = c.tipo_desconto === 'percentual'
+            ? `${Number(c.valor_desconto)}%`
+            : `R$ ${Number(c.valor_desconto).toFixed(2).replace('.', ',')}`;
+        const tetoTexto = c.desconto_maximo_por_pedido
+            ? `R$ ${Number(c.desconto_maximo_por_pedido).toFixed(2).replace('.', ',')}`
+            : '—';
+        const usosTexto = c.limite_usos ? `${c.usos_atuais} / ${c.limite_usos}` : `${c.usos_atuais} / ilimitado`;
+        const valorDescontadoTexto = c.limite_valor_total_desconto
+            ? `R$ ${Number(c.valor_total_descontado).toFixed(2).replace('.', ',')} / R$ ${Number(c.limite_valor_total_desconto).toFixed(2).replace('.', ',')}`
+            : `R$ ${Number(c.valor_total_descontado).toFixed(2).replace('.', ',')}`;
+
+        const esgotado = (c.limite_usos && c.usos_atuais >= c.limite_usos) || (c.limite_valor_total_desconto && c.valor_total_descontado >= c.limite_valor_total_desconto);
+        let statusHtml;
+        if (!c.ativo) statusHtml = `<span class="status-badge status-inativo">Inativo</span>`;
+        else if (esgotado) statusHtml = `<span class="status-badge status-inativo">Esgotado</span>`;
+        else statusHtml = `<span class="status-badge status-ativo">Ativo</span>`;
+
+        const botaoTexto = c.ativo ? "Desativar" : "Ativar";
+
+        return `
+        <tr>
+            <td><strong style="font-family: monospace;">${escaparHtml(c.codigo)}</strong></td>
+            <td>${descontoTexto}</td>
+            <td>${tetoTexto}</td>
+            <td>${usosTexto}</td>
+            <td>${valorDescontadoTexto}</td>
+            <td>${statusHtml}</td>
+            <td><button class="btn-acao btn-toggle" onclick="alternarStatusCupom(${c.id}, ${!c.ativo})">${botaoTexto}</button></td>
+        </tr>
+        `;
+    }).join('');
+}
+
+async function alternarStatusCupom(id, novoStatus) {
+    try {
+        await fetch(`${SUPABASE_URL}/rest/v1/cupons?id=eq.${id}`, {
+            method: 'PATCH',
+            headers: headersAutenticados('application/json'),
+            body: JSON.stringify({ ativo: novoStatus })
+        });
+        carregarCupons();
+    } catch (erro) {
+        alert("Erro ao atualizar o cupom.");
+    }
+}
+
+function abrirModalCupom() {
+    document.getElementById("cupom-codigo").value = "";
+    document.getElementById("cupom-tipo").value = "percentual";
+    document.getElementById("cupom-valor").value = "";
+    document.getElementById("cupom-teto-pedido").value = "";
+    document.getElementById("cupom-limite-usos").value = "";
+    document.getElementById("cupom-limite-valor").value = "";
+    document.getElementById("cupom-erro").style.display = "none";
+    alternarCampoTetoCupom();
+    document.getElementById("modal-cupom").style.display = "flex";
+}
+
+function fecharModalCupom() {
+    document.getElementById("modal-cupom").style.display = "none";
+}
+
+function alternarCampoTetoCupom() {
+    const tipo = document.getElementById("cupom-tipo").value;
+    document.getElementById("rotulo-cupom-valor").innerText = tipo === 'percentual' ? "Valor do Desconto (%)" : "Valor do Desconto (R$)";
+    document.getElementById("bloco-teto-cupom").style.display = tipo === 'percentual' ? "block" : "none";
+}
+
+async function salvarCupom() {
+    const codigo = document.getElementById("cupom-codigo").value.trim().toUpperCase();
+    const tipo = document.getElementById("cupom-tipo").value;
+    const valor = parseFloat(document.getElementById("cupom-valor").value);
+    const tetoPedido = document.getElementById("cupom-teto-pedido").value;
+    const limiteUsos = document.getElementById("cupom-limite-usos").value;
+    const limiteValor = document.getElementById("cupom-limite-valor").value;
+    const erroEl = document.getElementById("cupom-erro");
+    erroEl.style.display = "none";
+
+    if (!codigo || isNaN(valor) || valor <= 0) {
+        erroEl.innerText = "Preencha o código e um valor de desconto válido.";
+        erroEl.style.display = "block";
+        return;
+    }
+    if (tipo === 'percentual' && valor > 100) {
+        erroEl.innerText = "Desconto percentual não pode passar de 100%.";
+        erroEl.style.display = "block";
+        return;
+    }
+
+    const btn = document.getElementById("btn-salvar-cupom");
+    const textoOriginal = btn.innerText;
+    btn.innerText = "Salvando...";
+    btn.disabled = true;
+
+    try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/cupons`, {
+            method: 'POST',
+            headers: headersAutenticados('application/json'),
+            body: JSON.stringify({
+                loja_id: lojaAtual.id,
+                codigo,
+                tipo_desconto: tipo,
+                valor_desconto: valor,
+                desconto_maximo_por_pedido: (tipo === 'percentual' && tetoPedido) ? parseFloat(tetoPedido) : null,
+                limite_usos: limiteUsos ? parseInt(limiteUsos, 10) : null,
+                limite_valor_total_desconto: limiteValor ? parseFloat(limiteValor) : null
+            })
+        });
+
+        if (!res.ok) {
+            const erro = await res.json();
+            erroEl.innerText = erro.code === '23505' ? "Já existe um cupom com esse código nessa loja." : (erro.message || "Erro ao criar o cupom.");
+            erroEl.style.display = "block";
+            return;
+        }
+
+        fecharModalCupom();
+        carregarCupons();
+    } catch (erro) {
+        erroEl.innerText = "Erro de conexão ao criar o cupom.";
+        erroEl.style.display = "block";
+    } finally {
+        btn.innerText = textoOriginal;
+        btn.disabled = false;
+    }
 }
 
 // ==========================================

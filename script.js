@@ -1119,6 +1119,10 @@ async function enviarParaWhatsApp() {
                 removerCupom();
                 renderizarCheckout();
                 mostrarAviso("Esse cupom já foi usado por você antes e só vale uma vez. Remove pra continuar sem ele.", "Cupom Já Usado");
+            } else if (erroDB.message && erroDB.message.includes("CUPOM_RESTRITO_A_NOVOS_CLIENTES")) {
+                removerCupom();
+                renderizarCheckout();
+                mostrarAviso("Esse cupom é exclusivo pra quem está começando a pedir aqui. Remove pra continuar sem ele.", "Cupom Restrito");
             } else if (erroDB.message && (erroDB.message.includes("CUPOM_INVALIDO") || erroDB.message.includes("CUPOM_ESGOTADO"))) {
                 removerCupom();
                 renderizarCheckout();

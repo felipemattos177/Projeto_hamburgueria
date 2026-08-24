@@ -1088,6 +1088,10 @@
             <label>Valor Máximo de Desconto Total (R$) <span style="font-weight:400; color: var(--texto-claro);">(opcional)</span></label>
             <input type="number" id="cupom-limite-valor" placeholder="Ex: 300 — expira ao atingir esse total descontado" step="0.01" min="0">
 
+            <label>Máximo de Pedidos Anteriores do Cliente <span style="font-weight:400; color: var(--texto-claro);">(opcional)</span></label>
+            <input type="number" id="cupom-max-pedidos-anteriores" placeholder="Ex: 0 = só cliente que nunca comprou" step="1" min="0">
+            <p style="font-size: 11.5px; color: var(--texto-claro); margin: -10px 0 15px;">Deixe em branco pra valer pra qualquer cliente. Com <strong>0</strong>, só quem nunca fez pedido nessa loja consegue usar — bom pra atrair cliente novo sem descontar de quem já compra sempre.</p>
+
             <label class="toggle-linha">
                 <input type="checkbox" id="cupom-limite-por-cliente">
                 Limitar a 1 uso por cliente

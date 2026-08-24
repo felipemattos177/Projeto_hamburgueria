@@ -151,7 +151,7 @@
                 <h3><i class="fa-solid fa-tags"></i> Cupom de Desconto</h3>
                 <div id="linha-cupom-aplicado" style="display: none; justify-content: space-between; align-items: center; background: #16281c; border: 1px solid #2ed573; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px;">
                     <span style="color: #2ed573; font-weight: bold; font-size: 14px;"><i class="fa-solid fa-circle-check"></i> <span id="texto-cupom-aplicado"></span></span>
-                    <button type="button" onclick="removerCupom()" style="background: transparent; color: #ff4757; border: none; font-size: 13px; cursor: pointer; text-decoration: underline;">Remover</button>
+                    <button type="button" onclick="removerCupom()" title="Remover cupom" style="background: rgba(255,71,87,0.12); color: #ff4757; border: none; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: 0.15s;" onmouseover="this.style.background='rgba(255,71,87,0.3)'" onmouseout="this.style.background='rgba(255,71,87,0.12)'"><i class="fa-solid fa-trash"></i></button>
                 </div>
                 <div id="linha-cupom-input" style="display: flex; gap: 10px;">
                     <input type="text" id="cupom-codigo-cliente" placeholder="Digite o código" style="flex: 1; text-transform: uppercase; margin-bottom: 0;">

@@ -976,6 +976,92 @@ async function carregarCuponsPublicos() {
 
     const link = document.getElementById("link-ver-promocoes");
     if (link) link.style.display = cuponsPublicosCache.length > 0 ? "block" : "none";
+
+    // Badge no menu inferior — chama atenção pra quantos cupons dá pra usar agora.
+    const badge = document.getElementById("badge-cupons-disponiveis");
+    if (badge) {
+        if (cuponsPublicosCache.length > 0) {
+            badge.innerText = cuponsPublicosCache.length;
+            badge.style.display = "flex";
+        } else {
+            badge.style.display = "none";
+        }
+    }
+}
+
+// Tela "Meus Cupons" (aba do menu inferior) — mostra os cupons que esse
+// cliente pode usar agora, e embaixo o histórico dos que ele já usou.
+async function carregarTelaCupons() {
+    document.getElementById("cupons-total-disponiveis").innerText = cuponsPublicosCache.length;
+
+    const listaDisponiveis = document.getElementById("lista-cupons-disponiveis");
+    if (cuponsPublicosCache.length === 0) {
+        listaDisponiveis.innerHTML = `<p style="color:#aaa; text-align:center; padding:16px;">Nenhum cupom disponível pra você no momento.</p>`;
+    } else {
+        listaDisponiveis.innerHTML = cuponsPublicosCache.map(c => {
+            let descricao = c.tipo_desconto === 'percentual'
+                ? `${Number(c.valor_desconto)}% de desconto${c.desconto_maximo_por_pedido ? ` (até R$ ${Number(c.desconto_maximo_por_pedido).toFixed(2).replace('.', ',')})` : ''}`
+                : `R$ ${Number(c.valor_desconto).toFixed(2).replace('.', ',')} de desconto`;
+            if (c.valor_minimo_pedido) {
+                descricao += ` · a partir de R$ ${Number(c.valor_minimo_pedido).toFixed(2).replace('.', ',')}`;
+            }
+            return `
+                <div style="display:flex; justify-content:space-between; align-items:center; background:#1e1e1e; border:1px solid #333; border-radius:10px; padding:14px; margin-bottom:10px;">
+                    <div>
+                        <strong style="font-family: monospace; color: #fff; font-size:15px;">${escaparHtml(c.codigo)}</strong>
+                        <div style="color:#aaa; font-size:12.5px; margin-top:2px;">${descricao}</div>
+                    </div>
+                    <button type="button" onclick="usarCupomDaTelaCupons('${escaparHtml(c.codigo)}')" style="background: var(--laranja-fogo, #ff5e00); color:#fff; border:none; padding:8px 16px; border-radius:8px; font-size:13px; font-weight:bold; cursor:pointer; flex-shrink:0;">Usar</button>
+                </div>
+            `;
+        }).join('');
+    }
+
+    const listaUsados = document.getElementById("lista-cupons-usados");
+    listaUsados.innerHTML = `<p style="color:#666; text-align:center; padding:10px; font-size:13px;">Carregando...</p>`;
+    try {
+        const resposta = await fetchSupabase(`/rest/v1/rpc/listar_meus_cupons_usados`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ p_loja_id: lojaAtual.id, p_cliente_id: obterOuCriarClienteId() })
+        });
+        const usados = resposta.ok ? await resposta.json() : [];
+
+        if (usados.length === 0) {
+            listaUsados.innerHTML = `<p style="color:#666; text-align:center; padding:10px; font-size:13px;">Você ainda não usou nenhum cupom.</p>`;
+        } else {
+            listaUsados.innerHTML = usados.map(c => {
+                const descricao = c.tipo_desconto === 'percentual'
+                    ? `${Number(c.valor_desconto)}% de desconto`
+                    : `R$ ${Number(c.valor_desconto).toFixed(2).replace('.', ',')} de desconto`;
+                return `
+                    <div style="display:flex; justify-content:space-between; align-items:center; background:#1a1a1a; border:1px solid #2a2a2a; border-radius:10px; padding:12px 14px; margin-bottom:8px; opacity:.65;">
+                        <div>
+                            <strong style="font-family: monospace; color: #ccc; font-size:14px;">${escaparHtml(c.codigo)}</strong>
+                            <div style="color:#777; font-size:12px; margin-top:2px;">${descricao}</div>
+                        </div>
+                        <div style="color:#666; font-size:11.5px;">${formatarDataHoraBr(c.usado_em, { day: '2-digit', month: '2-digit' })}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+    } catch (erro) {
+        listaUsados.innerHTML = `<p style="color:#ff4757; text-align:center; padding:10px; font-size:13px;">Erro ao carregar cupons usados.</p>`;
+    }
+}
+
+function usarCupomDaTelaCupons(codigo) {
+    if (carrinho.length === 0) {
+        mostrarAviso("Adiciona alguns itens ao carrinho primeiro pra usar esse cupom.", "Carrinho Vazio");
+        navegarPara('inicio');
+        return;
+    }
+    navegarPara('checkout');
+    setTimeout(() => {
+        const input = document.getElementById("cupom-codigo-cliente");
+        if (input) input.value = codigo;
+        aplicarCupom();
+    }, 50);
 }
 
 function abrirVitrinePromocoes() {
@@ -1587,26 +1673,31 @@ function fecharModalLojaInfo() {
 }
 
 function navegarPara(aba) {
-    const telas = ["tela-catalogo", "tela-checkout", "tela-perfil", "tela-pedidos"];
+    const telas = ["tela-catalogo", "tela-checkout", "tela-perfil", "tela-pedidos", "tela-cupons"];
     telas.forEach(id => { const elemento = document.getElementById(id); if (elemento) elemento.classList.add("escondido"); });
     document.querySelectorAll(".nav-item").forEach(btn => btn.classList.remove("ativo"));
-    
-    if (aba === 'inicio') { 
-        document.getElementById("tela-catalogo").classList.remove("escondido"); 
-        const b = document.getElementById("btn-nav-inicio"); if(b) b.classList.add("ativo"); 
-        window.scrollTo(0, 0); 
-    } else if (aba === 'checkout') { 
-        document.getElementById("tela-checkout").classList.remove("escondido"); 
-        window.scrollTo(0, 0); 
-    } else if (aba === 'perfil') { 
-        document.getElementById("tela-perfil").classList.remove("escondido"); 
-        const b = document.getElementById("btn-nav-perfil"); if(b) b.classList.add("ativo"); 
-        carregarPerfilNaTela(); window.scrollTo(0, 0); 
-    } else if (aba === 'pedidos') { 
-        document.getElementById("tela-pedidos").classList.remove("escondido"); 
-        const b = document.getElementById("btn-nav-pedidos"); if(b) b.classList.add("ativo"); 
-        carregarHistoricoPedidos(); 
-        window.scrollTo(0, 0); 
+
+    if (aba === 'inicio') {
+        document.getElementById("tela-catalogo").classList.remove("escondido");
+        const b = document.getElementById("btn-nav-inicio"); if(b) b.classList.add("ativo");
+        window.scrollTo(0, 0);
+    } else if (aba === 'checkout') {
+        document.getElementById("tela-checkout").classList.remove("escondido");
+        window.scrollTo(0, 0);
+    } else if (aba === 'perfil') {
+        document.getElementById("tela-perfil").classList.remove("escondido");
+        const b = document.getElementById("btn-nav-perfil"); if(b) b.classList.add("ativo");
+        carregarPerfilNaTela(); window.scrollTo(0, 0);
+    } else if (aba === 'pedidos') {
+        document.getElementById("tela-pedidos").classList.remove("escondido");
+        const b = document.getElementById("btn-nav-pedidos"); if(b) b.classList.add("ativo");
+        carregarHistoricoPedidos();
+        window.scrollTo(0, 0);
+    } else if (aba === 'cupons') {
+        document.getElementById("tela-cupons").classList.remove("escondido");
+        const b = document.getElementById("btn-nav-cupons"); if(b) b.classList.add("ativo");
+        carregarTelaCupons();
+        window.scrollTo(0, 0);
     }
     atualizarContadorCart();
 }

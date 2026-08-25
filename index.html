@@ -261,10 +261,27 @@
     <!-- ========================================== -->
     <div id="tela-pedidos" class="container escondido" style="margin-top: 80px; margin-bottom: 100px;">
         <h2 style="color: var(--laranja-fogo); margin-bottom: 20px;"><i class="fa-regular fa-clipboard"></i> Meus Pedidos</h2>
-        
+
         <div id="lista-historico-pedidos">
             <!-- Os pedidos vão aparecer aqui magicamente -->
         </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TELA: MEUS CUPONS                          -->
+    <!-- ========================================== -->
+    <div id="tela-cupons" class="container escondido" style="margin-top: 80px; margin-bottom: 100px;">
+        <h2 style="color: var(--laranja-fogo); margin-bottom: 20px;"><i class="fa-solid fa-tags"></i> Meus Cupons</h2>
+
+        <div style="background: linear-gradient(135deg, #2a1608, #1a1a1a); border: 1px solid rgba(255,94,0,0.3); border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 24px;">
+            <div id="cupons-total-disponiveis" style="font-size: 38px; font-weight: 800; color: var(--laranja-fogo, #ff5e00); line-height: 1;">0</div>
+            <div style="color: #ddd; font-size: 13.5px; font-weight: 600; margin-top: 4px;">cupom(ns) disponível(is) pra você</div>
+        </div>
+
+        <div id="lista-cupons-disponiveis"></div>
+
+        <h3 style="color: #888; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin: 28px 0 12px;">Já usados</h3>
+        <div id="lista-cupons-usados"></div>
     </div>
 
     <!-- ========================================== -->
@@ -293,9 +310,10 @@
             <i class="fa-solid fa-house"></i>
             <span>Início</span>
         </a>
-        <a href="#" class="nav-item">
-            <i class="fa-solid fa-percent"></i>
-            <span>Promoções</span>
+        <a href="#" class="nav-item" onclick="navegarPara('cupons')" id="btn-nav-cupons" style="position: relative;">
+            <i class="fa-solid fa-tags"></i>
+            <span id="badge-cupons-disponiveis" style="display:none; position:absolute; top:-2px; right:calc(50% - 22px); background: var(--laranja-fogo, #ff5e00); color:#fff; font-size:10px; font-weight:800; min-width:16px; height:16px; border-radius:8px; align-items:center; justify-content:center; padding:0 3px; line-height:1;">0</span>
+            <span>Cupons</span>
         </a>
         <a href="#" class="nav-item" onclick="navegarPara('pedidos')" id="btn-nav-pedidos">
             <i class="fa-regular fa-clipboard"></i>

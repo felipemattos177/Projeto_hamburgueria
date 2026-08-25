@@ -24,7 +24,13 @@ function escaparHtml(texto) {
 // texto na tela isso ajuda o entregador, mas mandar pro Maps faz a busca dar
 // errado — então pra montar o link tiramos só essa parte entre parênteses.
 function enderecoParaMaps(endereco) {
-    return String(endereco || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+    // Formato salvo: "Rua, Número - Bairro (complemento)". O bairro às vezes
+    // confunde o geocoding do Maps (nome ambíguo, bairro repetido em cidade
+    // vizinha etc.) — pra busca, fica só "Rua, Número".
+    let limpo = String(endereco || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+    const idx = limpo.lastIndexOf(' - ');
+    if (idx !== -1) limpo = limpo.substring(0, idx).trim();
+    return limpo;
 }
 
 function formatarMoeda(v) {

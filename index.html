@@ -142,20 +142,30 @@
                     <!-- Itens do carrinho aparecem aqui -->
                 </div>
                 <div class="total-checkout">
-                    <span>Total:</span>
-                    <span id="valor-total">R$ 0,00</span>
+                    <div id="total-original-riscado" class="total-original-riscado" style="display: none;"></div>
+                    <div class="linha-total-principal">
+                        <span>Total:</span>
+                        <span id="valor-total">R$ 0,00</span>
+                    </div>
+                    <div id="linha-economia" class="linha-economia" style="display: none;"></div>
                 </div>
             </section>
 
             <section class="checkout-secao">
                 <h3><i class="fa-solid fa-tags"></i> Cupom de Desconto</h3>
-                <div id="linha-cupom-aplicado" style="display: none; justify-content: space-between; align-items: center; background: #16281c; border: 1px solid #2ed573; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px;">
-                    <span style="color: #2ed573; font-weight: bold; font-size: 14px;"><i class="fa-solid fa-circle-check"></i> <span id="texto-cupom-aplicado"></span></span>
-                    <button type="button" onclick="removerCupom()" title="Remover cupom" style="background: rgba(255,71,87,0.12); color: #ff4757; border: none; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: 0.15s;" onmouseover="this.style.background='rgba(255,71,87,0.3)'" onmouseout="this.style.background='rgba(255,71,87,0.12)'"><i class="fa-solid fa-trash"></i></button>
+                <div id="linha-cupom-aplicado" class="cupom-chip-aplicado" style="display: none; margin-bottom: 12px;">
+                    <div class="cupom-chip-info">
+                        <div class="cupom-chip-icone"><i class="fa-solid fa-tag"></i></div>
+                        <div>
+                            <div class="cupom-chip-codigo" id="texto-codigo-cupom-aplicado"></div>
+                            <div class="cupom-chip-desconto" id="texto-desconto-cupom-aplicado"></div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-remover-cupom" onclick="removerCupom()" title="Remover cupom"><i class="fa-solid fa-xmark"></i></button>
                 </div>
-                <div id="linha-cupom-input" style="display: flex; gap: 10px;">
-                    <input type="text" id="cupom-codigo-cliente" placeholder="Digite o código" style="flex: 1; text-transform: uppercase; margin-bottom: 0;">
-                    <button type="button" id="btn-aplicar-cupom" onclick="aplicarCupom()" style="padding: 0 18px; border-radius: 8px; border: none; background: var(--laranja-fogo, #ff5e00); color: #fff; font-weight: bold; cursor: pointer;">Aplicar</button>
+                <div id="linha-cupom-input" class="cupom-pill-input">
+                    <input type="text" id="cupom-codigo-cliente" placeholder="Código do cupom">
+                    <button type="button" id="btn-aplicar-cupom" onclick="aplicarCupom()">Aplicar</button>
                 </div>
                 <div id="cupom-feedback-erro" style="display: none; color: #ff4757; font-size: 13px; margin-top: 8px;"></div>
                 <div id="link-ver-promocoes" style="display:none; margin-top: 10px;">

@@ -825,6 +825,20 @@ function renderizarCheckout() {
     }
 
     document.getElementById("valor-total").innerText = `R$ ${somaTotal.toFixed(2).replace('.', ',')}`;
+
+    // "De R$X por R$Y" — deixa visível o quanto o cupom realmente economizou.
+    const elOriginal = document.getElementById("total-original-riscado");
+    const elEconomia = document.getElementById("linha-economia");
+    if (descontoAtual > 0) {
+        elOriginal.innerText = `R$ ${(somaTotal + descontoAtual).toFixed(2).replace('.', ',')}`;
+        elOriginal.style.display = "block";
+        elEconomia.innerHTML = `<i class="fa-solid fa-circle-check"></i> Você economizou R$ ${descontoAtual.toFixed(2).replace('.', ',')}`;
+        elEconomia.style.display = "block";
+    } else {
+        elOriginal.style.display = "none";
+        elEconomia.style.display = "none";
+    }
+
     verificarTroco();
 }
 
@@ -874,7 +888,8 @@ async function aplicarCupom() {
         }
 
         cupomAplicado = { codigo: codigo.toUpperCase(), valorDesconto: Number(dados.valor_desconto) };
-        document.getElementById("texto-cupom-aplicado").innerText = `Cupom ${cupomAplicado.codigo} aplicado — R$ ${cupomAplicado.valorDesconto.toFixed(2).replace('.', ',')} de desconto`;
+        document.getElementById("texto-codigo-cupom-aplicado").innerText = cupomAplicado.codigo;
+        document.getElementById("texto-desconto-cupom-aplicado").innerText = `-R$ ${cupomAplicado.valorDesconto.toFixed(2).replace('.', ',')} aplicado`;
         document.getElementById("linha-cupom-aplicado").style.display = "flex";
         document.getElementById("linha-cupom-input").style.display = "none";
         renderizarCheckout();

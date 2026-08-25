@@ -372,6 +372,7 @@ async function alternarItensPedido(pedidoId, botao) {
 
         let html;
         if (!res.ok || !Array.isArray(itens) || itens.length === 0) {
+            console.error("entregador_itens_pedido falhou:", itens);
             html = `<div class="vazio" style="margin:0; padding:12px;">Não foi possível carregar os itens.</div>`;
         } else {
             html = itens.map(item => `

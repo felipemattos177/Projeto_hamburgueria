@@ -895,6 +895,10 @@ function removerCupom() {
     if (elAplicado) elAplicado.style.display = "none";
     if (elInput) elInput.style.display = "flex";
     if (elErro) elErro.style.display = "none";
+
+    // Sem isso, o total (e o Pix já copiado) continuava mostrando o valor
+    // com desconto mesmo depois de remover o cupom.
+    if (document.getElementById("valor-total")) renderizarCheckout();
 }
 
 // ==========================================
@@ -1010,7 +1014,7 @@ function gerarPixCopiaECola(valorPix) {
 }
 
 function copiarPixParaAreaDeTransferencia() {
-    const totalCalculado = carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0) + obterTaxaEntregaAtual();
+    const totalCalculado = Math.max(0, carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0) - obterDescontoCupomAtual()) + obterTaxaEntregaAtual();
     const codigoPix = gerarPixCopiaECola(totalCalculado);
 
     navigator.clipboard.writeText(codigoPix).then(() => {
@@ -1060,6 +1064,32 @@ async function enviarParaWhatsApp() {
     if (ehEntrega && (rua === "" || numero === "" || bairro === "")) {
         mostrarAviso("Por favor, preencha Rua, Número e Bairro para a entrega!", "Dados Incompletos");
         return;
+    }
+
+    // Revalida o cupom bem na hora de enviar — no tempo entre aplicar e
+    // finalizar, ele pode ter esgotado ou deixado de valer.
+    if (cupomAplicado) {
+        const subtotalAtual = carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0);
+        try {
+            const respostaCupom = await fetchSupabase(`/rest/v1/rpc/validar_cupom`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ p_loja_id: lojaAtual.id, p_codigo: cupomAplicado.codigo, p_subtotal: subtotalAtual, p_cliente_id: obterOuCriarClienteId() })
+            });
+            const resultadoCupom = await respostaCupom.json();
+            const dadosCupom = Array.isArray(resultadoCupom) ? resultadoCupom[0] : resultadoCupom;
+
+            if (!dadosCupom || !dadosCupom.valido) {
+                removerCupom();
+                mostrarAviso((dadosCupom && dadosCupom.motivo) ? dadosCupom.motivo : "Esse cupom não é mais válido.", "Cupom Inválido");
+                return;
+            }
+            cupomAplicado.valorDesconto = Number(dadosCupom.valor_desconto);
+        } catch (erro) {
+            removerCupom();
+            mostrarAviso("Não foi possível confirmar o cupom agora. Tenta enviar de novo.", "Erro no Cupom");
+            return;
+        }
     }
 
     const enderecoFormatado = ehEntrega ? `${rua}, ${numero} - ${bairro} ${complemento ? '(' + complemento + ')' : ''}` : "";
@@ -1167,7 +1197,9 @@ async function enviarParaWhatsApp() {
             }
 
             textoPedido += "🛒 *ITENS DO PEDIDO:*\n";
+            let subtotalItens = 0;
             carrinho.forEach(item => {
+                subtotalItens += item.precoTotalItem;
                 textoPedido += `\n*1x ${item.produtoBase.nome}* (R$ ${item.produtoBase.preco.toFixed(2).replace('.', ',')})\n`;
                 item.adicionais.forEach(add => {
                     const subtotalExtra = add.preco * add.quantidade;
@@ -1179,12 +1211,16 @@ async function enviarParaWhatsApp() {
                 textoPedido += `   *Subtotal do item: R$ ${item.precoTotalItem.toFixed(2).replace('.', ',')}*\n`;
             });
 
-            if (taxaEntrega > 0) {
-                textoPedido += `\n🛵 *Taxa de entrega: R$ ${taxaEntrega.toFixed(2).replace('.', ',')}*\n`;
-            }
+            // Ordem proposital: subtotal -> desconto -> taxa de entrega -> total.
+            // O cupom desconta só em cima do subtotal dos itens, nunca da taxa.
+            textoPedido += `\n💵 *Subtotal: R$ ${subtotalItens.toFixed(2).replace('.', ',')}*\n`;
 
             if (cupomAplicado) {
-                textoPedido += `\n🏷️ *Cupom ${cupomAplicado.codigo}: -R$ ${cupomAplicado.valorDesconto.toFixed(2).replace('.', ',')}*\n`;
+                textoPedido += `🏷️ *Cupom ${cupomAplicado.codigo}: -R$ ${cupomAplicado.valorDesconto.toFixed(2).replace('.', ',')}*\n`;
+            }
+
+            if (taxaEntrega > 0) {
+                textoPedido += `🛵 *Taxa de entrega: R$ ${taxaEntrega.toFixed(2).replace('.', ',')}*\n`;
             }
 
             textoPedido += `\n💰 *TOTAL DO PEDIDO: R$ ${totalCalculado.toFixed(2).replace('.', ',')}*`;

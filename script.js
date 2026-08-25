@@ -763,9 +763,31 @@ function renderizarCheckout() {
     divItens.innerHTML = "";
     let somaTotal = 0;
 
+    // Agrupa itens IDÊNTICOS (mesmo produto, mesmos adicionais, mesma
+    // observação) numa linha só com quantidade — "1x Coca" + "1x Coca" vira
+    // "2x Coca". Item com observação diferente (ex: "sem tomate") não se
+    // mistura com um igual sem observação, fica em linhas separadas.
+    const grupos = [];
     carrinho.forEach((item, index) => {
-        somaTotal += item.precoTotalItem;
-        
+        const chave = JSON.stringify({
+            id: item.produtoBase.id,
+            adicionais: item.adicionais.map(a => ({ id: a.id, quantidade: a.quantidade })),
+            observacao: item.observacao || ''
+        });
+        const existente = grupos.find(g => g.chave === chave);
+        if (existente) {
+            existente.indices.push(index);
+        } else {
+            grupos.push({ chave, item, indices: [index] });
+        }
+    });
+
+    grupos.forEach(grupo => {
+        const item = grupo.item;
+        const qtd = grupo.indices.length;
+        const primeiroIndice = grupo.indices[0];
+        somaTotal += item.precoTotalItem * qtd;
+
         let listaAddsHtml = "";
         if (item.adicionais.length > 0) {
             listaAddsHtml = "<ul style='color: #aaa; font-size: 13px; margin-top: 5px; list-style: none;'>";
@@ -784,14 +806,18 @@ function renderizarCheckout() {
         divItens.innerHTML += `
             <div style="background: #222; border-radius: 8px; padding: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333;">
                 <div>
-                    <strong>1x ${escaparHtml(item.produtoBase.nome)} <span style="color: #aaa; font-size: 13px;">(R$ ${item.produtoBase.preco.toFixed(2).replace('.', ',')})</span></strong>
+                    <strong>${qtd}x ${escaparHtml(item.produtoBase.nome)} <span style="color: #aaa; font-size: 13px;">(R$ ${item.produtoBase.preco.toFixed(2).replace('.', ',')})</span></strong>
                     ${listaAddsHtml}
                     ${obsHtml}
                     <div style="color: var(--laranja-fogo, #ff5e00); margin-top: 5px; font-weight: bold; font-size: 15px;">
-                        Subtotal: R$ ${item.precoTotalItem.toFixed(2).replace('.', ',')}
+                        Subtotal: R$ ${(item.precoTotalItem * qtd).toFixed(2).replace('.', ',')}
                     </div>
                 </div>
-                <button onclick="removerDoCarrinho(${index})" style="background: transparent; color: #ff4757; border: none; font-size: 18px; cursor: pointer;"><i class="fa-solid fa-trash"></i></button>
+                <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+                    <button onclick="removerDoCarrinho(${primeiroIndice})" style="background: transparent; color: #ff4757; border: none; font-size: 16px; cursor: pointer; padding: 4px;"><i class="fa-solid fa-minus"></i></button>
+                    <span style="color:#fff; font-weight:bold; min-width:14px; text-align:center;">${qtd}</span>
+                    <button onclick="duplicarItemCarrinho(${primeiroIndice})" style="background: transparent; color: #2ed573; border: none; font-size: 16px; cursor: pointer; padding: 4px;"><i class="fa-solid fa-plus"></i></button>
+                </div>
             </div>
         `;
     });
@@ -855,6 +881,19 @@ function removerDoCarrinho(index) {
 
     if (carrinho.length === 0) navegarPara('inicio');
     else renderizarCheckout();
+}
+
+// Adiciona mais uma unidade idêntica a um item já no carrinho (mesmos
+// adicionais e observação) — usado pelo "+" da linha agrupada no checkout.
+function duplicarItemCarrinho(index) {
+    const original = carrinho[index];
+    if (!original) return;
+
+    carrinho.push(JSON.parse(JSON.stringify(original)));
+    atualizarContadorCart();
+    renderizarCardapio();
+    removerCupom();
+    renderizarCheckout();
 }
 
 async function aplicarCupom() {
@@ -978,7 +1017,6 @@ function abrirVitrinePromocoes() {
 function atualizarAvisoProgressoCupom(subtotalAtual) {
     const container = document.getElementById("aviso-progresso-cupom");
     const textoEl = document.getElementById("texto-aviso-progresso-cupom");
-    const btnTurbinar = document.getElementById("btn-turbinar-pedido");
     if (!container || !textoEl) return;
 
     const candidatos = cuponsPublicosCache.filter(c =>
@@ -987,7 +1025,6 @@ function atualizarAvisoProgressoCupom(subtotalAtual) {
 
     if (candidatos.length === 0) {
         container.style.display = "none";
-        fecharCarrosselTurbinar();
         return;
     }
 
@@ -1003,12 +1040,8 @@ function atualizarAvisoProgressoCupom(subtotalAtual) {
         const faltante = Number(proximo.valor_minimo_pedido) - subtotalAtual;
         textoEl.innerHTML = `<i class="fa-solid fa-gift"></i> Falta <strong>R$ ${faltante.toFixed(2).replace('.', ',')}</strong> pra desbloquear o cupom <strong>${escaparHtml(proximo.codigo)}</strong> (${descricaoDesconto(proximo)})!`;
         container.style.display = "block";
-        if (btnTurbinar) btnTurbinar.style.display = "flex";
         return;
     }
-
-    if (btnTurbinar) btnTurbinar.style.display = "none";
-    fecharCarrosselTurbinar();
 
     const melhorDisponivel = candidatos
         .filter(c => Number(c.valor_minimo_pedido) <= subtotalAtual)

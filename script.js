@@ -928,7 +928,7 @@ async function carregarCuponsPublicos() {
         const resposta = await fetchSupabase(`/rest/v1/rpc/listar_cupons_publicos`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ p_loja_id: lojaAtual.id })
+            body: JSON.stringify({ p_loja_id: lojaAtual.id, p_cliente_id: obterOuCriarClienteId() })
         });
         cuponsPublicosCache = resposta.ok ? await resposta.json() : [];
     } catch (erro) {
@@ -977,7 +977,9 @@ function abrirVitrinePromocoes() {
 // menor, pula automaticamente pra sugerir o de cima (se houver).
 function atualizarAvisoProgressoCupom(subtotalAtual) {
     const container = document.getElementById("aviso-progresso-cupom");
-    if (!container) return;
+    const textoEl = document.getElementById("texto-aviso-progresso-cupom");
+    const btnTurbinar = document.getElementById("btn-turbinar-pedido");
+    if (!container || !textoEl) return;
 
     const candidatos = cuponsPublicosCache.filter(c =>
         c.valor_minimo_pedido && (!cupomAplicado || c.codigo !== cupomAplicado.codigo)
@@ -985,6 +987,7 @@ function atualizarAvisoProgressoCupom(subtotalAtual) {
 
     if (candidatos.length === 0) {
         container.style.display = "none";
+        fecharCarrosselTurbinar();
         return;
     }
 
@@ -998,22 +1001,83 @@ function atualizarAvisoProgressoCupom(subtotalAtual) {
 
     if (proximo) {
         const faltante = Number(proximo.valor_minimo_pedido) - subtotalAtual;
-        container.innerHTML = `<i class="fa-solid fa-gift"></i> Falta <strong>R$ ${faltante.toFixed(2).replace('.', ',')}</strong> pra desbloquear o cupom <strong>${escaparHtml(proximo.codigo)}</strong> (${descricaoDesconto(proximo)})!`;
+        textoEl.innerHTML = `<i class="fa-solid fa-gift"></i> Falta <strong>R$ ${faltante.toFixed(2).replace('.', ',')}</strong> pra desbloquear o cupom <strong>${escaparHtml(proximo.codigo)}</strong> (${descricaoDesconto(proximo)})!`;
         container.style.display = "block";
+        if (btnTurbinar) btnTurbinar.style.display = "flex";
         return;
     }
+
+    if (btnTurbinar) btnTurbinar.style.display = "none";
+    fecharCarrosselTurbinar();
 
     const melhorDisponivel = candidatos
         .filter(c => Number(c.valor_minimo_pedido) <= subtotalAtual)
         .sort((a, b) => Number(b.valor_minimo_pedido) - Number(a.valor_minimo_pedido))[0];
 
     if (melhorDisponivel) {
-        container.innerHTML = `<i class="fa-solid fa-circle-check"></i> Você já pode usar o cupom <strong>${escaparHtml(melhorDisponivel.codigo)}</strong> (${descricaoDesconto(melhorDisponivel)})!`;
+        textoEl.innerHTML = `<i class="fa-solid fa-circle-check"></i> Você já pode usar o cupom <strong>${escaparHtml(melhorDisponivel.codigo)}</strong> (${descricaoDesconto(melhorDisponivel)})!`;
         container.style.display = "block";
         return;
     }
 
     container.style.display = "none";
+}
+
+// ==========================================
+// "TURBINAR PEDIDO" — carrossel horizontal de adição rápida, aberto pelo
+// "+" no aviso de progresso do cupom.
+// ==========================================
+function alternarCarrosselTurbinar() {
+    const carrossel = document.getElementById("carrossel-turbinar");
+    if (!carrossel) return;
+
+    if (carrossel.style.display === "block") {
+        fecharCarrosselTurbinar();
+        return;
+    }
+    renderizarCarrosselTurbinar();
+    carrossel.style.display = "block";
+}
+
+function fecharCarrosselTurbinar() {
+    const carrossel = document.getElementById("carrossel-turbinar");
+    if (carrossel) carrossel.style.display = "none";
+}
+
+function renderizarCarrosselTurbinar() {
+    const lista = document.getElementById("carrossel-turbinar-itens");
+    if (!lista) return;
+
+    const disponiveis = cardapio.filter(p => p.tem_estoque !== false).sort((a, b) => a.preco - b.preco);
+
+    if (disponiveis.length === 0) {
+        lista.innerHTML = `<p style="color:#aaa; font-size:13px; margin:0;">Nenhum item disponível agora.</p>`;
+        return;
+    }
+
+    lista.innerHTML = disponiveis.map(p => `
+        <div style="flex: 0 0 auto; width: 108px; background:#1a1a1a; border:1px solid #333; border-radius:10px; padding:8px; text-align:center;">
+            <div style="width:100%; height:58px; border-radius:6px; background-size:cover; background-position:center; background-color:#222; ${p.imagem ? `background-image:url('${p.imagem}');` : ''} margin-bottom:6px;"></div>
+            <div style="font-size:11.5px; color:#fff; font-weight:600; line-height:1.25; height:28px; overflow:hidden;">${escaparHtml(p.nome)}</div>
+            <div style="font-size:12px; color:#2ed573; font-weight:700; margin:4px 0;">R$ ${p.preco.toFixed(2).replace('.', ',')}</div>
+            <button type="button" onclick="adicionarProdutoRapido(${p.id})" style="width:100%; background: var(--laranja-fogo, #ff5e00); color:#fff; border:none; border-radius:6px; padding:6px; font-size:12px; font-weight:bold; cursor:pointer;">+ Add</button>
+        </div>
+    `).join('');
+}
+
+function adicionarProdutoRapido(produtoId) {
+    const produto = cardapio.find(p => p.id === produtoId);
+    if (!produto) return;
+
+    carrinho.push({
+        produtoBase: produto,
+        adicionais: [],
+        precoTotalItem: produto.preco,
+        observacao: ""
+    });
+
+    atualizarContadorCart();
+    renderizarCheckout();
 }
 
 function usarCupomDaVitrine(codigo) {

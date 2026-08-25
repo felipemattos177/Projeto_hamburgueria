@@ -153,7 +153,16 @@
 
             <section class="checkout-secao">
                 <h3><i class="fa-solid fa-tags"></i> Cupom de Desconto</h3>
-                <div id="aviso-progresso-cupom" style="display:none; background: rgba(255,94,0,0.08); border: 1px solid rgba(255,94,0,0.3); border-radius: 8px; padding: 10px 12px; font-size: 13px; color: #ffb37a; margin-bottom: 12px;"></div>
+                <div id="aviso-progresso-cupom" style="display:none; background: rgba(255,94,0,0.08); border: 1px solid rgba(255,94,0,0.3); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                        <span id="texto-aviso-progresso-cupom" style="flex:1; font-size: 13px; color: #ffb37a;"></span>
+                        <button type="button" id="btn-turbinar-pedido" onclick="alternarCarrosselTurbinar()" title="Adicionar mais itens rápido" style="display:none; background: var(--laranja-fogo, #ff5e00); color:#fff; border:none; width:26px; height:26px; border-radius:50%; font-size:16px; font-weight:bold; cursor:pointer; flex-shrink:0; align-items:center; justify-content:center; line-height:1;">+</button>
+                    </div>
+                </div>
+                <div id="carrossel-turbinar" style="display:none; margin-bottom: 12px;">
+                    <div style="font-size:11.5px; color:#888; font-weight:600; text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px;"><i class="fa-solid fa-bolt"></i> Turbinar pedido</div>
+                    <div id="carrossel-turbinar-itens" style="display:flex; gap:10px; overflow-x:auto; padding-bottom:6px; -webkit-overflow-scrolling:touch;"></div>
+                </div>
                 <div id="linha-cupom-aplicado" class="cupom-chip-aplicado" style="display: none; margin-bottom: 12px;">
                     <div class="cupom-chip-info">
                         <div class="cupom-chip-icone"><i class="fa-solid fa-tag"></i></div>

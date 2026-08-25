@@ -2197,9 +2197,12 @@ function renderizarTabelaCupons(cupons) {
     }
 
     tbody.innerHTML = cupons.map(c => {
-        const descontoTexto = c.tipo_desconto === 'percentual'
+        let descontoTexto = c.tipo_desconto === 'percentual'
             ? `${Number(c.valor_desconto)}%`
             : `R$ ${Number(c.valor_desconto).toFixed(2).replace('.', ',')}`;
+        if (c.valor_minimo_pedido) {
+            descontoTexto += `<div style="font-size:11px; color: var(--texto-claro); font-weight:400;">a partir de R$ ${Number(c.valor_minimo_pedido).toFixed(2).replace('.', ',')}</div>`;
+        }
         const tetoTexto = c.desconto_maximo_por_pedido
             ? `R$ ${Number(c.desconto_maximo_por_pedido).toFixed(2).replace('.', ',')}`
             : '—';
@@ -2253,6 +2256,7 @@ function abrirModalCupom() {
     document.getElementById("cupom-tipo").value = "percentual";
     document.getElementById("cupom-valor").value = "";
     document.getElementById("cupom-teto-pedido").value = "";
+    document.getElementById("cupom-valor-minimo").value = "";
     document.getElementById("cupom-limite-usos").value = "";
     document.getElementById("cupom-limite-valor").value = "";
     document.getElementById("cupom-max-pedidos-anteriores").value = "";
@@ -2280,6 +2284,7 @@ async function salvarCupom() {
     const tetoPedido = document.getElementById("cupom-teto-pedido").value;
     const limiteUsos = document.getElementById("cupom-limite-usos").value;
     const limiteValor = document.getElementById("cupom-limite-valor").value;
+    const valorMinimo = document.getElementById("cupom-valor-minimo").value;
     const maxPedidosAnteriores = document.getElementById("cupom-max-pedidos-anteriores").value;
     const erroEl = document.getElementById("cupom-erro");
     erroEl.style.display = "none";
@@ -2312,6 +2317,7 @@ async function salvarCupom() {
                 desconto_maximo_por_pedido: (tipo === 'percentual' && tetoPedido) ? parseFloat(tetoPedido) : null,
                 limite_usos: limiteUsos ? parseInt(limiteUsos, 10) : null,
                 limite_valor_total_desconto: limiteValor ? parseFloat(limiteValor) : null,
+                valor_minimo_pedido: valorMinimo ? parseFloat(valorMinimo) : null,
                 maximo_pedidos_anteriores: maxPedidosAnteriores !== "" ? parseInt(maxPedidosAnteriores, 10) : null,
                 limite_por_cliente: document.getElementById("cupom-limite-por-cliente").checked,
                 publico: document.getElementById("cupom-publico").checked

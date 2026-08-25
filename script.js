@@ -802,6 +802,8 @@ function renderizarCheckout() {
         </button>
     `;
 
+    atualizarAvisoProgressoCupom(somaTotal);
+
     const descontoAtual = obterDescontoCupomAtual();
     if (descontoAtual > 0) {
         somaTotal -= descontoAtual;
@@ -950,9 +952,12 @@ function abrirVitrinePromocoes() {
         container.innerHTML = `<p style="color:#aaa; font-size:13px; margin:0;">Nenhuma promoção disponível no momento.</p>`;
     } else {
         container.innerHTML = cuponsPublicosCache.map(c => {
-            const descricao = c.tipo_desconto === 'percentual'
+            let descricao = c.tipo_desconto === 'percentual'
                 ? `${Number(c.valor_desconto)}% de desconto${c.desconto_maximo_por_pedido ? ` (até R$ ${Number(c.desconto_maximo_por_pedido).toFixed(2).replace('.', ',')})` : ''}`
                 : `R$ ${Number(c.valor_desconto).toFixed(2).replace('.', ',')} de desconto`;
+            if (c.valor_minimo_pedido) {
+                descricao += ` · a partir de R$ ${Number(c.valor_minimo_pedido).toFixed(2).replace('.', ',')}`;
+            }
             return `
                 <div style="display:flex; justify-content:space-between; align-items:center; padding: 8px 0; border-bottom: 1px solid #2a2a2a;">
                     <div>
@@ -965,6 +970,50 @@ function abrirVitrinePromocoes() {
         }).join('');
     }
     container.style.display = "block";
+}
+
+// Mostra "falta R$X pra desbloquear o cupom Y" olhando sempre pro PRÓXIMO
+// patamar ainda não alcançado — se o cliente já bateu o mínimo de um cupom
+// menor, pula automaticamente pra sugerir o de cima (se houver).
+function atualizarAvisoProgressoCupom(subtotalAtual) {
+    const container = document.getElementById("aviso-progresso-cupom");
+    if (!container) return;
+
+    const candidatos = cuponsPublicosCache.filter(c =>
+        c.valor_minimo_pedido && (!cupomAplicado || c.codigo !== cupomAplicado.codigo)
+    );
+
+    if (candidatos.length === 0) {
+        container.style.display = "none";
+        return;
+    }
+
+    const descricaoDesconto = (c) => c.tipo_desconto === 'percentual'
+        ? `${Number(c.valor_desconto)}% de desconto`
+        : `R$ ${Number(c.valor_desconto).toFixed(2).replace('.', ',')} de desconto`;
+
+    const proximo = candidatos
+        .filter(c => Number(c.valor_minimo_pedido) > subtotalAtual)
+        .sort((a, b) => Number(a.valor_minimo_pedido) - Number(b.valor_minimo_pedido))[0];
+
+    if (proximo) {
+        const faltante = Number(proximo.valor_minimo_pedido) - subtotalAtual;
+        container.innerHTML = `<i class="fa-solid fa-gift"></i> Falta <strong>R$ ${faltante.toFixed(2).replace('.', ',')}</strong> pra desbloquear o cupom <strong>${escaparHtml(proximo.codigo)}</strong> (${descricaoDesconto(proximo)})!`;
+        container.style.display = "block";
+        return;
+    }
+
+    const melhorDisponivel = candidatos
+        .filter(c => Number(c.valor_minimo_pedido) <= subtotalAtual)
+        .sort((a, b) => Number(b.valor_minimo_pedido) - Number(a.valor_minimo_pedido))[0];
+
+    if (melhorDisponivel) {
+        container.innerHTML = `<i class="fa-solid fa-circle-check"></i> Você já pode usar o cupom <strong>${escaparHtml(melhorDisponivel.codigo)}</strong> (${descricaoDesconto(melhorDisponivel)})!`;
+        container.style.display = "block";
+        return;
+    }
+
+    container.style.display = "none";
 }
 
 function usarCupomDaVitrine(codigo) {
@@ -1164,6 +1213,10 @@ async function enviarParaWhatsApp() {
                 removerCupom();
                 renderizarCheckout();
                 mostrarAviso("Esse cupom já foi usado por você antes e só vale uma vez. Remove pra continuar sem ele.", "Cupom Já Usado");
+            } else if (erroDB.message && erroDB.message.includes("CUPOM_VALOR_MINIMO_NAO_ATINGIDO")) {
+                removerCupom();
+                renderizarCheckout();
+                mostrarAviso("O carrinho ficou abaixo do valor mínimo exigido por esse cupom. Remove ou adiciona mais itens pra continuar.", "Valor Mínimo Não Atingido");
             } else if (erroDB.message && erroDB.message.includes("CUPOM_RESTRITO_A_NOVOS_CLIENTES")) {
                 removerCupom();
                 renderizarCheckout();

@@ -2580,6 +2580,10 @@ async function carregarConfiguracoesAdmin() {
             document.getElementById("admin-repasse-igual").checked = config.repasse_igual_taxa !== false;
             document.getElementById("admin-valor-repasse").value = config.valor_repasse_entregador || 0;
             alternarCampoRepasse();
+            document.getElementById("admin-tempo-entrega-modo").value = config.tempo_entrega_modo || "fixo";
+            document.getElementById("admin-tempo-entrega-fixo").value = config.tempo_entrega_fixo || 50;
+            document.getElementById("admin-tempo-retirada-modo").value = config.tempo_retirada_modo || "fixo";
+            document.getElementById("admin-tempo-retirada-fixo").value = config.tempo_retirada_fixo || 30;
 
             // 2. Preenche os Dados da Identidade Visual (White-Label)
             document.getElementById("admin-nome-loja").value = config.nome_loja || "";
@@ -2698,6 +2702,10 @@ async function salvarConfiguracoesLoja() {
             taxa_entrega: parseFloat(document.getElementById("admin-taxa-entrega").value) || 0,
             repasse_igual_taxa: document.getElementById("admin-repasse-igual").checked,
             valor_repasse_entregador: parseFloat(document.getElementById("admin-valor-repasse").value) || 0,
+            tempo_entrega_modo: document.getElementById("admin-tempo-entrega-modo").value,
+            tempo_entrega_fixo: parseInt(document.getElementById("admin-tempo-entrega-fixo").value, 10) || 50,
+            tempo_retirada_modo: document.getElementById("admin-tempo-retirada-modo").value,
+            tempo_retirada_fixo: parseInt(document.getElementById("admin-tempo-retirada-fixo").value, 10) || 30,
 
             nome_loja: document.getElementById("admin-nome-loja").value,
             titulo_banner: document.getElementById("admin-titulo-banner").value,

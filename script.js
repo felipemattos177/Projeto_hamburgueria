@@ -941,6 +941,35 @@ async function aplicarCupom() {
         btn.innerText = textoOriginal;
         btn.disabled = false;
     }
+    atualizarPrevisaoCliente();
+}
+
+async function obterPrevisaoCliente(tipo) {
+    const ehRetirada = tipo === "retirada";
+    const modo = configLoja[ehRetirada ? "tempo_retirada_modo" : "tempo_entrega_modo"] || "fixo";
+    const fixo = Number(configLoja[ehRetirada ? "tempo_retirada_fixo" : "tempo_entrega_fixo"]) || (ehRetirada ? 30 : 50);
+    if (modo !== "dinamico") return `Em ate ${fixo} minutos`;
+
+    try {
+        const resposta = await fetchSupabase(`/rest/v1/rpc/obter_previsao_pedido`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ p_loja_id: lojaAtual.id, p_tipo_entrega: tipo })
+        });
+        if (resposta.ok) return await resposta.json();
+    } catch (erro) {
+        console.warn("Previsao dinamica indisponivel; usando tempo fixo.", erro);
+    }
+    return `Em ate ${fixo} minutos`;
+}
+
+async function atualizarPrevisaoCliente() {
+    const elemento = document.getElementById("previsao-cliente");
+    if (!elemento || !lojaAtual) return;
+    elemento.style.display = "block";
+    elemento.innerHTML = '<i class="fa-solid fa-clock"></i> Calculando previsao...';
+    const previsao = await obterPrevisaoCliente(tipoEntregaSelecionado);
+    elemento.innerHTML = `<i class="fa-solid fa-clock"></i> Tempo estimado: <strong>${escaparHtml(previsao)}</strong>`;
 }
 
 function removerCupom() {
@@ -1372,7 +1401,7 @@ async function enviarParaWhatsApp() {
             p_cliente_id: clienteId,
             p_telefone_cliente: telefoneCliente,
             p_status: "Pendente",
-            p_previsao_entrega: "Em até 50 minutos",
+            p_previsao_entrega: await obterPrevisaoCliente(tipoEntregaSelecionado),
             p_carrinho: carrinho,
             p_loja_id: lojaAtual.id,
             p_tipo_entrega: tipoEntregaSelecionado,
@@ -1565,6 +1594,7 @@ async function carregarHistoricoPedidos() {
                         <span style="color: #aaa; font-size: 12px;">${dataFormatada}</span>
                     </div>
                     <div style="color: #fff; font-size: 14px; margin-bottom: 5px;">Status: <strong>${escaparHtml(p.status) || 'Pendente'}</strong></div>
+                    <div style="color: #aaa; font-size: 13px; margin-bottom: 5px;"><i class="fa-solid fa-clock"></i> Previsao: ${escaparHtml(p.previsao_entrega || 'Nao informada')}</div>
                     <div style="color: #fff; font-size: 14px; margin-bottom: 5px;">Pagamento: ${escaparHtml(p.forma_pagamento)}</div>
                     <div style="color: #2ed573; font-weight: bold; font-size: 15px;">Total: R$ ${Number(p.total).toFixed(2).replace('.', ',')}</div>
                 </div>
@@ -1787,6 +1817,7 @@ async function carregarConfiguracoes() {
     } catch (erro) {
         console.error("Erro ao puxar configurações da loja.", erro);
     } finally {
+        atualizarPrevisaoCliente();
         verificarHorarioLoja();
         setInterval(verificarHorarioLoja, 60000); 
     }

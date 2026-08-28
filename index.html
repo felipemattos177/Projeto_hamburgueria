@@ -186,13 +186,12 @@
             </section>
 
             <section class="checkout-secao">
-                <h3><i class="fa-solid fa-location-dot"></i> Entrega</h3>
+                <h3 style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;"><span><i class="fa-solid fa-location-dot"></i> Entrega</span><span id="previsao-cliente" style="display: none; align-items: center; gap: 6px; color: #ffd2b8; background: rgba(255,94,0,.12); border: 1px solid rgba(255,94,0,.28); border-radius: 999px; padding: 6px 10px; font-size: 11px; font-weight: 500; white-space: nowrap;"></span></h3>
 
                 <div style="display: flex; gap: 10px; margin-bottom: 15px;">
                     <button type="button" id="btn-tipo-entrega" onclick="selecionarTipoEntrega('entrega')" style="flex: 1; padding: 12px; border-radius: 8px; border: 2px solid var(--laranja-fogo, #ff5e00); background: var(--laranja-fogo, #ff5e00); color: #fff; font-weight: bold; cursor: pointer; font-size: 14px;"><i class="fa-solid fa-motorcycle"></i> Entrega</button>
                     <button type="button" id="btn-tipo-retirada" onclick="selecionarTipoEntrega('retirada')" style="flex: 1; padding: 12px; border-radius: 8px; border: 2px solid #333; background: transparent; color: #fff; font-weight: bold; cursor: pointer; font-size: 14px;"><i class="fa-solid fa-store"></i> Retirar na loja</button>
                 </div>
-                <div id="previsao-cliente" style="display: none; color: #ddd; background: rgba(255,94,0,.1); border: 1px solid rgba(255,94,0,.3); border-radius: 8px; padding: 10px 12px; margin-bottom: 15px; font-size: 13px;"></div>
 
                 <input type="text" id="nome-cliente" placeholder="Seu Nome Completo">
 

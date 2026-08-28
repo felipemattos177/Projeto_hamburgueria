@@ -746,7 +746,45 @@ function selecionarTipoEntrega(tipo) {
         btnEntrega.style.borderColor = "#333";
         camposEndereco.style.display = "none";
     }
+    atualizarPrevisaoCliente();
     renderizarCheckout();
+}
+
+let previsaoClienteAtualizacao = 0;
+
+async function obterPrevisaoCliente(tipo) {
+    const ehRetirada = tipo === "retirada";
+    const campoModo = ehRetirada ? "tempo_retirada_modo" : "tempo_entrega_modo";
+    const campoFixo = ehRetirada ? "tempo_retirada_fixo" : "tempo_entrega_fixo";
+    const tempoFixo = Number(configLoja[campoFixo]) || (ehRetirada ? 30 : 50);
+
+    if (configLoja[campoModo] !== "dinamico") return `Em ate ${tempoFixo} minutos`;
+
+    try {
+        const resposta = await fetchSupabase(`/rest/v1/rpc/obter_previsao_pedido`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ p_loja_id: lojaAtual.id, p_tipo_entrega: tipo })
+        });
+        if (resposta.ok) {
+            const previsao = await resposta.json();
+            if (typeof previsao === "string" && previsao.trim()) return previsao;
+        }
+    } catch (erro) {
+        console.warn("Previsao dinamica indisponivel; usando tempo fixo.");
+    }
+    return `Em ate ${tempoFixo} minutos`;
+}
+
+async function atualizarPrevisaoCliente() {
+    const elemento = document.getElementById("previsao-cliente");
+    if (!elemento || !lojaAtual) return;
+    const atualizacao = ++previsaoClienteAtualizacao;
+    elemento.style.display = "inline-flex";
+    elemento.innerHTML = '<i class="fa-solid fa-clock"></i><span>Calculando...</span>';
+    const previsao = await obterPrevisaoCliente(tipoEntregaSelecionado);
+    if (atualizacao !== previsaoClienteAtualizacao) return;
+    elemento.innerHTML = `<i class="fa-solid fa-clock"></i><span>Tempo estimado <strong>${escaparHtml(previsao)}</strong></span>`;
 }
 
 function abrirCheckout() {
@@ -942,34 +980,6 @@ async function aplicarCupom() {
         btn.disabled = false;
     }
     atualizarPrevisaoCliente();
-}
-
-async function obterPrevisaoCliente(tipo) {
-    const ehRetirada = tipo === "retirada";
-    const modo = configLoja[ehRetirada ? "tempo_retirada_modo" : "tempo_entrega_modo"] || "fixo";
-    const fixo = Number(configLoja[ehRetirada ? "tempo_retirada_fixo" : "tempo_entrega_fixo"]) || (ehRetirada ? 30 : 50);
-    if (modo !== "dinamico") return `Em ate ${fixo} minutos`;
-
-    try {
-        const resposta = await fetchSupabase(`/rest/v1/rpc/obter_previsao_pedido`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ p_loja_id: lojaAtual.id, p_tipo_entrega: tipo })
-        });
-        if (resposta.ok) return await resposta.json();
-    } catch (erro) {
-        console.warn("Previsao dinamica indisponivel; usando tempo fixo.", erro);
-    }
-    return `Em ate ${fixo} minutos`;
-}
-
-async function atualizarPrevisaoCliente() {
-    const elemento = document.getElementById("previsao-cliente");
-    if (!elemento || !lojaAtual) return;
-    elemento.style.display = "block";
-    elemento.innerHTML = '<i class="fa-solid fa-clock"></i> Calculando previsao...';
-    const previsao = await obterPrevisaoCliente(tipoEntregaSelecionado);
-    elemento.innerHTML = `<i class="fa-solid fa-clock"></i> Tempo estimado: <strong>${escaparHtml(previsao)}</strong>`;
 }
 
 function removerCupom() {
@@ -1819,6 +1829,7 @@ async function carregarConfiguracoes() {
     } finally {
         atualizarPrevisaoCliente();
         verificarHorarioLoja();
+        setInterval(verificarHorarioLoja, 60000); 
         setInterval(verificarHorarioLoja, 60000); 
     }
 }

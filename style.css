@@ -86,6 +86,7 @@ h1, h2, h3, .logo {
 
 /* Hero Section (Banner de Fogo) */
 .hero {
+    position: relative;
     margin-top: 60px;
     height: 200px;
     background-image: linear-gradient(to top, var(--fundo-principal), rgba(0,0,0,0.4)), url('https://images.unsplash.com/photo-1555939594-58d7cb561ad1?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80');
@@ -109,29 +110,30 @@ h1, h2, h3, .logo {
     text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
 }
 
-/* Resumo visivel da loja: informa o essencial sem esconder dados no logo. */
-.resumo-loja {
-    max-width: 600px;
-    margin: 0 auto;
-    padding: 14px 20px 4px;
+/* Acoes discretas sobre a foto, sem criar uma faixa extra no cardapio. */
+.hero-acoes-loja {
+    position: absolute;
+    right: 16px;
+    bottom: 14px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 12px;
-    border-bottom: 1px solid rgba(255,255,255,.08);
+    max-width: calc(100% - 32px);
 }
-
-.resumo-loja-linha {
+.hero-tempo-loja {
     display: flex;
     align-items: center;
     gap: 8px;
-    min-width: 0;
-    color: var(--texto-cinza);
-    font-size: 12px;
+    color: #fff;
+    background: rgba(18,18,18,.78);
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 999px;
+    padding: 7px 10px;
+    font-size: 11px;
     line-height: 1.35;
+    white-space: nowrap;
 }
-.resumo-loja-linha i { color: var(--laranja-fogo); flex-shrink: 0; }
-.resumo-loja-linha span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hero-tempo-loja i { color: var(--laranja-fogo); flex-shrink: 0; }
 .btn-ver-informacoes {
     flex-shrink: 0;
     display: inline-flex;
@@ -148,7 +150,8 @@ h1, h2, h3, .logo {
 .btn-ver-informacoes:hover { background: rgba(255,94,0,.1); }
 
 @media (max-width: 420px) {
-    .resumo-loja { align-items: flex-start; }
+    .hero-acoes-loja { right: 10px; bottom: 10px; gap: 7px; }
+    .hero-tempo-loja { padding: 6px 8px; }
     .btn-ver-informacoes { padding: 7px 8px; }
     .btn-ver-informacoes i { font-size: 13px; }
 }

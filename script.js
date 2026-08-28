@@ -1843,8 +1843,7 @@ async function renderizarResumoLoja() {
     if (!texto) return;
 
     const previsaoEntrega = await obterPrevisaoCliente("entrega");
-    const endereco = configLoja.endereco || "endereço não informado";
-    texto.innerText = `${previsaoEntrega} · ${endereco}`;
+    texto.innerText = `Entrega: ${previsaoEntrega.replace(/^Em ate /, "")}`;
 }
 
 function verificarHorarioLoja() {

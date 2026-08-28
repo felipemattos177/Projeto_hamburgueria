@@ -87,7 +87,7 @@ h1, h2, h3, .logo {
 /* Hero Section (Banner de Fogo) */
 .hero {
     position: relative;
-    margin-top: 60px;
+    margin-top: 0;
     height: 200px;
     background-image: linear-gradient(to top, var(--fundo-principal), rgba(0,0,0,0.4)), url('https://images.unsplash.com/photo-1555939594-58d7cb561ad1?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80');
     background-size: cover;
@@ -111,14 +111,16 @@ h1, h2, h3, .logo {
 }
 
 /* Acoes discretas sobre a foto, sem criar uma faixa extra no cardapio. */
-.hero-acoes-loja {
-    position: absolute;
-    right: 16px;
-    top: 14px;
+.acoes-loja-acima-banner {
+    max-width: 600px;
+    margin: 60px auto 0;
+    min-height: 38px;
+    padding: 5px 16px;
     display: flex;
     align-items: center;
+    justify-content: flex-end;
     gap: 12px;
-    max-width: calc(100% - 32px);
+    background: var(--fundo-principal);
 }
 .hero-tempo-loja {
     display: flex;
@@ -150,7 +152,7 @@ h1, h2, h3, .logo {
 .btn-ver-informacoes:hover { background: rgba(255,94,0,.1); }
 
 @media (max-width: 420px) {
-    .hero-acoes-loja { right: 10px; top: 10px; gap: 7px; }
+    .acoes-loja-acima-banner { margin-top: 60px; padding: 5px 10px; gap: 7px; }
     .hero-tempo-loja { padding: 6px 8px; }
     .btn-ver-informacoes { padding: 7px 8px; }
     .btn-ver-informacoes i { font-size: 13px; }

@@ -611,6 +611,11 @@
                     <input type="date" id="entregas-data-inicio" onchange="carregarRelatorioEntregas()" style="width: auto; padding: 8px; border-radius: 7px; border: 1px solid var(--borda); font-family: inherit; font-size: 14px;">
                     <span>até</span>
                     <input type="date" id="entregas-data-fim" onchange="carregarRelatorioEntregas()" style="width: auto; padding: 8px; border-radius: 7px; border: 1px solid var(--borda); font-family: inherit; font-size: 14px;">
+                    <select id="entregas-tipo" onchange="carregarRelatorioEntregas()" style="width: auto; padding: 8px; border-radius: 7px; border: 1px solid var(--borda); font-family: inherit; font-size: 14px; background: #fbfbfd; color: var(--texto);">
+                        <option value="todos">Todos os pedidos</option>
+                        <option value="entrega">Somente entregas</option>
+                        <option value="retirada">Somente retiradas</option>
+                    </select>
                 </div>
 
                 <div class="grid-config" style="margin-bottom: 20px;">
@@ -622,13 +627,21 @@
                         <h3 style="margin-bottom: 6px;"><i class="fa-solid fa-sack-dollar" style="color: var(--laranja-fogo);"></i> Total a Repassar</h3>
                         <div id="entregas-total-repasse" style="font-size: 28px; font-weight: 800; color: var(--texto);">R$ 0,00</div>
                     </div>
+                    <div class="card-config" style="--cor-card: var(--azul);">
+                        <h3 style="margin-bottom: 6px;"><i class="fa-solid fa-stopwatch" style="color: var(--azul);"></i> Tempo Médio Total</h3>
+                        <div id="entregas-tempo-total" style="font-size: 28px; font-weight: 800; color: var(--texto);">-</div>
+                    </div>
+                    <div class="card-config" style="--cor-card: var(--amarelo);">
+                        <h3 style="margin-bottom: 6px;"><i class="fa-solid fa-bag-shopping" style="color: var(--amarelo);"></i> Tempo Médio de Retirada</h3>
+                        <div id="retiradas-tempo-total" style="font-size: 28px; font-weight: 800; color: var(--texto);">-</div>
+                    </div>
                 </div>
 
                 <div class="card-config" style="--cor-card: var(--azul); margin-bottom: 20px;">
                     <h3><i class="fa-solid fa-user-group" style="color: var(--azul);"></i> Repasse por Entregador</h3>
                     <table style="box-shadow: none; border: none;">
-                        <thead><tr><th>Entregador</th><th>Entregas</th><th>Total a Pagar</th></tr></thead>
-                        <tbody id="tabela-repasse-entregador"><tr><td colspan="3" style="text-align:center;">Selecione um período.</td></tr></tbody>
+                        <thead><tr><th>Responsável</th><th>Pedidos</th><th>Média preparo</th><th>Média entrega/retirada</th><th>Total a Pagar</th></tr></thead>
+                        <tbody id="tabela-repasse-entregador"><tr><td colspan="5" style="text-align:center;">Selecione um período.</td></tr></tbody>
                     </table>
                 </div>
 
@@ -638,7 +651,9 @@
                         <tr>
                             <th>Pedido</th>
                             <th>Cliente</th>
-                            <th>Entregador</th>
+                            <th>Tipo</th>
+                            <th>Responsável</th>
+                            <th>Preparo</th>
                             <th>Tempo Total</th>
                             <th>Repasse</th>
                             <th></th>

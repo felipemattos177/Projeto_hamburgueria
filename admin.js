@@ -504,12 +504,13 @@ async function carregarRelatorioEntregas() {
     const tbody = document.getElementById("tabela-entregas");
     if (!dataInicio || !dataFim || !tbody) return;
 
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Carregando...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;">Carregando...</td></tr>';
 
     try {
+        const tipo = document.getElementById("entregas-tipo")?.value || "todos";
         const res = await fetch(
-            `${SUPABASE_URL}/rest/v1/pedidos?select=id,numero_pedido,nome_cliente,data_pedido,saiu_em,entregue_em,valor_repasse_entregador,entregador_id` +
-            `&loja_id=eq.${lojaAtual.id}&tipo_entrega=eq.entrega` +
+            `${SUPABASE_URL}/rest/v1/pedidos?select=id,numero_pedido,nome_cliente,data_pedido,saiu_em,entregue_em,valor_repasse_entregador,entregador_id,tipo_entrega` +
+            `&loja_id=eq.${lojaAtual.id}${tipo !== "todos" ? `&tipo_entrega=eq.${tipo}` : ""}` +
             `&data_pedido=gte.${dataInicio}T00:00:00-03:00&data_pedido=lte.${dataFim}T23:59:59-03:00&order=data_pedido.desc`,
             { headers: headersAutenticados() }
         );
@@ -519,23 +520,33 @@ async function carregarRelatorioEntregas() {
         let html = "";
         const porEntregador = {};
         entregasDetalhesCache = {};
+        const temposTotais = [];
+        const temposRetirada = [];
 
         pedidos.forEach(p => {
             const repasse = Number(p.valor_repasse_entregador) || 0;
             totalRepasse += repasse;
 
             const nomeEnt = p.entregador_id ? nomeEntregadorPorId(p.entregador_id) : "Sem entregador";
-            if (!porEntregador[nomeEnt]) porEntregador[nomeEnt] = { qtd: 0, total: 0 };
+            if (!porEntregador[nomeEnt]) porEntregador[nomeEnt] = { qtd: 0, total: 0, preparo: [], conclusao: [] };
             porEntregador[nomeEnt].qtd++;
             porEntregador[nomeEnt].total += repasse;
 
+            const tempoPreparoMin = minutosEntre(p.data_pedido, p.saiu_em);
+            const tempoConclusaoMin = minutosEntre(p.saiu_em || p.data_pedido, p.entregue_em);
             const tempoTotal = duracaoEntre(p.data_pedido, p.entregue_em);
+            if (tempoTotal !== '-') temposTotais.push(minutosEntre(p.data_pedido, p.entregue_em));
+            if (p.tipo_entrega === "retirada" && tempoTotal !== '-') temposRetirada.push(minutosEntre(p.data_pedido, p.entregue_em));
+            if (tempoPreparoMin !== null) porEntregador[nomeEnt].preparo.push(tempoPreparoMin);
+            if (tempoConclusaoMin !== null) porEntregador[nomeEnt].conclusao.push(tempoConclusaoMin);
             entregasDetalhesCache[p.id] = { ...p, nomeEnt, repasse };
             html += `
                 <tr>
                     <td>#${p.numero_pedido || p.id}</td>
                     <td>${escaparHtml(p.nome_cliente)}</td>
+                    <td>${p.tipo_entrega === 'retirada' ? 'Retirada' : 'Entrega'}</td>
                     <td>${escaparHtml(nomeEnt)}</td>
+                    <td>${duracaoEntre(p.data_pedido, p.saiu_em)}</td>
                     <td>${tempoTotal}</td>
                     <td>R$ ${repasse.toFixed(2).replace('.', ',')}</td>
                     <td><button class="btn-detalhes-entrega" onclick="abrirDetalhesEntrega(${p.id})">Mais detalhes</button></td>
@@ -543,18 +554,23 @@ async function carregarRelatorioEntregas() {
             `;
         });
 
-        tbody.innerHTML = html || '<tr><td colspan="6" style="text-align:center;">Nenhuma entrega nesse período.</td></tr>';
+        tbody.innerHTML = html || '<tr><td colspan="8" style="text-align:center;">Nenhum pedido nesse período.</td></tr>';
         document.getElementById("entregas-total-qtd").innerText = pedidos.length;
         document.getElementById("entregas-total-repasse").innerText = `R$ ${totalRepasse.toFixed(2).replace('.', ',')}`;
+        const media = valores => valores.length ? valores.reduce((total, valor) => total + valor, 0) / valores.length : null;
+        document.getElementById("entregas-tempo-total").innerText = formatarMinutos(media(temposTotais));
+        document.getElementById("retiradas-tempo-total").innerText = formatarMinutos(media(temposRetirada));
 
         const tbodyResumo = document.getElementById("tabela-repasse-entregador");
         const linhasResumo = Object.keys(porEntregador).map(nome => {
             const dados = porEntregador[nome];
-            return `<tr><td>${escaparHtml(nome)}</td><td>${dados.qtd}</td><td>R$ ${dados.total.toFixed(2).replace('.', ',')}</td></tr>`;
+            const mediaPreparo = dados.preparo.length ? dados.preparo.reduce((total, valor) => total + valor, 0) / dados.preparo.length : null;
+            const mediaConclusao = dados.conclusao.length ? dados.conclusao.reduce((total, valor) => total + valor, 0) / dados.conclusao.length : null;
+            return `<tr><td>${escaparHtml(nome)}</td><td>${dados.qtd}</td><td>${formatarMinutos(mediaPreparo)}</td><td>${formatarMinutos(mediaConclusao)}</td><td>R$ ${dados.total.toFixed(2).replace('.', ',')}</td></tr>`;
         }).join('');
-        tbodyResumo.innerHTML = linhasResumo || '<tr><td colspan="3" style="text-align:center;">Nenhuma entrega nesse período.</td></tr>';
+        tbodyResumo.innerHTML = linhasResumo || '<tr><td colspan="5" style="text-align:center;">Nenhum pedido nesse período.</td></tr>';
     } catch (erro) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color: var(--vermelho);">Erro ao carregar entregas.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color: var(--vermelho);">Erro ao carregar pedidos.</td></tr>';
         console.error(erro);
     }
 }
@@ -565,10 +581,11 @@ function abrirDetalhesEntrega(pedidoId) {
 
     document.getElementById("detalhes-entrega-numero").innerText = `#${p.numero_pedido || p.id}`;
 
+    const tituloConclusao = p.tipo_entrega === "retirada" ? "Retirado pelo cliente" : "Entregue";
     const passos = [
         { titulo: "Pedido feito", hora: p.data_pedido, anterior: null },
-        { titulo: "Saiu para entrega", hora: p.saiu_em, anterior: p.data_pedido },
-        { titulo: "Entregue", hora: p.entregue_em, anterior: p.saiu_em }
+        { titulo: p.tipo_entrega === "retirada" ? "Pronto para retirada" : "Saiu para entrega", hora: p.saiu_em, anterior: p.data_pedido },
+        { titulo: tituloConclusao, hora: p.entregue_em, anterior: p.saiu_em || p.data_pedido }
     ];
 
     const html = passos.map(passo => {

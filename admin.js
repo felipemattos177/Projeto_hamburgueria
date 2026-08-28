@@ -1781,6 +1781,8 @@ async function carregarPedidosAdmin() {
 // null = ainda não sabemos quais pedidos pendentes já existiam antes de a
 // página carregar; evita disparar som/impressão de tudo de uma vez ao abrir o painel.
 let idsPedidosVistosAutoImpressao = null;
+let filaImpressaoAutomatica = [];
+let processandoFilaImpressao = false;
 
 async function processarPedidosNovos(pedidos) {
     const idsPendentesAtuais = pedidos
@@ -1795,19 +1797,41 @@ async function processarPedidosNovos(pedidos) {
     const idsNovos = idsPendentesAtuais.filter(id => !idsPedidosVistosAutoImpressao.has(id));
     if (idsNovos.length === 0) return;
 
-    idsNovos.forEach(id => idsPedidosVistosAutoImpressao.add(id));
-
     // Alerta sonoro toca sempre que chega pedido novo, independente da
     // impressão automática estar ligada ou não.
     tocarSomNovoPedido();
 
     const toggleImpressao = document.getElementById("admin-impressao-automatica");
     if (toggleImpressao && toggleImpressao.checked) {
-        for (const id of idsNovos) {
-            await atualizarStatusPedido(id, 'Em Preparo');
-            await imprimirPedido(id);
-        }
+        idsNovos.forEach(id => {
+            if (!filaImpressaoAutomatica.includes(id)) filaImpressaoAutomatica.push(id);
+        });
+        processarFilaImpressao();
     }
+}
+
+async function processarFilaImpressao() {
+    if (processandoFilaImpressao) return;
+    processandoFilaImpressao = true;
+
+    while (filaImpressaoAutomatica.length > 0) {
+        const pedidoId = filaImpressaoAutomatica[0];
+        const impresso = await imprimirPedido(pedidoId);
+        if (!impresso) {
+            console.error(`Pedido ${pedidoId} nao foi impresso. Ele continua pendente.`);
+            break;
+        }
+
+        const atualizado = await atualizarStatusPedido(pedidoId, 'Em Preparo');
+        if (!atualizado) {
+            console.error(`Pedido ${pedidoId} foi impresso, mas nao mudou de status.`);
+            break;
+        }
+        filaImpressaoAutomatica.shift();
+        idsPedidosVistosAutoImpressao.add(pedidoId);
+    }
+
+    processandoFilaImpressao = false;
 }
 
 // Mesmo som usado no site do cliente quando o pedido sai para entrega.
@@ -1964,16 +1988,19 @@ async function atualizarStatusPedido(id, novoStatus, botao) {
     if (novoStatus === 'Entregue') corpo.entregue_em = new Date().toISOString();
 
     try {
-        await fetch(`${SUPABASE_URL}/rest/v1/pedidos?id=eq.${id}`, {
+        const resposta = await fetch(`${SUPABASE_URL}/rest/v1/pedidos?id=eq.${id}`, {
             method: 'PATCH',
             headers: { ...headersAutenticados('application/json'), 'Prefer': 'return=representation' },
             body: JSON.stringify(corpo)
         });
         
+        if (!resposta.ok) return false;
         carregarPedidosAdmin();
+        return true;
     } catch (erro) {
         alert("Erro ao atualizar status do pedido.");
         if (botao) { botao.disabled = false; botao.classList.remove("carregando"); }
+        return false;
     }
 }
 
@@ -1981,21 +2008,23 @@ async function atualizarStatusPedido(id, novoStatus, botao) {
 // MÓDULO 9: IMPRESSÃO DE CUPOM
 // ==========================================
 async function imprimirPedido(pedidoId) {
-    if (!(await garantirSessaoOuRelogar())) return;
+    if (!(await garantirSessaoOuRelogar())) return false;
 
     try {
         const resPedido = await fetch(
             `${SUPABASE_URL}/rest/v1/pedidos?select=*&id=eq.${pedidoId}&loja_id=eq.${lojaAtual.id}`,
             { headers: headersAutenticados() }
         );
+        if (!resPedido.ok) return false;
         const pedidos = await resPedido.json();
-        if (!pedidos || pedidos.length === 0) return;
+        if (!pedidos || pedidos.length === 0) return false;
         const pedido = pedidos[0];
 
         const resItens = await fetch(
             `${SUPABASE_URL}/rest/v1/itens_pedido?select=id,produto_id,quantidade,preco_unitario,observacao&pedido_id=eq.${pedidoId}&loja_id=eq.${lojaAtual.id}`,
             { headers: headersAutenticados() }
         );
+        if (!resItens.ok) return false;
         const itens = await resItens.json();
 
         const idsProdutos = [...new Set(itens.map(i => i.produto_id))];
@@ -2036,10 +2065,23 @@ async function imprimirPedido(pedidoId) {
         }
 
         montarCupomImpressao(pedido, itens, nomeProdutoPorId, adicionaisPorItem);
-        setTimeout(() => window.print(), 150);
+        await new Promise((resolve, reject) => {
+            let concluido = false;
+            const finalizar = () => {
+                if (concluido) return;
+                concluido = true;
+                window.removeEventListener('afterprint', finalizar);
+                resolve();
+            };
+            window.addEventListener('afterprint', finalizar, { once: true });
+            setTimeout(() => {
+                try { window.print(); } catch (erro) { reject(erro); }
+            }, 150);
+        });
+        return true;
     } catch (erro) {
         console.error("Erro ao preparar impressão:", erro);
-        alert("Erro ao preparar a impressão do pedido.");
+        return false;
     }
 }
 

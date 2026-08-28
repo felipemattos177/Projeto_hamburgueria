@@ -110,32 +110,24 @@ h1, h2, h3, .logo {
     text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
 }
 
-/* Acoes discretas sobre a foto, sem criar uma faixa extra no cardapio. */
-.acoes-loja-acima-banner {
-    max-width: 600px;
-    margin: 60px auto 0;
-    min-height: 38px;
-    padding: 5px 16px;
+.acoes-cabecalho-loja {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
     gap: 12px;
-    background: var(--fundo-principal);
+    margin-left: auto;
 }
-.hero-tempo-loja {
+.cabecalho-tempo-loja {
     display: flex;
     align-items: center;
     gap: 8px;
-    color: #fff;
-    background: rgba(18,18,18,.78);
-    border: 1px solid rgba(255,255,255,.18);
+    color: var(--texto-cinza);
     border-radius: 999px;
-    padding: 7px 10px;
+    padding: 5px 0;
     font-size: 11px;
     line-height: 1.35;
     white-space: nowrap;
 }
-.hero-tempo-loja i { color: var(--laranja-fogo); flex-shrink: 0; }
+.cabecalho-tempo-loja i { color: var(--laranja-fogo); flex-shrink: 0; }
 .btn-ver-informacoes {
     flex-shrink: 0;
     display: inline-flex;
@@ -152,9 +144,11 @@ h1, h2, h3, .logo {
 .btn-ver-informacoes:hover { background: rgba(255,94,0,.1); }
 
 @media (max-width: 420px) {
-    .acoes-loja-acima-banner { margin-top: 60px; padding: 5px 10px; gap: 7px; }
-    .hero-tempo-loja { padding: 6px 8px; }
-    .btn-ver-informacoes { padding: 7px 8px; }
+    .acoes-cabecalho-loja { gap: 8px; }
+    .cabecalho-tempo-loja { font-size: 10px; }
+    .logo { max-width: 46%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; letter-spacing: .5px; }
+    .acoes-cabecalho-loja { max-width: 54%; gap: 6px; }
+    .btn-ver-informacoes { padding: 7px 6px; font-size: 10px; }
     .btn-ver-informacoes i { font-size: 13px; }
 }
 

@@ -97,6 +97,10 @@
             <img id="loja-logo-img" src="" alt="" style="display: none; height: 28px; width: 28px; object-fit: contain; border-radius: 6px; vertical-align: middle; margin-right: 8px;">
             <i id="loja-logo-icone" class="fa-solid fa-fire-flame-curved"></i> <span id="loja-nome">Maths_hub</span>
         </div>
+        <div class="acoes-cabecalho-loja" aria-label="Informacoes da loja">
+            <span class="cabecalho-tempo-loja" title="Tempo estimado de entrega"><i class="fa-solid fa-clock"></i><span id="resumo-loja-texto">-- min</span></span>
+            <button type="button" class="btn-ver-informacoes" onclick="abrirModalLojaInfo()"><i class="fa-solid fa-circle-info"></i> <span>Ver informações</span></button>
+        </div>
     </header>
 
     <!-- === MODAL "SOBRE A LOJA" === -->
@@ -111,12 +115,6 @@
     <!-- TELA 1: CATÁLOGO E CARDÁPIO                -->
     <!-- ========================================== -->
     <div id="tela-catalogo">
-        <div class="acoes-loja-acima-banner" aria-label="Informacoes da loja">
-            <span class="hero-tempo-loja"><i class="fa-solid fa-clock"></i><span id="resumo-loja-texto">Calculando tempo...</span></span>
-            <button type="button" class="btn-ver-informacoes" onclick="abrirModalLojaInfo()">
-                <i class="fa-solid fa-circle-info"></i> Ver informações
-            </button>
-        </div>
         <!-- AQUI ESTÁ O BANNER QUE HAVIA SUMIDO -->
         <section class="hero" id="banner-fundo">
             <div class="hero-texto">

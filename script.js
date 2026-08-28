@@ -1701,6 +1701,10 @@ function abrirModalLojaInfo() {
                 <i class="fa-solid fa-clock" style="color: var(--laranja-fogo, #ff5e00); width: 18px;"></i>
                 <span style="color: #ddd; font-size: 14px;">${escaparHtml(horarioTexto)}</span>
             </div>
+            <div style="display: flex; gap: 12px; align-items: center;">
+                <i class="fa-solid fa-stopwatch" style="color: var(--laranja-fogo, #ff5e00); width: 18px;"></i>
+                <span style="color: #ddd; font-size: 14px;">Entrega: ${escaparHtml(`Em ate ${Number(configLoja.tempo_entrega_fixo) || 50} minutos`)} · Retirada: ${escaparHtml(`Em ate ${Number(configLoja.tempo_retirada_fixo) || 30} minutos`)}</span>
+            </div>
         </div>
     `;
 
@@ -1827,11 +1831,26 @@ async function carregarConfiguracoes() {
     } catch (erro) {
         console.error("Erro ao puxar configurações da loja.", erro);
     } finally {
+        renderizarResumoLoja();
         atualizarPrevisaoCliente();
         verificarHorarioLoja();
         setInterval(verificarHorarioLoja, 60000); 
-        setInterval(verificarHorarioLoja, 60000); 
     }
+}
+
+async function renderizarResumoLoja() {
+    const endereco = document.getElementById("resumo-loja-endereco");
+    const entrega = document.getElementById("resumo-tempo-entrega");
+    const retirada = document.getElementById("resumo-tempo-retirada");
+    if (!endereco || !entrega || !retirada) return;
+
+    endereco.innerText = configLoja.endereco || "Endereço não informado";
+    const [previsaoEntrega, previsaoRetirada] = await Promise.all([
+        obterPrevisaoCliente("entrega"),
+        obterPrevisaoCliente("retirada")
+    ]);
+    entrega.innerHTML = `<i class="fa-solid fa-motorcycle"></i> Entrega: ${escaparHtml(previsaoEntrega.replace(/^Em ate /, ""))}`;
+    retirada.innerHTML = `<i class="fa-solid fa-store"></i> Retirada: ${escaparHtml(previsaoRetirada.replace(/^Em ate /, ""))}`;
 }
 
 function verificarHorarioLoja() {

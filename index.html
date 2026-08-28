@@ -119,6 +119,22 @@
             </div>
         </section>
 
+        <section class="resumo-loja" aria-label="Informacoes da loja">
+            <div class="resumo-loja-dados">
+                <div class="resumo-loja-local">
+                    <i class="fa-solid fa-location-dot"></i>
+                    <span id="resumo-loja-endereco">Consulte nosso endereço</span>
+                </div>
+                <div class="resumo-loja-tempos">
+                    <span id="resumo-tempo-entrega"><i class="fa-solid fa-motorcycle"></i> Entrega: --</span>
+                    <span id="resumo-tempo-retirada"><i class="fa-solid fa-store"></i> Retirada: --</span>
+                </div>
+            </div>
+            <button type="button" class="btn-ver-informacoes" onclick="abrirModalLojaInfo()">
+                <i class="fa-solid fa-circle-info"></i> Ver informações
+            </button>
+        </section>
+
         <nav class="menu-categorias" id="menu-categorias-dinamico">
             <button class="btn-categoria ativo" onclick="filtrarCategoria('Todos', this)">Todos</button>
             <!-- Os outros botões vão nascer magicamente pelo JS lendo o banco! -->

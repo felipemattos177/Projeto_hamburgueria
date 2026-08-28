@@ -109,6 +109,53 @@ h1, h2, h3, .logo {
     text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
 }
 
+/* Resumo visivel da loja: informa o essencial sem esconder dados no logo. */
+.resumo-loja {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 14px 20px 4px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+}
+
+.resumo-loja-dados { min-width: 0; }
+.resumo-loja-local {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #ddd;
+    font-size: 12px;
+    line-height: 1.35;
+}
+.resumo-loja-local i { color: var(--laranja-fogo); flex-shrink: 0; }
+.resumo-loja-local span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.resumo-loja-tempos { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 7px; color: var(--texto-cinza); font-size: 11px; }
+.resumo-loja-tempos span { white-space: nowrap; }
+.resumo-loja-tempos i { color: var(--laranja-fogo); margin-right: 3px; }
+.btn-ver-informacoes {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+    color: var(--laranja-fogo);
+    background: transparent;
+    border: 1px solid rgba(255,94,0,.45);
+    border-radius: 7px;
+    font: 600 11px 'Roboto', sans-serif;
+    cursor: pointer;
+}
+.btn-ver-informacoes:hover { background: rgba(255,94,0,.1); }
+
+@media (max-width: 420px) {
+    .resumo-loja { align-items: flex-start; }
+    .btn-ver-informacoes { padding: 7px 8px; }
+    .btn-ver-informacoes i { font-size: 13px; }
+}
+
 /* Menu de Categorias Deslizante */
 .menu-categorias {
     display: flex;

@@ -54,6 +54,9 @@ h1, h2, h3, .logo {
 }
 
 .logo {
+    display: flex;
+    align-items: center;
+    min-width: 0;
     font-size: 20px;
     font-weight: 800;
     color: var(--laranja-fogo);
@@ -87,7 +90,7 @@ h1, h2, h3, .logo {
 /* Hero Section (Banner de Fogo) */
 .hero {
     position: relative;
-    margin-top: 0;
+    margin-top: 68px;
     height: 200px;
     background-image: linear-gradient(to top, var(--fundo-principal), rgba(0,0,0,0.4)), url('https://images.unsplash.com/photo-1555939594-58d7cb561ad1?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80');
     background-size: cover;
@@ -134,8 +137,8 @@ h1, h2, h3, .logo {
 
 @media (max-width: 420px) {
     .acoes-cabecalho-loja { gap: 8px; }
-    .logo { max-width: 46%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; letter-spacing: .5px; }
-    .acoes-cabecalho-loja { max-width: 54%; gap: 6px; }
+    .logo { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; letter-spacing: .5px; }
+    .acoes-cabecalho-loja { gap: 6px; }
 }
 
 /* Menu de Categorias Deslizante */

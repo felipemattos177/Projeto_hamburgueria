@@ -116,40 +116,26 @@ h1, h2, h3, .logo {
     gap: 12px;
     margin-left: auto;
 }
-.cabecalho-tempo-loja {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: var(--texto-cinza);
-    border-radius: 999px;
-    padding: 5px 0;
-    font-size: 11px;
-    line-height: 1.35;
-    white-space: nowrap;
-}
-.cabecalho-tempo-loja i { color: var(--laranja-fogo); flex-shrink: 0; }
-.btn-ver-informacoes {
+.btn-icone-informacoes {
     flex-shrink: 0;
+    width: 32px;
+    height: 32px;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 8px 10px;
+    justify-content: center;
     color: var(--laranja-fogo);
     background: transparent;
     border: 1px solid rgba(255,94,0,.45);
-    border-radius: 7px;
-    font: 600 11px 'Roboto', sans-serif;
+    border-radius: 50%;
+    font-size: 14px;
     cursor: pointer;
 }
-.btn-ver-informacoes:hover { background: rgba(255,94,0,.1); }
+.btn-icone-informacoes:hover { background: rgba(255,94,0,.1); }
 
 @media (max-width: 420px) {
     .acoes-cabecalho-loja { gap: 8px; }
-    .cabecalho-tempo-loja { font-size: 10px; }
     .logo { max-width: 46%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; letter-spacing: .5px; }
     .acoes-cabecalho-loja { max-width: 54%; gap: 6px; }
-    .btn-ver-informacoes { padding: 7px 6px; font-size: 10px; }
-    .btn-ver-informacoes i { font-size: 13px; }
 }
 
 /* Menu de Categorias Deslizante */

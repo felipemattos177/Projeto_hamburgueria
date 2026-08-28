@@ -1827,7 +1827,10 @@ async function carregarConfiguracoes() {
     try {
         const res = await fetchSupabase(`/rest/v1/configuracoes?select=*&loja_id=eq.${lojaAtual.id}&limit=1`);
         const dados = await res.json();
-        if (dados && dados.length > 0) configLoja = dados[0];
+        if (dados && dados.length > 0) {
+            configLoja = dados[0];
+            aplicarTemaCliente(configLoja.tema_cliente);
+        }
     } catch (erro) {
         console.error("Erro ao puxar configurações da loja.", erro);
     } finally {
@@ -1836,6 +1839,12 @@ async function carregarConfiguracoes() {
         verificarHorarioLoja();
         setInterval(verificarHorarioLoja, 60000); 
     }
+}
+
+function aplicarTemaCliente(tema) {
+    const temaAplicado = tema === "claro" ? "claro" : "escuro";
+    document.documentElement.dataset.tema = temaAplicado;
+    try { localStorage.setItem(chaveLocalStorage("tema_cliente"), temaAplicado); } catch (e) {}
 }
 
 async function renderizarResumoLoja() {

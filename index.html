@@ -25,6 +25,8 @@
             var _slug = (_params.get("loja") || window.location.hostname.split(".")[0]).toLowerCase();
             var corSalvaAntes = localStorage.getItem('loja_' + _slug + '_cor_principal');
             if (corSalvaAntes) document.documentElement.style.setProperty('--laranja-fogo', corSalvaAntes);
+            var temaSalvoAntes = localStorage.getItem('loja_' + _slug + '_tema_cliente');
+            if (temaSalvoAntes === 'claro') document.documentElement.dataset.tema = 'claro';
         } catch (e) {}
     </script>
     

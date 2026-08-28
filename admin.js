@@ -2584,6 +2584,7 @@ async function carregarConfiguracoesAdmin() {
             document.getElementById("admin-tempo-entrega-fixo").value = config.tempo_entrega_fixo || 50;
             document.getElementById("admin-tempo-retirada-modo").value = config.tempo_retirada_modo || "fixo";
             document.getElementById("admin-tempo-retirada-fixo").value = config.tempo_retirada_fixo || 30;
+            document.getElementById("admin-tema-cliente").value = config.tema_cliente || "escuro";
 
             // 2. Preenche os Dados da Identidade Visual (White-Label)
             document.getElementById("admin-nome-loja").value = config.nome_loja || "";
@@ -2706,6 +2707,7 @@ async function salvarConfiguracoesLoja() {
             tempo_entrega_fixo: parseInt(document.getElementById("admin-tempo-entrega-fixo").value, 10) || 50,
             tempo_retirada_modo: document.getElementById("admin-tempo-retirada-modo").value,
             tempo_retirada_fixo: parseInt(document.getElementById("admin-tempo-retirada-fixo").value, 10) || 30,
+            tema_cliente: document.getElementById("admin-tema-cliente").value,
 
             nome_loja: document.getElementById("admin-nome-loja").value,
             titulo_banner: document.getElementById("admin-titulo-banner").value,

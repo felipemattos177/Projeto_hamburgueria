@@ -716,6 +716,47 @@ body.modo-checkout .bottom-nav {
 #barra-sacola {
     bottom: 85px; 
 }
+
+/* Tema claro escolhido pela loja no painel administrativo. */
+html[data-tema="claro"] {
+    --fundo-principal: #f4f6f8;
+    --fundo-secundario: #ffffff;
+    --texto-claro: #17202a;
+    --texto-cinza: #5f6b76;
+    --borda: #d9dee5;
+}
+
+html[data-tema="claro"] .header {
+    background-color: rgba(255,255,255,.96);
+}
+html[data-tema="claro"] .produto-card,
+html[data-tema="claro"] .checkout-secao,
+html[data-tema="claro"] .modal-conteudo,
+html[data-tema="claro"] .skeleton-card {
+    box-shadow: 0 4px 15px rgba(23,32,42,.08);
+}
+html[data-tema="claro"] .produto-info h3,
+html[data-tema="claro"] .checkout-secao h3,
+html[data-tema="claro"] .item-checkout-info,
+html[data-tema="claro"] .modal-conteudo {
+    color: var(--texto-claro);
+}
+html[data-tema="claro"] input,
+html[data-tema="claro"] select {
+    background-color: #fff;
+    color: var(--texto-claro);
+}
+html[data-tema="claro"] .bottom-nav {
+    background-color: #fff;
+    border-top-color: var(--borda);
+}
+html[data-tema="claro"] .nav-item.ativo { color: var(--laranja-fogo); }
+html[data-tema="claro"] #barra-sacola {
+    background-color: #17202a;
+    color: #fff;
+}
+html[data-tema="claro"] .selo-esgotado { background-color: rgba(220,38,38,.88); }
+
 /* --- EFEITO DE FOGO NO CHECKOUT --- */
 #fogo-overlay {
     position: fixed;

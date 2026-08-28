@@ -121,20 +121,17 @@ h1, h2, h3, .logo {
     border-bottom: 1px solid rgba(255,255,255,.08);
 }
 
-.resumo-loja-dados { min-width: 0; }
-.resumo-loja-local {
+.resumo-loja-linha {
     display: flex;
     align-items: center;
     gap: 8px;
-    color: #ddd;
+    min-width: 0;
+    color: var(--texto-cinza);
     font-size: 12px;
     line-height: 1.35;
 }
-.resumo-loja-local i { color: var(--laranja-fogo); flex-shrink: 0; }
-.resumo-loja-local span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.resumo-loja-tempos { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 7px; color: var(--texto-cinza); font-size: 11px; }
-.resumo-loja-tempos span { white-space: nowrap; }
-.resumo-loja-tempos i { color: var(--laranja-fogo); margin-right: 3px; }
+.resumo-loja-linha i { color: var(--laranja-fogo); flex-shrink: 0; }
+.resumo-loja-linha span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .btn-ver-informacoes {
     flex-shrink: 0;
     display: inline-flex;

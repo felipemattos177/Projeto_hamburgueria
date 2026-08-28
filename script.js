@@ -1839,18 +1839,12 @@ async function carregarConfiguracoes() {
 }
 
 async function renderizarResumoLoja() {
-    const endereco = document.getElementById("resumo-loja-endereco");
-    const entrega = document.getElementById("resumo-tempo-entrega");
-    const retirada = document.getElementById("resumo-tempo-retirada");
-    if (!endereco || !entrega || !retirada) return;
+    const texto = document.getElementById("resumo-loja-texto");
+    if (!texto) return;
 
-    endereco.innerText = configLoja.endereco || "Endereço não informado";
-    const [previsaoEntrega, previsaoRetirada] = await Promise.all([
-        obterPrevisaoCliente("entrega"),
-        obterPrevisaoCliente("retirada")
-    ]);
-    entrega.innerHTML = `<i class="fa-solid fa-motorcycle"></i> Entrega: ${escaparHtml(previsaoEntrega.replace(/^Em ate /, ""))}`;
-    retirada.innerHTML = `<i class="fa-solid fa-store"></i> Retirada: ${escaparHtml(previsaoRetirada.replace(/^Em ate /, ""))}`;
+    const previsaoEntrega = await obterPrevisaoCliente("entrega");
+    const endereco = configLoja.endereco || "endereço não informado";
+    texto.innerText = `${previsaoEntrega} · ${endereco}`;
 }
 
 function verificarHorarioLoja() {

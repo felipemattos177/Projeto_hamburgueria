@@ -249,15 +249,34 @@ async function carregarDadosEntregador() {
         const minhasEntregas = await resMinhas.json();
         const entreguesHoje = await resEntreguesHoje.json();
 
+        const entreguesHojeDetalhados = await carregarEntregasFinalizadasHoje();
+
         document.getElementById("resumo-entregues").innerText = entreguesHoje;
         document.getElementById("resumo-andamento").innerText = minhasEntregas.length;
         document.getElementById("resumo-aguardando").innerText = pedidosPreparo.length;
 
         renderizarEmPreparo(pedidosPreparo);
         renderizarMinhasEntregas(minhasEntregas);
+        renderizarEntreguesHoje(entreguesHojeDetalhados);
         reaplicarItensAbertos();
     } catch (erro) {
         console.error("Erro ao carregar dados do entregador:", erro);
+    }
+}
+
+async function carregarEntregasFinalizadasHoje() {
+    try {
+        const hojeInicio = new Date();
+        hojeInicio.setHours(0, 0, 0, 0);
+
+        const url = `${SUPABASE_URL}/rest/v1/pedidos?select=id,numero_pedido,nome_cliente,telefone_cliente,endereco_entrega,total,forma_pagamento,entregue_em,valor_entrega&loja_id=eq.${lojaAtual.id}&entregador_id=eq.${entregadorAtual.entregador_id}&status=eq.Entregue&entregue_em=gte.${hojeInicio.toISOString()}`;
+        const res = await fetch(url, { headers: HEADERS_ANON });
+        if (!res.ok) return [];
+        const dados = await res.json();
+        return Array.isArray(dados) ? dados : [];
+    } catch (erro) {
+        console.error("Erro ao carregar entregas finalizadas hoje:", erro);
+        return [];
     }
 }
 
@@ -318,6 +337,35 @@ function renderizarMinhasEntregas(pedidos) {
                 <div id="itens-pedido-${ped.id}" class="itens-pedido-expandido" style="display:none;"></div>
                 ${linkMaps}
                 <button class="btn-acao-entregador btn-entregue" onclick="marcarComoEntregue(${ped.id})"><i class="fa-solid fa-check-double"></i> Marcar como entregue</button>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderizarEntreguesHoje(pedidos) {
+    const container = document.getElementById("lista-entregues-hoje");
+    if (!container) return;
+
+    if (!pedidos || pedidos.length === 0) {
+        container.innerHTML = '<div class="vazio">Nenhuma entrega concluída hoje.</div>';
+        return;
+    }
+
+    container.innerHTML = pedidos.map(ped => {
+        const totalNum = parseFloat(ped.total) || 0;
+        const hora = ped.entregue_em ? new Date(ped.entregue_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—';
+        return `
+            <div class="card-pedido-entregador">
+                <div class="cabecalho">
+                    <span class="pedido-id">#${ped.numero_pedido || ped.id}</span>
+                    <span class="pedido-hora">${hora}</span>
+                </div>
+                <div class="info">
+                    <strong>${escaparHtml(ped.nome_cliente) || 'Cliente'}</strong><br>
+                    ${ped.endereco_entrega ? escaparHtml(ped.endereco_entrega) + '<br>' : ''}
+                    ${ped.forma_pagamento ? `Pgto: ${escaparHtml(ped.forma_pagamento)}<br>` : ''}
+                    <span class="total">${formatarMoeda(totalNum)}</span>
+                </div>
             </div>
         `;
     }).join('');

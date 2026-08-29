@@ -222,16 +222,13 @@ function iniciarPainelEntregador() {
 // ==========================================
 async function carregarDadosEntregador() {
     try {
-        const hojeInicio = new Date();
-        hojeInicio.setHours(0, 0, 0, 0);
-
-        const [resPreparo, resMinhas, resEntreguesHoje] = await Promise.all([
-            chamarRpcEntregador('entregador_pedidos_em_preparo'),
+        const [resMinhas, resEntreguesHoje, pedidosPreparo] = await Promise.all([
             chamarRpcEntregador('entregador_minhas_entregas'),
-            chamarRpcEntregador('entregador_entregues_hoje')
+            chamarRpcEntregador('entregador_entregues_hoje'),
+            carregarPedidosDisponiveisEntrega()
         ]);
 
-        if (!resPreparo.ok || !resMinhas.ok || !resEntreguesHoje.ok) {
+        if (!resMinhas.ok || !resEntreguesHoje.ok) {
             // Token foi desativado enquanto o entregador estava com a tela aberta
             if (intervaloDadosEntregador) clearInterval(intervaloDadosEntregador);
             limparSessaoLocal();
@@ -245,10 +242,8 @@ async function carregarDadosEntregador() {
             return;
         }
 
-        const pedidosPreparo = await resPreparo.json();
         const minhasEntregas = await resMinhas.json();
         const entreguesHoje = await resEntreguesHoje.json();
-
         const entreguesHojeDetalhados = await carregarEntregasFinalizadasHoje();
 
         document.getElementById("resumo-entregues").innerText = entreguesHoje;
@@ -261,6 +256,21 @@ async function carregarDadosEntregador() {
         reaplicarItensAbertos();
     } catch (erro) {
         console.error("Erro ao carregar dados do entregador:", erro);
+    }
+}
+
+async function carregarPedidosDisponiveisEntrega() {
+    try {
+        const url = `${SUPABASE_URL}/rest/v1/pedidos?select=id,numero_pedido,nome_cliente,telefone_cliente,endereco_entrega,total,forma_pagamento,status,tipo_entrega,entregador_id&loja_id=eq.${lojaAtual.id}&tipo_entrega=eq.entrega&status=in.(Pendente,Em%20Preparo)&order=data_pedido.desc`;
+        const res = await fetch(url, { headers: HEADERS_ANON });
+        if (!res.ok) {
+            throw new Error(`Erro ao buscar pedidos disponíveis: ${res.status}`);
+        }
+        const dados = await res.json();
+        return Array.isArray(dados) ? dados : [];
+    } catch (erro) {
+        console.error("Erro ao carregar pedidos disponíveis para entrega:", erro);
+        return [];
     }
 }
 
@@ -283,18 +293,20 @@ async function carregarEntregasFinalizadasHoje() {
 function renderizarEmPreparo(pedidos) {
     const container = document.getElementById("lista-em-preparo");
     if (pedidos.length === 0) {
-        container.innerHTML = '<div class="vazio">Nenhum pedido em preparo no momento.</div>';
+        container.innerHTML = '<div class="vazio">Nenhum pedido de entrega pendente no momento.</div>';
         return;
     }
 
     container.innerHTML = pedidos.map(ped => {
         const totalNum = parseFloat(ped.total) || 0;
+        const statusTexto = String(ped.status || '').trim();
         const tipoTexto = ped.tipo_entrega === 'retirada' ? 'Retirada na loja' : 'Entrega';
+        const tagStatus = statusTexto === 'Pendente' ? 'Pendente' : 'Em preparo';
         return `
             <div class="card-pedido-entregador">
                 <div class="cabecalho">
                     <span class="pedido-id">#${ped.numero_pedido || ped.id}</span>
-                    <span class="pedido-hora">${tipoTexto}</span>
+                    <span class="pedido-hora">${tipoTexto} · ${tagStatus}</span>
                 </div>
                 <div class="info">
                     <strong>${escaparHtml(ped.nome_cliente) || 'Cliente'}</strong><br>

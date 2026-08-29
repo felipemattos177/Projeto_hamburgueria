@@ -222,13 +222,13 @@ function iniciarPainelEntregador() {
 // ==========================================
 async function carregarDadosEntregador() {
     try {
-        const [resMinhas, resEntreguesHoje, pedidosPreparo] = await Promise.all([
+        const [resPreparo, resMinhas, resEntreguesHoje] = await Promise.all([
+            chamarRpcEntregador('entregador_pedidos_em_preparo'),
             chamarRpcEntregador('entregador_minhas_entregas'),
-            chamarRpcEntregador('entregador_entregues_hoje'),
-            carregarPedidosDisponiveisEntrega()
+            chamarRpcEntregador('entregador_entregues_hoje')
         ]);
 
-        if (!resMinhas.ok || !resEntreguesHoje.ok) {
+        if (!resPreparo.ok || !resMinhas.ok || !resEntreguesHoje.ok) {
             // Token foi desativado enquanto o entregador estava com a tela aberta
             if (intervaloDadosEntregador) clearInterval(intervaloDadosEntregador);
             limparSessaoLocal();
@@ -242,9 +242,9 @@ async function carregarDadosEntregador() {
             return;
         }
 
+        const pedidosPreparo = await resPreparo.json();
         const minhasEntregas = await resMinhas.json();
         const entreguesHoje = await resEntreguesHoje.json();
-        const entreguesHojeDetalhados = await carregarEntregasFinalizadasHoje();
 
         document.getElementById("resumo-entregues").innerText = entreguesHoje;
         document.getElementById("resumo-andamento").innerText = minhasEntregas.length;
@@ -252,61 +252,27 @@ async function carregarDadosEntregador() {
 
         renderizarEmPreparo(pedidosPreparo);
         renderizarMinhasEntregas(minhasEntregas);
-        renderizarEntreguesHoje(entreguesHojeDetalhados);
         reaplicarItensAbertos();
     } catch (erro) {
         console.error("Erro ao carregar dados do entregador:", erro);
     }
 }
 
-async function carregarPedidosDisponiveisEntrega() {
-    try {
-        const url = `${SUPABASE_URL}/rest/v1/pedidos?select=id,numero_pedido,nome_cliente,telefone_cliente,endereco_entrega,total,forma_pagamento,status,tipo_entrega,entregador_id&loja_id=eq.${lojaAtual.id}&tipo_entrega=eq.entrega&status=in.(Pendente,Em%20Preparo)&order=data_pedido.desc`;
-        const res = await fetch(url, { headers: HEADERS_ANON });
-        if (!res.ok) {
-            throw new Error(`Erro ao buscar pedidos disponíveis: ${res.status}`);
-        }
-        const dados = await res.json();
-        return Array.isArray(dados) ? dados : [];
-    } catch (erro) {
-        console.error("Erro ao carregar pedidos disponíveis para entrega:", erro);
-        return [];
-    }
-}
-
-async function carregarEntregasFinalizadasHoje() {
-    try {
-        const hojeInicio = new Date();
-        hojeInicio.setHours(0, 0, 0, 0);
-
-        const url = `${SUPABASE_URL}/rest/v1/pedidos?select=id,numero_pedido,nome_cliente,telefone_cliente,endereco_entrega,total,forma_pagamento,entregue_em,valor_entrega&loja_id=eq.${lojaAtual.id}&entregador_id=eq.${entregadorAtual.entregador_id}&status=eq.Entregue&entregue_em=gte.${hojeInicio.toISOString()}`;
-        const res = await fetch(url, { headers: HEADERS_ANON });
-        if (!res.ok) return [];
-        const dados = await res.json();
-        return Array.isArray(dados) ? dados : [];
-    } catch (erro) {
-        console.error("Erro ao carregar entregas finalizadas hoje:", erro);
-        return [];
-    }
-}
-
 function renderizarEmPreparo(pedidos) {
     const container = document.getElementById("lista-em-preparo");
     if (pedidos.length === 0) {
-        container.innerHTML = '<div class="vazio">Nenhum pedido de entrega pendente no momento.</div>';
+        container.innerHTML = '<div class="vazio">Nenhum pedido em preparo no momento.</div>';
         return;
     }
 
     container.innerHTML = pedidos.map(ped => {
         const totalNum = parseFloat(ped.total) || 0;
-        const statusTexto = String(ped.status || '').trim();
         const tipoTexto = ped.tipo_entrega === 'retirada' ? 'Retirada na loja' : 'Entrega';
-        const tagStatus = statusTexto === 'Pendente' ? 'Pendente' : 'Em preparo';
         return `
             <div class="card-pedido-entregador">
                 <div class="cabecalho">
                     <span class="pedido-id">#${ped.numero_pedido || ped.id}</span>
-                    <span class="pedido-hora">${tipoTexto} · ${tagStatus}</span>
+                    <span class="pedido-hora">${tipoTexto}</span>
                 </div>
                 <div class="info">
                     <strong>${escaparHtml(ped.nome_cliente) || 'Cliente'}</strong><br>
@@ -349,35 +315,6 @@ function renderizarMinhasEntregas(pedidos) {
                 <div id="itens-pedido-${ped.id}" class="itens-pedido-expandido" style="display:none;"></div>
                 ${linkMaps}
                 <button class="btn-acao-entregador btn-entregue" onclick="marcarComoEntregue(${ped.id})"><i class="fa-solid fa-check-double"></i> Marcar como entregue</button>
-            </div>
-        `;
-    }).join('');
-}
-
-function renderizarEntreguesHoje(pedidos) {
-    const container = document.getElementById("lista-entregues-hoje");
-    if (!container) return;
-
-    if (!pedidos || pedidos.length === 0) {
-        container.innerHTML = '<div class="vazio">Nenhuma entrega concluída hoje.</div>';
-        return;
-    }
-
-    container.innerHTML = pedidos.map(ped => {
-        const totalNum = parseFloat(ped.total) || 0;
-        const hora = ped.entregue_em ? new Date(ped.entregue_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—';
-        return `
-            <div class="card-pedido-entregador">
-                <div class="cabecalho">
-                    <span class="pedido-id">#${ped.numero_pedido || ped.id}</span>
-                    <span class="pedido-hora">${hora}</span>
-                </div>
-                <div class="info">
-                    <strong>${escaparHtml(ped.nome_cliente) || 'Cliente'}</strong><br>
-                    ${ped.endereco_entrega ? escaparHtml(ped.endereco_entrega) + '<br>' : ''}
-                    ${ped.forma_pagamento ? `Pgto: ${escaparHtml(ped.forma_pagamento)}<br>` : ''}
-                    <span class="total">${formatarMoeda(totalNum)}</span>
-                </div>
             </div>
         `;
     }).join('');

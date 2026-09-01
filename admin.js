@@ -2586,16 +2586,61 @@ function reenviarTokenPorWhatsapp(entregadorId) {
 // MÓDULO 5: CONFIGURAÇÕES DA LOJA (O Cofre Mestre)
 // ==========================================
 
+async function garantirLinhaConfiguracoesLoja() {
+    try {
+        const resVerifica = await fetch(`${SUPABASE_URL}/rest/v1/configuracoes?loja_id=eq.${lojaAtual.id}&select=id,loja_id&limit=1`, {
+            method: 'GET',
+            headers: headersAutenticados()
+        });
+        const dados = await resVerifica.json();
+
+        if (dados && dados.length > 0) return dados[0];
+
+        const payloadInicial = {
+            loja_id: lojaAtual.id,
+            nome_loja: lojaAtual.nome || "",
+            tema_cliente: "escuro"
+        };
+
+        const resCria = await fetch(`${SUPABASE_URL}/rest/v1/configuracoes`, {
+            method: 'POST',
+            headers: headersAutenticados('application/json'),
+            body: JSON.stringify(payloadInicial)
+        });
+
+        if (!resCria.ok) {
+            const detalhe = await resCria.text();
+            console.error("Falha ao criar linha de configurações da loja:", detalhe);
+            throw new Error("Não foi possível criar a linha de configurações desta loja.");
+        }
+
+        const novaLinha = await resCria.json();
+        return Array.isArray(novaLinha) ? novaLinha[0] : novaLinha;
+    } catch (erro) {
+        console.error("Erro ao garantir linha de configurações da loja:", erro);
+        throw erro;
+    }
+}
+
 async function carregarConfiguracoesAdmin() {
     const elWebhook = document.getElementById("whatsapp-webhook-url");
     if (elWebhook) elWebhook.innerText = `${window.location.origin}/api/whatsapp-webhook`;
 
     try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracoes?loja_id=eq.${lojaAtual.id}&select=*`, {
+        let res = await fetch(`${SUPABASE_URL}/rest/v1/configuracoes?loja_id=eq.${lojaAtual.id}&select=*`, {
             method: 'GET',
             headers: headersAutenticados()
         });
-        const dados = await res.json();
+        let dados = await res.json();
+
+        if (!dados || dados.length === 0) {
+            await garantirLinhaConfiguracoesLoja();
+            res = await fetch(`${SUPABASE_URL}/rest/v1/configuracoes?loja_id=eq.${lojaAtual.id}&select=*`, {
+                method: 'GET',
+                headers: headersAutenticados()
+            });
+            dados = await res.json();
+        }
 
         if (dados && dados.length > 0) {
             const config = dados[0];
@@ -2728,6 +2773,8 @@ async function salvarConfiguracoesLoja() {
         // ==========================================================
         // 2. SALVANDO NA TABELA 'CONFIGURACOES'
         // ==========================================================
+        await garantirLinhaConfiguracoesLoja();
+
         const corpoDb = {
             chave_pix: document.getElementById("admin-chave-pix").value,
             nome_recebedor: document.getElementById("admin-nome-pix").value,

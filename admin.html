@@ -3,997 +3,274 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Painel de Gestão</title>
-    <script>
-        // Aplica a última cor conhecida da loja ANTES da página desenhar o
-        // primeiro quadro (sem esperar a consulta na rede) — evita o laranja
-        // padrão aparecer por uma fração de segundo em quem já visitou antes.
-        try {
-            var corSalvaAntes = localStorage.getItem('cor_principal_loja');
-            if (corSalvaAntes) document.documentElement.style.setProperty('--laranja-fogo', corSalvaAntes);
-        } catch (e) {}
-    </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <title>Painel de Gestão - Fire Burger</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
     <style>
-        :root {
-            --laranja-fogo: #ff5e00;
-            --laranja-suave: #fff2ea;
-            --bg-app: #f4f5f9;
-            --bg-sidebar: #15171f;
-            --bg-sidebar-hover: #1f222e;
-            --bg-card: #ffffff;
-            --texto: #171923;
-            --texto-suave: #667085;
-            --texto-claro: #98a2b3;
-            --borda: #e7e9ef;
-            --verde: #16a34a;
-            --verde-suave: #dcfce7;
-            --vermelho: #dc2626;
-            --vermelho-suave: #fee2e2;
-            --amarelo: #b45309;
-            --amarelo-suave: #fef3c7;
-            --azul: #2563eb;
-            --azul-suave: #dbeafe;
-            --rosa: #db2777;
-            --rosa-suave: #fce7f3;
-            --sombra: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
-            --sombra-lg: 0 10px 30px rgba(16,24,40,.12);
-            --raio: 12px;
-        }
-        * { box-sizing: border-box; }
-        body {
-            font-family: 'Inter', sans-serif; background-color: var(--bg-app); margin: 0;
-            color: var(--texto); -webkit-font-smoothing: antialiased;
-        }
-
-        /* ===== TELA DE LOGIN ===== */
-        #tela-login-admin {
-            position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
-            background:
-                radial-gradient(circle at 15% 15%, rgba(255,94,0,.18), transparent 45%),
-                radial-gradient(circle at 85% 85%, rgba(37,99,235,.15), transparent 45%),
-                var(--bg-sidebar);
-            z-index: 5000; padding: 20px;
-        }
-        .login-card { background: var(--bg-card); padding: 40px 34px; border-radius: 18px; width: 100%; max-width: 360px; box-shadow: var(--sombra-lg); }
-        .login-icone { width: 52px; height: 52px; border-radius: 14px; background: var(--laranja-fogo); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 22px; margin: 0 auto 18px; }
-        .login-card h1 { color: var(--texto); font-size: 19px; font-weight: 700; margin: 0 0 4px; text-align: center; }
-        .login-card p.subtitulo { color: var(--texto-suave); font-size: 13px; text-align: center; margin: 0 0 24px; }
-        .login-card label { font-size: 13px; font-weight: 500; color: var(--texto-suave); margin-bottom: 6px; display: block; }
-        .login-card input { width: 100%; padding: 12px 14px; margin-bottom: 16px; border: 1px solid var(--borda); border-radius: 9px; background: #fbfbfd; color: var(--texto); font-size: 14px; font-family: inherit; }
-        .login-card input:focus { outline: none; border-color: var(--laranja-fogo); background: #fff; }
-        .login-card button { width: 100%; background: var(--laranja-fogo); color: #fff; border: none; padding: 13px; border-radius: 9px; font-weight: 600; font-size: 14px; cursor: pointer; transition: .15s; }
-        .login-card button:hover { filter: brightness(1.08); }
-        #login-erro, #recuperar-erro, #nova-senha-erro { color: var(--vermelho); background: var(--vermelho-suave); padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; display: none; text-align: center; }
-        #recuperar-sucesso { color: var(--verde); background: var(--verde-suave); padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; display: none; text-align: center; }
-        .btn-google { width: 100%; background: #fff; color: #344054; border: 1px solid var(--borda); padding: 11px; border-radius: 9px; font-weight: 600; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; font-family: inherit; transition: .15s; }
-        .btn-google:hover { background: #fafbfc; }
-        .divisor-login { display: flex; align-items: center; text-align: center; color: var(--texto-claro); font-size: 12px; margin: 16px 0; }
-        .divisor-login::before, .divisor-login::after { content: ""; flex: 1; border-bottom: 1px solid var(--borda); }
-        .divisor-login span { padding: 0 10px; }
-        .link-recuperar { text-align: center; color: var(--texto-suave); font-size: 13px; margin: 14px 0 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
-        .link-recuperar:hover { color: var(--laranja-fogo); }
-
-        /* ===== LAYOUT: SIDEBAR + CONTEÚDO ===== */
-        #app-admin-container { display: none; }
-        .shell { display: flex; min-height: 100vh; }
-
-        .sidebar {
-            width: 252px; background: var(--bg-sidebar); color: #fff; flex-shrink: 0;
-            display: flex; flex-direction: column; padding: 22px 16px; position: fixed; top: 0; bottom: 0; left: 0;
-        }
-        .sidebar-brand { display: flex; align-items: center; gap: 12px; padding: 6px 8px 24px; }
-        .sidebar-brand-icone { width: 38px; height: 38px; border-radius: 10px; background: var(--laranja-fogo); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
-        .sidebar-brand-nome { font-weight: 700; font-size: 15px; line-height: 1.25; }
-        .sidebar-brand-tag { font-size: 11px; color: var(--texto-claro); text-transform: uppercase; letter-spacing: .05em; }
-
-        .sidebar-nav { display: flex; flex-direction: column; gap: 4px; }
-        .tab-btn {
-            background: transparent; color: #b6b9c6; border: none; text-align: left; padding: 11px 14px; border-radius: 9px;
-            font-weight: 500; cursor: pointer; transition: .15s; font-size: 14px; display: flex; align-items: center; gap: 11px;
-            font-family: inherit; width: 100%;
-        }
-        .tab-btn i { width: 18px; text-align: center; font-size: 15px; }
-        .tab-btn:hover:not(.ativa) { background: var(--bg-sidebar-hover); color: #fff; }
-        .tab-btn.ativa { background: var(--laranja-fogo); color: #fff; }
-
-        .sidebar-rodape { margin-top: auto; padding-top: 16px; border-top: 1px solid rgba(255,255,255,.08); }
-        .btn-sair-admin { background: transparent; color: #b6b9c6; border: 1px solid rgba(255,255,255,.12); padding: 11px 14px; border-radius: 9px; font-weight: 500; cursor: pointer; font-size: 14px; width: 100%; display: flex; align-items: center; gap: 11px; font-family: inherit; transition: .15s; }
-        .btn-sair-admin:hover { background: var(--bg-sidebar-hover); color: #fff; }
-
-        .conteudo { margin-left: 252px; flex: 1; padding: 32px 36px 60px; min-width: 0; }
-
+        :root { --laranja-fogo: #ff5e00; }
+        body { font-family: 'Roboto', sans-serif; background-color: #f4f6f8; margin: 0; padding: 20px; color: #333; padding-bottom: 50px;}
+        
+        /* === NAVEGAÇÃO DE SUBMENUS (TABS) === */
+        .tabs-container { display: flex; gap: 10px; background: #121212; padding: 15px 20px; border-radius: 10px; margin-bottom: 20px; align-items: center; flex-wrap: wrap;}
+        .tabs-logo { color: var(--laranja-fogo); font-weight: bold; font-size: 20px; margin-right: auto; }
+        .tab-btn { background: #333; color: #ccc; border: none; padding: 12px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 14px; display: flex; align-items: center; gap: 8px;}
+        .tab-btn.ativa { background: var(--laranja-fogo); color: white; }
+        .tab-btn:hover:not(.ativa) { background: #444; }
+        
         /* Controle de visibilidade das abas */
         .view-section { display: none; }
-        .view-section.ativa { display: block; animation: fadeIn .25s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .view-section.ativa { display: block; animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* ===== CABEÇALHO DE SEÇÃO ===== */
-        .header-admin { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; margin-top: 32px; flex-wrap: wrap; gap: 12px; }
-        .header-admin:first-of-type { margin-top: 0; }
-        .header-admin h1 { margin: 0; font-size: 19px; font-weight: 700; color: var(--texto); display: flex; align-items: center; gap: 10px; }
-        .header-admin h1 .icone-secao { width: 34px; height: 34px; border-radius: 9px; background: var(--laranja-suave); color: var(--laranja-fogo); display: inline-flex; align-items: center; justify-content: center; font-size: 15px; }
-
-        .btn-novo { background-color: var(--laranja-fogo); color: white; border: none; padding: 10px 18px; border-radius: 9px; font-weight: 600; font-size: 14px; cursor: pointer; transition: .15s; display: inline-flex; align-items: center; gap: 8px; }
-        .btn-novo:hover { filter: brightness(1.08); }
-
-        /* ===== TABELAS ===== */
-        table { width: 100%; background: var(--bg-card); border-collapse: collapse; border-radius: var(--raio); overflow: hidden; box-shadow: var(--sombra); border: 1px solid var(--borda); }
-        th, td { padding: 14px 16px; text-align: left; border-bottom: 1px solid var(--borda); font-size: 14px; }
-        tbody tr:last-child td { border-bottom: none; }
-        tbody tr:hover { background: #fafafc; }
-        th { background-color: #fafbfc; color: var(--texto-suave); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
-        .drag-handle-cell { width: 32px; text-align: center; color: var(--texto-claro); cursor: grab; }
-        tr[draggable="true"]:active { cursor: grabbing; }
-        tr.arrastando { opacity: .4; background: var(--laranja-suave); }
-
-        .status-badge { padding: 4px 11px; border-radius: 20px; font-size: 12px; font-weight: 600; }
-        .status-ativo { background-color: var(--verde-suave); color: var(--verde); }
-        .status-inativo { background-color: var(--vermelho-suave); color: var(--vermelho); }
-
-        .btn-acao { padding: 7px 12px; border: none; border-radius: 7px; cursor: pointer; font-weight: 600; font-size: 12.5px; transition: .15s; }
-        .btn-toggle { background-color: #eef0f4; color: #344054; }
-        .btn-toggle:hover { background-color: #e1e4ea; }
-        .btn-receita { background-color: var(--amarelo-suave); color: var(--amarelo); margin-left: 5px; }
-        .btn-receita:hover { filter: brightness(.96); }
-        .btn-excluir { background-color: var(--vermelho-suave); color: var(--vermelho); }
-        .btn-excluir:hover { filter: brightness(.96); }
-
-        .estoque-baixo { color: var(--vermelho); font-weight: 700; }
-
-        /* ===== MODAIS ===== */
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,17,25,.55); backdrop-filter: blur(2px); display: none; justify-content: center; align-items: center; z-index: 1000; }
-        .modal-conteudo { background: var(--bg-card); padding: 30px; border-radius: 16px; width: 400px; box-shadow: var(--sombra-lg); max-height: 90vh; overflow-y: auto; }
+        /* === ESTILOS ORIGINAIS DO SEU PAINEL DE ESTOQUE === */
+        .header-admin { display: flex; justify-content: space-between; align-items: center; background: #121212; color: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; margin-top: 20px;}
+        .header-admin h1 { margin: 0; font-size: 24px; color: var(--laranja-fogo); }
+        .btn-novo { background-color: #2ed573; color: white; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; transition: 0.2s;}
+        .btn-novo:hover { background-color: #26b963; }
+        
+        table { width: 100%; background: white; border-collapse: collapse; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background-color: #f1f2f6; color: #555; font-weight: 500; }
+        
+        .status-badge { padding: 5px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; color: white; }
+        .status-ativo { background-color: #2ed573; }
+        .status-inativo { background-color: #ff4757; }
+        
+        .btn-acao { padding: 8px 12px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .btn-toggle { background-color: #dfe4ea; color: #2f3542; }
+        .btn-receita { background-color: #ffa502; color: white; margin-left: 5px; }
+        .btn-receita:hover { background-color: #ff7f50; }
+        .btn-excluir { background-color: #ff4757; color: white; }
+        
+        .estoque-baixo { color: #ff4757; font-weight: bold; }
+        
+        /* Modais originais */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-conteudo { background: white; padding: 30px; border-radius: 10px; width: 400px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); max-height: 90vh; overflow-y: auto; }
         .modal-conteudo.largo { width: 600px; }
-        .modal-conteudo h2 { margin-top: 0; margin-bottom: 20px; color: var(--texto); font-size: 18px; font-weight: 700; }
-        .modal-conteudo label { font-size: 13px; font-weight: 500; color: var(--texto-suave); }
-        .modal-conteudo input, .modal-conteudo select, .modal-conteudo textarea {
-            width: 100%; padding: 10px 12px; margin-bottom: 15px; border: 1px solid var(--borda); border-radius: 8px;
-            box-sizing: border-box; font-family: inherit; font-size: 14px; background: #fbfbfd; color: var(--texto);
-        }
-        .modal-conteudo input:focus, .modal-conteudo select:focus { outline: none; border-color: var(--laranja-fogo); background: #fff; }
+        .modal-conteudo h2 { margin-top: 0; margin-bottom: 20px; color: #121212; }
+        .modal-conteudo input, .modal-conteudo select { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
         .modal-botoes { display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; }
-        .btn-cancelar { background-color: #eef0f4; color: #344054; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; }
-        .btn-detalhes-entrega { background: none; border: 1px solid var(--borda); color: var(--texto-suave); padding: 6px 12px; border-radius: 7px; cursor: pointer; font-size: 12.5px; font-weight: 600; font-family: inherit; white-space: nowrap; }
-        .btn-detalhes-entrega:hover { background: #f4f5f9; color: var(--texto); }
-        .timeline-entrega { list-style: none; margin: 0; padding: 0; }
-        .timeline-passo { position: relative; padding: 0 0 22px 30px; }
-        .timeline-passo:last-child { padding-bottom: 0; }
-        .timeline-passo::before { content: ''; position: absolute; left: 5px; top: 4px; width: 11px; height: 11px; border-radius: 50%; background: var(--laranja-fogo); }
-        .timeline-passo::after { content: ''; position: absolute; left: 10px; top: 15px; bottom: 0; width: 2px; background: var(--borda); }
-        .timeline-passo:last-child::after { display: none; }
-        .timeline-passo.pendente::before { background: var(--borda); }
-        .timeline-passo .titulo { font-weight: 700; font-size: 14px; color: var(--texto); }
-        .timeline-passo .hora { font-size: 13px; color: var(--texto-suave); }
-        .timeline-passo .duracao { font-size: 12.5px; color: var(--laranja-fogo); font-weight: 600; margin-top: 2px; }
-        .box-add-ingrediente { background: #fafbfc; padding: 15px; border-radius: 10px; margin-bottom: 15px; border: 1px solid var(--borda); }
+        .btn-cancelar { background-color: #dfe4ea; color: #333; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .box-add-ingrediente { background: #f1f2f6; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #dfe4ea; }
 
-        /* ===== KANBAN DE PEDIDOS ===== */
-        .barra-tempo { background: var(--bg-card); padding: 14px 18px; border-radius: var(--raio); margin-bottom: 20px; display: flex; align-items: center; gap: 15px; border: 1px solid var(--borda); box-shadow: var(--sombra); flex-wrap: wrap; }
-        .barra-tempo strong { color: var(--texto); font-size: 14px; display: flex; align-items: center; gap: 8px; }
-        .barra-tempo input { width: 70px; padding: 8px; border-radius: 7px; border: 1px solid var(--borda); background: #fbfbfd; color: var(--laranja-fogo); font-weight: 700; text-align: center; font-size: 15px; font-family: inherit; }
-        .barra-tempo span { color: var(--texto-suave); font-size: 13px; }
-
-        .painel-board { display: flex; gap: 18px; overflow-x: auto; align-items: flex-start; }
-        .kpi-strip { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
-        .kpi-card { flex: 1 1 130px; background: var(--bg-card); border: 1px solid var(--borda); border-radius: var(--raio); box-shadow: var(--sombra); padding: 12px 14px; text-align: center; border-top: 3px solid var(--cor-kpi, var(--laranja-fogo)); }
-        .kpi-card .kpi-valor { font-size: 30px; font-weight: 800; color: var(--texto); line-height: 1.1; }
-        .kpi-card .kpi-rotulo { font-size: 11.5px; font-weight: 600; color: var(--texto-suave); margin-top: 4px; text-transform: uppercase; letter-spacing: .3px; }
-        .coluna { flex: 1; min-width: 300px; background: #eef0f5; border-radius: var(--raio); padding: 14px; display: flex; flex-direction: column; max-height: calc(100vh - 220px); }
-        .coluna h2 { font-size: 14px; font-weight: 700; text-align: left; margin: 0 0 14px; padding: 0 4px; display: flex; align-items: center; gap: 8px; color: var(--texto); }
-        .coluna-pedidos { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 2px; }
-
-        .card-pedido { background: var(--bg-card); padding: 15px; border-radius: 11px; border-left: 4px solid #98a2b3; position: relative; color: var(--texto); box-shadow: var(--sombra); }
-        .card-pedido.pendente { border-left-color: var(--vermelho); }
-        .card-pedido.em-preparo { border-left-color: var(--amarelo); }
-        .card-pedido.saiu-para-entrega { border-left-color: var(--verde); }
-
+        /* === ESTILOS DO KANBAN DE PEDIDOS === */
+        .painel-board { display: flex; gap: 20px; overflow-x: auto; min-height: calc(100vh - 120px); }
+        .coluna { flex: 1; min-width: 320px; background: #121212; border-radius: 10px; padding: 15px; display: flex; flex-direction: column; }
+        .coluna h2 { font-size: 18px; text-align: center; margin-top: 0; padding-bottom: 15px; border-bottom: 1px solid #333; color: #fff; }
+        .coluna-pedidos { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; padding-right: 5px; }
+        
+        .card-pedido { background: #1e1e1e; padding: 15px; border-radius: 8px; border-left: 5px solid #555; position: relative; color: #f1f2f6; box-shadow: 0 4px 6px rgba(0,0,0,0.2);}
+        .card-pedido.pendente { border-left-color: #ff4757; }
+        .card-pedido.preparo { border-left-color: #ffa502; }
+        .card-pedido.entrega { border-left-color: #2ed573; }
+        
         .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .pedido-id { font-weight: 800; font-size: 16px; }
-        .pedido-tempo { font-size: 12px; color: var(--texto-suave); }
-
-        .info-cliente { margin-bottom: 10px; font-size: 13.5px; line-height: 1.6; color: var(--texto-suave); }
-        .info-cliente strong { color: var(--texto); font-size: 14.5px; }
-
-        .btn-acao-kanban { width: 100%; padding: 11px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; font-size: 13.5px; margin-top: 6px; transition: .15s; }
-        .btn-aceitar { background: var(--amarelo-suave); color: var(--amarelo); }
-        .btn-despachar { background: var(--verde-suave); color: var(--verde); }
-        .btn-entregue { background: #eef0f4; color: #344054; }
-        .btn-acao-kanban:hover { filter: brightness(.97); }
-        .btn-acao-kanban:disabled { cursor: not-allowed; opacity: .7; }
-        .btn-acao-kanban.carregando i { animation: girar-spinner .8s linear infinite; }
-
+        .pedido-id { font-weight: 800; font-size: 18px; }
+        .pedido-tempo { font-size: 12px; color: #aaa; }
+        
+        .info-cliente { margin-bottom: 15px; font-size: 14px; line-height: 1.5; color: #ccc;}
+        .info-cliente strong { color: var(--laranja-fogo); font-size: 15px;}
+        
+        .btn-acao-kanban { width: 100%; padding: 12px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; font-size: 14px; margin-top: 5px;}
+        .btn-aceitar { background: #ffa502; color: #000; }
+        .btn-despachar { background: #2ed573; color: #000; }
+        .btn-entregue { background: #57606f; color: #fff; }
+        
         .coluna-pedidos::-webkit-scrollbar { width: 6px; }
-        .coluna-pedidos::-webkit-scrollbar-thumb { background: #c7cbd6; border-radius: 10px; }
-
-        /* ===== CONFIGURAÇÕES ===== */
-        .grid-config { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
-        .card-config { background: var(--bg-card); padding: 20px; border-radius: var(--raio); border: 1px solid var(--borda); box-shadow: var(--sombra); border-top: 3px solid var(--cor-card, var(--laranja-fogo)); }
-        .card-config h3 { margin-top: 0; margin-bottom: 16px; font-size: 15px; font-weight: 700; color: var(--texto); display: flex; align-items: center; gap: 8px; }
-        .card-config label { color: var(--texto-suave); font-size: 13px; font-weight: 500; }
-        .card-config input, .card-config select {
-            width: 100%; padding: 10px 12px; margin: 6px 0 14px; border-radius: 8px; border: 1px solid var(--borda);
-            background: #fbfbfd; color: var(--texto); font-family: inherit; font-size: 14px; box-sizing: border-box;
-        }
-        .card-config input:focus { outline: none; border-color: var(--laranja-fogo); background: #fff; }
-        .card-config p.dica { font-size: 11.5px; color: var(--texto-claro); margin: -8px 0 0; }
-
-        .btn-salvar-config { width: 100%; background: var(--verde); color: #fff; font-weight: 700; padding: 14px; font-size: 15px; border: none; border-radius: 10px; margin: 22px 0; cursor: pointer; transition: .15s; display: flex; align-items: center; justify-content: center; gap: 10px; }
-        .btn-salvar-config:hover { filter: brightness(1.05); }
-
-        /* ===== DASHBOARD ===== */
-        .btn-periodo-rapido, .btn-granularidade {
-            background: #eef0f4; color: #344054; border: none; padding: 8px 14px; border-radius: 7px;
-            font-weight: 600; font-size: 13px; cursor: pointer; font-family: inherit; transition: .15s;
-        }
-        .btn-periodo-rapido:hover, .btn-granularidade:hover { background: #e1e4ea; }
-        .btn-granularidade.ativo { background: var(--laranja-fogo); color: #fff; }
-        .card-grafico { min-width: 0; }
-        .card-grafico .grafico-wrap { position: relative; height: 260px; margin-top: 10px; }
-        .card-config table { box-shadow: none; border: none; }
-        .card-config table th, .card-config table td { padding: 10px 8px; font-size: 13px; }
-        .delta-positivo { color: var(--verde); }
-        .delta-negativo { color: var(--vermelho); }
-
-        /* ===== IMPRESSÃO DE CUPOM ===== */
-        .toggle-linha { display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 4px; }
-        .toggle-linha input { width: auto; margin: 0; }
-        .btn-imprimir-pedido { background: #eef0f4; color: #344054; border: none; padding: 8px 10px; border-radius: 7px; cursor: pointer; font-weight: 600; font-size: 12.5px; margin-top: 6px; width: 100%; }
-        .btn-imprimir-pedido:hover { background: #e1e4ea; }
-
-        #area-impressao { display: none; }
-        @media print {
-            @page { margin: 0; }
-            body * { visibility: hidden; }
-            #area-impressao, #area-impressao * { visibility: visible; }
-            #area-impressao {
-                display: block; position: absolute; top: 0; left: 0; width: 76mm; padding: 5mm 4mm;
-                font-family: Arial, Helvetica, sans-serif; font-size: 15px; line-height: 1.5; color: #000;
-            }
-            #area-impressao .cupom-loja { font-size: 21px; font-weight: 800; text-align: center; letter-spacing: .3px; margin-bottom: 1mm; }
-            #area-impressao .cupom-sub { text-align: center; font-size: 13px; color: #333; }
-            #area-impressao .cupom-sep { border-top: 1.5px dashed #000; margin: 3.5mm 0; }
-            #area-impressao .cupom-secao-titulo { font-size: 12.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2mm; }
-            #area-impressao .cupom-linha { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 2mm; }
-            #area-impressao .cupom-linha.grande { font-size: 19px; font-weight: 800; margin-top: 2mm; }
-            #area-impressao .cupom-item-nome { font-weight: 700; }
-            #area-impressao .cupom-add { padding-left: 4mm; font-size: 13.5px; color: #333; margin-bottom: 1.5mm; }
-            #area-impressao .cupom-obs { padding-left: 4mm; font-style: italic; font-size: 13.5px; color: #333; margin-bottom: 2.5mm; }
-            #area-impressao .cupom-footer { text-align: center; margin-top: 5mm; font-size: 13.5px; font-weight: 600; }
-        }
-
-        @media (max-width: 880px) {
-            .sidebar { position: static; width: 100%; flex-direction: row; align-items: center; padding: 12px 14px; overflow-x: auto; }
-            .sidebar-brand { padding: 0 12px 0 0; }
-            .sidebar-nav { flex-direction: row; }
-            .sidebar-rodape { margin-top: 0; margin-left: auto; padding-top: 0; border-top: none; padding-left: 12px; display: flex; align-items: center; }
-            .btn-sair-admin { width: auto; white-space: nowrap; }
-            .sidebar-rodape > div { display: none; }
-            .shell { flex-direction: column; }
-            .conteudo { margin-left: 0; padding: 20px; }
-        }
-
-        /* Cobre a tela até sabermos o nome/logo/cor certos da loja — sem
-           isso, com internet lenta dá pra ver o ícone/cor genéricos por um
-           instante antes de trocar pelos da loja, o que passa impressão ruim. */
-        #tela-carregando-inicial {
-            position: fixed; inset: 0; z-index: 9000; display: flex; align-items: center; justify-content: center;
-            background: var(--bg-sidebar);
-        }
-        #tela-carregando-inicial .marca {
-            font-size: 22px; font-weight: 800; color: #fff; letter-spacing: .3px; margin-bottom: 22px;
-        }
-        #tela-carregando-inicial .marca span { color: #ff5e00; }
-        #tela-carregando-inicial .spinner {
-            width: 34px; height: 34px; border-radius: 50%; margin: 0 auto;
-            border: 3px solid rgba(255,255,255,.15); border-top-color: #fff;
-            animation: girar-spinner .8s linear infinite;
-        }
-        #tela-carregando-inicial .legenda {
-            color: rgba(255,255,255,.5); font-size: 12px; margin-top: 14px; letter-spacing: .08em; text-transform: uppercase;
-        }
-        @keyframes girar-spinner { to { transform: rotate(360deg); } }
+        .coluna-pedidos::-webkit-scrollbar-thumb { background: #444; border-radius: 10px; }
     </style>
 </head>
 <body>
 
-    <div id="tela-carregando-inicial">
-        <div style="text-align: center;">
-            <div class="marca">Maths Hub <span>Delivery</span></div>
-            <div class="spinner"></div>
-            <div class="legenda">Carregando...</div>
-        </div>
+    <!-- SUBMENU DE NAVEGAÇÃO -->
+    <div class="tabs-container">
+        <div class="tabs-logo"><i class="fa-solid fa-fire-flame-curved"></i> Fire Burger Admin</div>
+        <button class="tab-btn ativa" onclick="mudarAbaAdmin('view-estoque', this)"><i class="fa-solid fa-boxes-stacked"></i> Cardápio & Estoque</button>
+        <button class="tab-btn" onclick="mudarAbaAdmin('view-pedidos', this)"><i class="fa-solid fa-motorcycle"></i> Gestão de Pedidos</button>
+        <!-- NOVO BOTÃO DAS CONFIGURAÇÕES -->
+        <button class="tab-btn" onclick="mudarAbaAdmin('view-config', this)"><i class="fa-solid fa-gear"></i> Configurações</button>
     </div>
 
-    <!-- TELA DE LOGIN (única coisa visível antes de autenticar) -->
-    <div id="tela-login-admin">
-        <div class="login-card">
-            <div class="login-icone">
-                <img id="login-logo-img" src="" alt="" style="display:none; width:100%; height:100%; object-fit:cover; border-radius:14px;">
-                <i class="fa-solid fa-fire-flame-curved" id="login-logo-icone"></i>
-            </div>
-            <h1><span id="login-nome-loja">Painel Admin</span></h1>
-            <p class="subtitulo">Entre com sua conta para gerenciar sua loja</p>
-
-            <!-- PAINEL 1: login normal -->
-            <div id="painel-login-normal">
-                <div id="login-erro"></div>
-
-                <button type="button" class="btn-google" onclick="loginComGoogleAdmin()">
-                    <img src="https://www.google.com/favicon.ico" alt="" style="width: 16px; height: 16px;">
-                    Continuar com Google
-                </button>
-
-                <div class="divisor-login"><span>ou</span></div>
-
-                <form onsubmit="fazerLoginAdmin(event)">
-                    <label>E-mail</label>
-                    <input type="email" id="login-email" placeholder="seu@email.com" autocomplete="username" required>
-                    <label>Senha</label>
-                    <input type="password" id="login-senha" placeholder="••••••••" autocomplete="current-password" required>
-                    <button type="submit" id="btn-login-admin">Entrar</button>
-                </form>
-
-                <p class="link-recuperar" onclick="mostrarPainelRecuperarSenha()">Esqueci minha senha</p>
-            </div>
-
-            <!-- PAINEL 2: pedir e-mail pra recuperação -->
-            <div id="painel-recuperar-senha" style="display: none;">
-                <div id="recuperar-erro"></div>
-                <div id="recuperar-sucesso"></div>
-                <label>Digite seu e-mail cadastrado</label>
-                <input type="email" id="recuperar-email" placeholder="seu@email.com">
-                <button type="button" id="btn-recuperar-senha" onclick="enviarRecuperacaoSenha()">Enviar link de recuperação</button>
-                <p class="link-recuperar" onclick="mostrarPainelLoginNormal()">Voltar pro login</p>
-            </div>
-
-            <!-- PAINEL 3: definir nova senha (aparece ao voltar do link do e-mail) -->
-            <div id="painel-nova-senha" style="display: none;">
-                <p class="subtitulo" style="margin-top: -8px;">Defina sua nova senha de acesso</p>
-                <div id="nova-senha-erro"></div>
-                <label>Nova senha</label>
-                <input type="password" id="nova-senha-input" placeholder="Mínimo 6 caracteres">
-                <button type="button" id="btn-salvar-nova-senha" onclick="salvarNovaSenha()">Salvar nova senha</button>
-            </div>
+    <!-- ========================================== -->
+    <!-- ABA 1: GESTÃO E ESTOQUE                    -->
+    <!-- ========================================== -->
+    <div id="view-estoque" class="view-section ativa">
+        
+        <div class="header-admin" style="margin-top: 0;">
+            <h1>🍔 Gestão do Cardápio</h1>
+            <button class="btn-novo" onclick="abrirModalAdmin()">+ Novo Produto</button>
         </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nome do Produto</th>
+                    <th>Categoria</th>
+                    <th>Preço</th>
+                    <th>Status</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody id="tabela-produtos">
+                <tr><td colspan="6" style="text-align: center;">Carregando produtos...</td></tr>
+            </tbody>
+        </table>
+
+        <div class="header-admin">
+            <h1>📦 Controle de Estoque (Ingredientes)</h1>
+            <button class="btn-novo" onclick="abrirModalIngrediente()">+ Nova Matéria-Prima</button>        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Matéria-Prima</th>
+                    <th>Unidade</th>
+                    <th>Saldo Atual</th>
+                    <th>Ação</th>
+                </tr>
+            </thead>
+            <tbody id="tabela-estoque">
+                <tr><td colspan="5" style="text-align: center;">Carregando estoque...</td></tr>
+            </tbody>
+        </table>
     </div>
 
-    <!-- CONTEÚDO DO PAINEL: só aparece depois do login -->
-    <div id="app-admin-container">
-    <div class="shell">
+    <!-- ========================================== -->
+    <!-- ABA 2: KANBAN DE PEDIDOS (TEMPO REAL)      -->
+    <!-- ========================================== -->
+    <div id="view-pedidos" class="view-section">
+        
+        <!-- CONTROLE DE TEMPO DINÂMICO -->
+        <div style="background: #1e1e1e; padding: 15px 20px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 15px; border-left: 4px solid var(--laranja-fogo);">
+            <strong style="color: #fff; font-size: 16px;"><i class="fa-solid fa-clock"></i> Tempo Estimado Atual:</strong>
+            <input type="number" id="input-tempo-preparo" value="40" style="width: 70px; padding: 8px; border-radius: 5px; border: 1px solid #444; background: #111; color: var(--laranja-fogo); font-weight: bold; text-align: center; font-size: 16px;" onchange="carregarPedidosAdmin()">
+            <span style="color: #aaa; font-size: 14px;">minutos (Mude aqui conforme o movimento da chapa)</span>
+        </div>
 
-        <aside class="sidebar">
-            <div class="sidebar-brand">
-                <div class="sidebar-brand-icone">
-                    <img id="sidebar-logo-img" src="" alt="" style="display:none; width:100%; height:100%; object-fit:cover; border-radius:10px;">
-                    <i class="fa-solid fa-fire-flame-curved" id="sidebar-logo-icone"></i>
+        <div class="painel-board">
+            
+            <!-- Coluna 1: Pendentes (Novos) -->
+            <div class="coluna">
+                <h2 style="color: #ff4757;"><i class="fa-solid fa-bell"></i> Novos (Pendentes)</h2>
+                <div id="col-pendentes" class="coluna-pedidos">
+                    <p style="text-align: center; color: #666; margin-top: 20px;">Carregando pedidos...</p>
                 </div>
+            </div>
+
+            <!-- Coluna 2: Em Preparo -->
+            <div class="coluna">
+                <h2 style="color: #ffa502;"><i class="fa-solid fa-fire-burner"></i> Em Preparo</h2>
+                <div id="col-preparo" class="coluna-pedidos"></div>
+            </div>
+
+            <!-- Coluna 3: Em Entrega -->
+            <div class="coluna">
+                <h2 style="color: #2ed573;"><i class="fa-solid fa-motorcycle"></i> Saiu p/ Entrega</h2>
+                <div id="col-entrega" class="coluna-pedidos"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- ABA 3: CONFIGURAÇÕES DA LOJA               -->
+    <!-- ========================================== -->
+    <div id="view-config" class="view-section">
+        
+        <div class="header-admin" style="margin-top: 0;">
+            <h1>⚙️ Configurações da Lanchonete</h1>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+            
+            <!-- Bloco do PIX -->
+            <div style="background: #1e1e1e; padding: 20px; border-radius: 10px; border-left: 4px solid #2ed573;">
+                <h3 style="color: #2ed573; margin-top: 0;"><i class="fa-brands fa-pix"></i> Pagamento PIX</h3>
+                <label style="color: #aaa; font-size: 14px;">Chave PIX (E-mail, CPF, CNPJ, Celular):</label>
+                <input type="text" id="admin-chave-pix" style="width: 100%; padding: 10px; margin: 5px 0 15px; border-radius: 5px; border: 1px solid #333; background: #111; color: #fff;">
+                
+                <label style="color: #aaa; font-size: 14px;">Nome do Recebedor:</label>
+                <input type="text" id="admin-nome-pix" style="width: 100%; padding: 10px; margin: 5px 0 15px; border-radius: 5px; border: 1px solid #333; background: #111; color: #fff;">
+                
+                <label style="color: #aaa; font-size: 14px;">Cidade:</label>
+                <input type="text" id="admin-cidade-pix" style="width: 100%; padding: 10px; margin: 5px 0; border-radius: 5px; border: 1px solid #333; background: #111; color: #fff;">
+            </div>
+
+            <!-- Bloco de Funcionamento -->
+            <div style="background: #1e1e1e; padding: 20px; border-radius: 10px; border-left: 4px solid #ffa502;">
+                <h3 style="color: #ffa502; margin-top: 0;"><i class="fa-solid fa-clock"></i> Horários</h3>
+                <label style="color: #aaa; font-size: 14px;">Dias Abertos (0=Dom, 1=Seg...):</label>
+                <input type="text" id="admin-dias-trabalho" placeholder="Ex: 0,1,2,3,4,5,6" style="width: 100%; padding: 10px; margin: 5px 0 15px; border-radius: 5px; border: 1px solid #333; background: #111; color: #fff;">
+                
+                <div style="display: flex; gap: 10px;">
+                    <div style="flex: 1;">
+                        <label style="color: #aaa; font-size: 14px;">Abre às:</label>
+                        <input type="time" id="admin-hora-abre" style="width: 100%; padding: 10px; margin: 5px 0; border-radius: 5px; border: 1px solid #333; background: #111; color: #fff;">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="color: #aaa; font-size: 14px;">Fecha às:</label>
+                        <input type="time" id="admin-hora-fecha" style="width: 100%; padding: 10px; margin: 5px 0; border-radius: 5px; border: 1px solid #333; background: #111; color: #fff;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bloco de Contato -->
+            <div style="background: #1e1e1e; padding: 20px; border-radius: 10px; border-left: 4px solid #3742fa;">
+                <h3 style="color: #3742fa; margin-top: 0;"><i class="fa-brands fa-whatsapp"></i> WhatsApp</h3>
+                <label style="color: #aaa; font-size: 14px;">Número Oficial (+55 + DDD):</label>
+                <input type="text" id="admin-whatsapp" placeholder="Ex: 5543996150221" style="width: 100%; padding: 10px; margin: 5px 0; border-radius: 5px; border: 1px solid #333; background: #111; color: #fff;">
+            </div>
+        </div>
+
+        <button id="btn-salvar-config" style="width: 100%; background: #2ed573; color: #000; font-weight: bold; padding: 15px; font-size: 18px; border: none; border-radius: 8px; margin-top: 20px; cursor: pointer; transition: 0.3s;" onclick="salvarConfiguracoesLoja()">
+            💾 Salvar Todas as Configurações
+        </button>
+        <!-- Bloco de Identidade Visual -->
+        <div style="background: #1e1e1e; padding: 20px; border-radius: 10px; border-left: 4px solid #e84393; margin-top: 20px;">
+            <h3 style="color: #e84393; margin-top: 0;"><i class="fa-solid fa-palette"></i> Identidade Visual do Site</h3>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
                 <div>
-                    <div class="sidebar-brand-nome" id="tabs-nome-loja">Admin</div>
-                    <div class="sidebar-brand-tag">Painel de gestão</div>
+                    <label style="color: #aaa; font-size: 14px;">Nome da Hamburgueria:</label>
+                    <input type="text" id="admin-nome-loja" placeholder="Ex: Vilela Burgers" style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 5px; border: 1px solid #333; background: #111; color: #fff;">
+                </div>
+                
+                <div>
+                    <label style="color: #aaa; font-size: 14px;">Título do Banner:</label>
+                    <input type="text" id="admin-titulo-banner" placeholder="Ex: Grelhado no fogo." style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 5px; border: 1px solid #333; background: #111; color: #fff;">
+                </div>
+
+                <div>
+                    <label style="color: #aaa; font-size: 14px;">Subtítulo do Banner:</label>
+                    <input type="text" id="admin-subtitulo-banner" placeholder="Ex: O verdadeiro sabor..." style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 5px; border: 1px solid #333; background: #111; color: #fff;">
+                </div>
+
+                <div>
+                    <label style="color: #aaa; font-size: 14px;">Foto de Fundo (Computador/Celular):</label>
+                    <!-- Novo botão de envio de arquivo -->
+                    <input type="file" id="admin-file-banner" accept="image/*" style="width: 100%; padding: 7px; margin-top: 5px; border-radius: 5px; border: 1px solid #333; background: #111; color: #fff; cursor: pointer;">
+                    
+                    <!-- Campo invisível: ele guarda o link da foto que já está salva para não perder caso você mude só o nome da loja -->
+                    <input type="hidden" id="admin-img-banner">
+                </div>
+
+                <div>
+                    <label style="color: #aaa; font-size: 14px;">Cor Principal (Botões):</label>
+                    <input type="color" id="admin-cor-principal" value="#ff5e00" style="width: 100%; height: 40px; padding: 2px; margin-top: 5px; border-radius: 5px; border: 1px solid #333; background: #111; cursor: pointer;">
+                </div>
+
+                <div style="margin-top: 15px;">
+                    <label style="color: #aaa; font-size: 14px;">Áudio do Fogo (Estalo .mp3):</label>
+                    <input type="hidden" id="admin-audio-fogo-atual" value="">
+                    <input type="file" id="admin-file-audio-fogo" accept="audio/mpeg, audio/mp3" style="width: 100%; padding: 10px; margin-top: 5px; border-radius: 5px; border: 1px solid #333; background: #111; color: #fff; cursor: pointer;">
+                    <p style="font-size: 11px; color: #777; margin-top: 5px;">Selecione o som do fogo que tocará ao finalizar o pedido no site do cliente.</p>
                 </div>
             </div>
-
-            <nav class="sidebar-nav">
-                <button class="tab-btn ativa" onclick="mudarAbaAdmin('view-estoque', this)"><i class="fa-solid fa-boxes-stacked"></i> Cardápio & Estoque</button>
-                <button class="tab-btn" onclick="mudarAbaAdmin('view-pedidos', this)"><i class="fa-solid fa-motorcycle"></i> Gestão de Pedidos</button>
-                <button class="tab-btn" onclick="mudarAbaAdmin('view-dashboard', this)"><i class="fa-solid fa-gauge-high"></i> Dashboard</button>
-                <button class="tab-btn" onclick="mudarAbaAdmin('view-entregas', this)"><i class="fa-solid fa-hand-holding-dollar"></i> Entregas</button>
-                <button class="tab-btn" onclick="mudarAbaAdmin('view-financeiro', this)"><i class="fa-solid fa-chart-line"></i> Financeiro</button>
-                <button class="tab-btn" onclick="mudarAbaAdmin('view-clientes', this)"><i class="fa-solid fa-users"></i> Meus Clientes</button>
-                <button class="tab-btn" onclick="mudarAbaAdmin('view-cupons', this)"><i class="fa-solid fa-tags"></i> Cupons</button>
-                <button class="tab-btn" onclick="mudarAbaAdmin('view-entregadores', this)"><i class="fa-solid fa-motorcycle"></i> Entregadores</button>
-                <button class="tab-btn" onclick="mudarAbaAdmin('view-config', this)"><i class="fa-solid fa-gear"></i> Configurações</button>
-            </nav>
-
-            <div class="sidebar-rodape">
-                <button class="btn-sair-admin" onclick="sairAdmin()"><i class="fa-solid fa-right-from-bracket"></i> Sair</button>
-                <div style="text-align: center; margin-top: 12px; font-size: 11px; color: #6b6f80;">
-                    Powered by <a href="https://mathshub.com.br" target="_blank" style="color: #9298ab; text-decoration: none; font-weight: 600;">Maths Hub</a>
-                    <div style="margin-top: 6px;">
-                        <a href="termos-de-uso.html" target="_blank" style="color: #565a68; text-decoration: none;">Termos</a>
-                        &nbsp;·&nbsp;
-                        <a href="politica-de-privacidade.html" target="_blank" style="color: #565a68; text-decoration: none;">Privacidade</a>
-                    </div>
-                </div>
-            </div>
-        </aside>
-
-        <main class="conteudo">
-
-            <!-- ========================================== -->
-            <!-- ABA 1: GESTÃO E ESTOQUE                    -->
-            <!-- ========================================== -->
-            <div id="view-estoque" class="view-section ativa">
-
-                <div class="header-admin">
-                    <h1><span class="icone-secao"><i class="fa-solid fa-burger"></i></span> Gestão do Cardápio</h1>
-                    <button class="btn-novo" onclick="abrirModalAdmin()"><i class="fa-solid fa-plus"></i> Novo Produto</button>
-                </div>
-
-                <table>
-                    <thead>
-                        <tr>
-                            <th></th>
-                            <th>ID</th>
-                            <th>Nome do Produto</th>
-                            <th>Categoria</th>
-                            <th>Preço</th>
-                            <th>Status</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tabela-produtos">
-                        <tr><td colspan="7" style="text-align: center;">Carregando produtos...</td></tr>
-                    </tbody>
-                </table>
-
-                <div class="header-admin">
-                    <h1><span class="icone-secao"><i class="fa-solid fa-boxes-stacked"></i></span> Controle de Estoque</h1>
-                    <button class="btn-novo" onclick="abrirModalIngrediente()"><i class="fa-solid fa-plus"></i> Nova Matéria-Prima</button>
-                </div>
-
-                <table>
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Matéria-Prima</th>
-                            <th>Unidade</th>
-                            <th>Saldo Atual</th>
-                            <th>Ação</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tabela-estoque">
-                        <tr><td colspan="5" style="text-align: center;">Carregando estoque...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- ========================================== -->
-            <!-- ABA 2: KANBAN DE PEDIDOS (TEMPO REAL)      -->
-            <!-- ========================================== -->
-            <div id="view-pedidos" class="view-section">
-
-                <div class="header-admin">
-                    <h1><span class="icone-secao"><i class="fa-solid fa-motorcycle"></i></span> Gestão de Pedidos</h1>
-                </div>
-
-                <div class="barra-tempo">
-                    <strong><i class="fa-solid fa-clock"></i> Tempo Estimado Atual:</strong>
-                    <input type="number" id="input-tempo-preparo" value="40" onchange="carregarPedidosAdmin()">
-                    <span>minutos (mude aqui conforme o movimento da chapa)</span>
-                </div>
-
-                <div class="kpi-strip">
-                    <div class="kpi-card" style="--cor-kpi: var(--laranja-fogo);">
-                        <div class="kpi-valor" id="kpi-pedidos-hoje">0</div>
-                        <div class="kpi-rotulo">Pedidos Hoje</div>
-                    </div>
-                    <div class="kpi-card" style="--cor-kpi: var(--vermelho);">
-                        <div class="kpi-valor" id="kpi-pendentes">0</div>
-                        <div class="kpi-rotulo">Pendentes</div>
-                    </div>
-                    <div class="kpi-card" style="--cor-kpi: var(--amarelo);">
-                        <div class="kpi-valor" id="kpi-preparo">0</div>
-                        <div class="kpi-rotulo">Em Preparo</div>
-                    </div>
-                    <div class="kpi-card" style="--cor-kpi: var(--verde);">
-                        <div class="kpi-valor" id="kpi-saiu">0</div>
-                        <div class="kpi-rotulo">Saiu p/ Entrega</div>
-                    </div>
-                    <div class="kpi-card" style="--cor-kpi: var(--verde);">
-                        <div class="kpi-valor" id="kpi-entregues-hoje">0</div>
-                        <div class="kpi-rotulo">Entregues Hoje</div>
-                    </div>
-                </div>
-                <div class="barra-tempo">
-                    <strong><i class="fa-solid fa-stopwatch" style="color: var(--azul);"></i> Tempo médio hoje:</strong>
-                    <span>Preparo <strong style="color: var(--texto);" id="kpi-tempo-preparo">--</strong></span>
-                    <span>Entrega <strong style="color: var(--texto);" id="kpi-tempo-entrega">--</strong></span>
-                    <span>Total <strong style="color: var(--texto);" id="kpi-tempo-total">--</strong></span>
-                </div>
-
-                <div class="painel-board">
-
-                    <div class="coluna">
-                        <h2 style="color: var(--vermelho);"><i class="fa-solid fa-bell"></i> Novos (Pendentes)</h2>
-                        <div id="col-pendentes" class="coluna-pedidos">
-                            <p style="text-align: center; color: var(--texto-claro); margin-top: 20px;">Carregando pedidos...</p>
-                        </div>
-                    </div>
-
-                    <div class="coluna">
-                        <h2 style="color: var(--amarelo);"><i class="fa-solid fa-fire-burner"></i> Em Preparo</h2>
-                        <div id="col-preparo" class="coluna-pedidos"></div>
-                    </div>
-
-                    <div class="coluna">
-                        <h2 style="color: var(--verde);"><i class="fa-solid fa-motorcycle"></i> Saiu p/ Entrega</h2>
-                        <div id="col-entrega" class="coluna-pedidos"></div>
-                    </div>
-
-                </div>
-            </div>
-
-            <!-- ========================================== -->
-            <!-- DASHBOARD ANALÍTICO                        -->
-            <!-- ========================================== -->
-            <div id="view-dashboard" class="view-section">
-
-                <div class="header-admin">
-                    <h1><span class="icone-secao"><i class="fa-solid fa-gauge-high"></i></span> Dashboard</h1>
-                </div>
-
-                <div class="barra-tempo" style="flex-wrap: wrap; gap: 8px;">
-                    <button type="button" class="btn-periodo-rapido" onclick="aplicarPeriodoRapido(7)">7 dias</button>
-                    <button type="button" class="btn-periodo-rapido" onclick="aplicarPeriodoRapido(30)">30 dias</button>
-                    <button type="button" class="btn-periodo-rapido" onclick="aplicarPeriodoRapidoMes()">Este mês</button>
-                    <button type="button" class="btn-periodo-rapido" onclick="aplicarPeriodoRapidoAno()">Este ano</button>
-                    <span style="color: var(--texto-claro);">|</span>
-                    <input type="date" id="dash-data-inicio" onchange="carregarDashboard()" style="width: auto; padding: 8px; border-radius: 7px; border: 1px solid var(--borda); font-family: inherit; font-size: 14px;">
-                    <span>até</span>
-                    <input type="date" id="dash-data-fim" onchange="carregarDashboard()" style="width: auto; padding: 8px; border-radius: 7px; border: 1px solid var(--borda); font-family: inherit; font-size: 14px;">
-                </div>
-
-                <div class="grid-config" style="margin: 18px 0;">
-                    <div class="card-config" style="--cor-card: var(--laranja-fogo);">
-                        <h3 style="margin-bottom: 6px;">Faturamento</h3>
-                        <div id="dash-faturamento" style="font-size: 26px; font-weight: 800; color: var(--texto);">R$ 0,00</div>
-                        <div id="dash-faturamento-delta" style="font-size: 12.5px; font-weight: 600; margin-top: 4px;"></div>
-                    </div>
-                    <div class="card-config" style="--cor-card: var(--azul);">
-                        <h3 style="margin-bottom: 6px;">Pedidos</h3>
-                        <div id="dash-pedidos-qtd" style="font-size: 26px; font-weight: 800; color: var(--texto);">0</div>
-                    </div>
-                    <div class="card-config" style="--cor-card: var(--amarelo);">
-                        <h3 style="margin-bottom: 6px;">Ticket Médio</h3>
-                        <div id="dash-ticket-medio" style="font-size: 26px; font-weight: 800; color: var(--texto);">R$ 0,00</div>
-                    </div>
-                    <div class="card-config" style="--cor-card: var(--verde);">
-                        <h3 style="margin-bottom: 6px;">Cliente Mais Fiel</h3>
-                        <div id="dash-cliente-fiel" style="font-size: 15px; font-weight: 700; line-height: 1.3; color: var(--texto);">-</div>
-                    </div>
-                </div>
-
-                <div class="grid-config" style="grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); margin-bottom: 20px;">
-                    <div class="card-config card-grafico" style="--cor-card: var(--laranja-fogo);">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <h3 style="margin: 0;">Faturamento por Período</h3>
-                            <div style="display: flex; gap: 6px;">
-                                <button type="button" class="btn-granularidade ativo" id="btn-gran-dia" onclick="mudarGranularidade('dia')">Dia</button>
-                                <button type="button" class="btn-granularidade" id="btn-gran-mes" onclick="mudarGranularidade('mes')">Mês</button>
-                            </div>
-                        </div>
-                        <div class="grafico-wrap"><canvas id="grafico-faturamento"></canvas></div>
-                    </div>
-                    <div class="card-config card-grafico" style="--cor-card: var(--azul);">
-                        <h3>Horários de Pico</h3>
-                        <div class="grafico-wrap"><canvas id="grafico-picos"></canvas></div>
-                    </div>
-                </div>
-
-                <div class="grid-config" style="grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); margin-bottom: 20px;">
-                    <div class="card-config" style="--cor-card: var(--rosa);">
-                        <h3><i class="fa-solid fa-burger" style="color: var(--rosa);"></i> Faturamento por Produto</h3>
-                        <table>
-                            <thead><tr><th>Produto</th><th>Qtd</th><th>Faturamento</th></tr></thead>
-                            <tbody id="dash-tabela-produtos"><tr><td colspan="3" style="text-align:center;">Carregando...</td></tr></tbody>
-                        </table>
-                    </div>
-                    <div class="card-config" style="--cor-card: var(--verde);">
-                        <h3><i class="fa-solid fa-star" style="color: var(--verde);"></i> Clientes Mais Fiéis</h3>
-                        <table>
-                            <thead><tr><th>Cliente</th><th>Pedidos</th><th>Total Gasto</th></tr></thead>
-                            <tbody id="dash-tabela-clientes"><tr><td colspan="3" style="text-align:center;">Carregando...</td></tr></tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div class="card-config" style="--cor-card: var(--laranja-fogo); margin-bottom: 30px;">
-                    <h3><i class="fa-solid fa-lightbulb" style="color: var(--laranja-fogo);"></i> Insights</h3>
-                    <ul id="dash-insights" style="margin: 0; padding-left: 20px; color: var(--texto); font-size: 14px; line-height: 1.9;"></ul>
-                </div>
-            </div>
-
-            <!-- ========================================== -->
-            <!-- ABA 3: CONTROLE DE ENTREGAS                -->
-            <!-- ========================================== -->
-            <div id="view-entregas" class="view-section">
-
-                <div class="header-admin">
-                    <h1><span class="icone-secao"><i class="fa-solid fa-hand-holding-dollar"></i></span> Controle de Entregas</h1>
-                </div>
-
-                <div class="barra-tempo" style="flex-wrap: wrap;">
-                    <strong><i class="fa-solid fa-calendar"></i> Período:</strong>
-                    <input type="date" id="entregas-data-inicio" onchange="carregarRelatorioEntregas()" style="width: auto; padding: 8px; border-radius: 7px; border: 1px solid var(--borda); font-family: inherit; font-size: 14px;">
-                    <span>até</span>
-                    <input type="date" id="entregas-data-fim" onchange="carregarRelatorioEntregas()" style="width: auto; padding: 8px; border-radius: 7px; border: 1px solid var(--borda); font-family: inherit; font-size: 14px;">
-                    <select id="entregas-tipo" onchange="carregarRelatorioEntregas()" style="width: auto; padding: 8px; border-radius: 7px; border: 1px solid var(--borda); font-family: inherit; font-size: 14px; background: #fbfbfd; color: var(--texto);">
-                        <option value="todos">Todos os pedidos</option>
-                        <option value="entrega">Somente entregas</option>
-                        <option value="retirada">Somente retiradas</option>
-                    </select>
-                </div>
-
-                <div class="grid-config" style="margin-bottom: 20px;">
-                    <div class="card-config" style="--cor-card: var(--verde);">
-                        <h3 style="margin-bottom: 6px;"><i class="fa-solid fa-motorcycle" style="color: var(--verde);"></i> Entregas no Período</h3>
-                        <div id="entregas-total-qtd" style="font-size: 28px; font-weight: 800; color: var(--texto);">0</div>
-                    </div>
-                    <div class="card-config" style="--cor-card: var(--laranja-fogo);">
-                        <h3 style="margin-bottom: 6px;"><i class="fa-solid fa-sack-dollar" style="color: var(--laranja-fogo);"></i> Total a Repassar</h3>
-                        <div id="entregas-total-repasse" style="font-size: 28px; font-weight: 800; color: var(--texto);">R$ 0,00</div>
-                    </div>
-                    <div class="card-config" style="--cor-card: var(--azul);">
-                        <h3 style="margin-bottom: 6px;"><i class="fa-solid fa-stopwatch" style="color: var(--azul);"></i> Tempo Médio Total</h3>
-                        <div id="entregas-tempo-total" style="font-size: 28px; font-weight: 800; color: var(--texto);">-</div>
-                    </div>
-                    <div class="card-config" style="--cor-card: var(--amarelo);">
-                        <h3 style="margin-bottom: 6px;"><i class="fa-solid fa-bag-shopping" style="color: var(--amarelo);"></i> Tempo Médio de Retirada</h3>
-                        <div id="retiradas-tempo-total" style="font-size: 28px; font-weight: 800; color: var(--texto);">-</div>
-                    </div>
-                </div>
-
-                <div class="card-config" style="--cor-card: var(--azul); margin-bottom: 20px;">
-                    <h3><i class="fa-solid fa-user-group" style="color: var(--azul);"></i> Repasse por Entregador</h3>
-                    <table style="box-shadow: none; border: none;">
-                        <thead><tr><th>Responsável</th><th>Pedidos</th><th>Média preparo</th><th>Média entrega/retirada</th><th>Total a Pagar</th></tr></thead>
-                        <tbody id="tabela-repasse-entregador"><tr><td colspan="5" style="text-align:center;">Selecione um período.</td></tr></tbody>
-                    </table>
-                </div>
-
-                <div style="overflow-x: auto;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Pedido</th>
-                            <th>Cliente</th>
-                            <th>Tipo</th>
-                            <th>Responsável</th>
-                            <th>Preparo</th>
-                            <th>Tempo Total</th>
-                            <th>Repasse</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody id="tabela-entregas">
-                        <tr><td colspan="6" style="text-align: center;">Selecione um período.</td></tr>
-                    </tbody>
-                </table>
-                </div>
-            </div>
-
-            <!-- ========================================== -->
-            <!-- ABA 4: PAINEL FINANCEIRO                   -->
-            <!-- ========================================== -->
-            <div id="view-financeiro" class="view-section">
-
-                <div class="header-admin">
-                    <h1><span class="icone-secao"><i class="fa-solid fa-chart-line"></i></span> Painel Financeiro</h1>
-                </div>
-
-                <div class="barra-tempo" style="flex-wrap: wrap;">
-                    <strong><i class="fa-solid fa-calendar"></i> Período:</strong>
-                    <input type="date" id="financeiro-data-inicio" onchange="carregarRelatorioFinanceiro()" style="width: auto; padding: 8px; border-radius: 7px; border: 1px solid var(--borda); font-family: inherit; font-size: 14px;">
-                    <span>até</span>
-                    <input type="date" id="financeiro-data-fim" onchange="carregarRelatorioFinanceiro()" style="width: auto; padding: 8px; border-radius: 7px; border: 1px solid var(--borda); font-family: inherit; font-size: 14px;">
-                </div>
-
-                <div class="grid-config" style="margin-bottom: 18px;">
-                    <div class="card-config" style="--cor-card: var(--verde);">
-                        <h3 style="margin-bottom: 6px;"><i class="fa-solid fa-sack-dollar" style="color: var(--verde);"></i> Total Vendido</h3>
-                        <div id="financeiro-total-vendido" style="font-size: 26px; font-weight: 800; color: var(--texto);">R$ 0,00</div>
-                    </div>
-                    <div class="card-config" style="--cor-card: var(--azul);">
-                        <h3 style="margin-bottom: 6px;"><i class="fa-solid fa-receipt" style="color: var(--azul);"></i> Número de Vendas</h3>
-                        <div id="financeiro-total-vendas" style="font-size: 26px; font-weight: 800; color: var(--texto);">0</div>
-                    </div>
-                    <div class="card-config" style="--cor-card: var(--amarelo);">
-                        <h3 style="margin-bottom: 6px;"><i class="fa-solid fa-calculator" style="color: var(--amarelo);"></i> Ticket Médio</h3>
-                        <div id="financeiro-ticket-medio" style="font-size: 26px; font-weight: 800; color: var(--texto);">R$ 0,00</div>
-                    </div>
-                </div>
-
-                <div class="grid-config" style="margin-bottom: 20px;">
-                    <div class="card-config" style="--cor-card: var(--rosa);">
-                        <h3><i class="fa-solid fa-wallet" style="color: var(--rosa);"></i> Formas de Pagamento</h3>
-                        <div id="financeiro-formas-pagamento"></div>
-                    </div>
-                    <div class="card-config" style="--cor-card: var(--laranja-fogo);">
-                        <h3><i class="fa-solid fa-motorcycle" style="color: var(--laranja-fogo);"></i> Entrega x Retirada</h3>
-                        <div id="financeiro-tipos-entrega"></div>
-                    </div>
-                </div>
-
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Pedido</th>
-                            <th>Cliente</th>
-                            <th>Data</th>
-                            <th>Pagamento</th>
-                            <th>Tipo</th>
-                            <th>Total</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tabela-financeiro">
-                        <tr><td colspan="6" style="text-align: center;">Selecione um período.</td></tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- ========================================== -->
-            <!-- MEUS CLIENTES                               -->
-            <!-- ========================================== -->
-            <div id="view-clientes" class="view-section">
-
-                <div class="header-admin">
-                    <h1><span class="icone-secao"><i class="fa-solid fa-users"></i></span> Meus Clientes</h1>
-                </div>
-
-                <div class="grid-config" style="margin-bottom: 20px;">
-                    <div class="card-config" style="--cor-card: var(--laranja-fogo);">
-                        <h3 style="margin-bottom: 6px;"><i class="fa-solid fa-users" style="color: var(--laranja-fogo);"></i> Clientes Cadastrados</h3>
-                        <div id="clientes-total-qtd" style="font-size: 28px; font-weight: 800; color: var(--texto);">0</div>
-                    </div>
-                </div>
-
-                <div class="barra-tempo">
-                    <strong><i class="fa-solid fa-magnifying-glass"></i> Buscar:</strong>
-                    <input type="text" id="clientes-busca" placeholder="Nome, telefone ou e-mail..." oninput="filtrarTabelaClientes()" style="width: auto; flex: 1; min-width: 180px; padding: 8px 12px; border-radius: 7px; border: 1px solid var(--borda); font-family: inherit; font-size: 14px;">
-                </div>
-
-                <div style="overflow-x: auto;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Nome</th>
-                            <th>Telefone</th>
-                            <th>E-mail</th>
-                            <th>Status</th>
-                            <th>Pedidos</th>
-                            <th>Total Gasto</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tabela-clientes">
-                        <tr><td colspan="6" style="text-align: center;">Carregando...</td></tr>
-                    </tbody>
-                </table>
-                </div>
-            </div>
-
-            <!-- ========================================== -->
-            <!-- CUPONS DE DESCONTO                          -->
-            <!-- ========================================== -->
-            <div id="view-cupons" class="view-section">
-
-                <div class="header-admin">
-                    <h1><span class="icone-secao"><i class="fa-solid fa-tags"></i></span> Cupons de Desconto</h1>
-                    <button class="btn-novo" onclick="abrirModalCupom()"><i class="fa-solid fa-plus"></i> Novo Cupom</button>
-                </div>
-
-                <div style="overflow-x: auto;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Código</th>
-                            <th>Desconto</th>
-                            <th>Teto por pedido</th>
-                            <th>Usos</th>
-                            <th>Valor descontado</th>
-                            <th>Status</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tabela-cupons">
-                        <tr><td colspan="7" style="text-align: center;">Carregando...</td></tr>
-                    </tbody>
-                </table>
-                </div>
-            </div>
-
-            <!-- ========================================== -->
-            <!-- ENTREGADORES                                -->
-            <!-- ========================================== -->
-            <div id="view-entregadores" class="view-section">
-
-                <div class="header-admin">
-                    <h1><span class="icone-secao"><i class="fa-solid fa-motorcycle"></i></span> Entregadores</h1>
-                    <button class="btn-novo" onclick="abrirModalEntregador()"><i class="fa-solid fa-plus"></i> Novo Entregador</button>
-                </div>
-
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Nome</th>
-                            <th>Código de Acesso</th>
-                            <th>Status</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tabela-entregadores">
-                        <tr><td colspan="4" style="text-align: center;">Carregando...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- ========================================== -->
-            <!-- ABA 3: CONFIGURAÇÕES DA LOJA               -->
-            <!-- ========================================== -->
-            <div id="view-config" class="view-section">
-
-                <div class="header-admin">
-                    <h1><span class="icone-secao"><i class="fa-solid fa-gear"></i></span> Configurações da Lanchonete</h1>
-                </div>
-
-                <div class="grid-config">
-
-                    <div class="card-config" style="--cor-card: var(--verde);">
-                        <h3><i class="fa-brands fa-pix" style="color: var(--verde);"></i> Pagamento PIX</h3>
-                        <label>Chave PIX (E-mail, CPF, CNPJ, Celular)</label>
-                        <input type="text" id="admin-chave-pix">
-                        <label>Nome do Recebedor</label>
-                        <input type="text" id="admin-nome-pix">
-                        <label>Cidade</label>
-                        <input type="text" id="admin-cidade-pix" style="margin-bottom: 0;">
-                    </div>
-
-                    <div class="card-config" style="--cor-card: var(--amarelo);">
-                        <h3><i class="fa-solid fa-clock" style="color: var(--amarelo);"></i> Horários</h3>
-                        <label>Dias Abertos (0=Dom, 1=Seg...)</label>
-                        <input type="text" id="admin-dias-trabalho" placeholder="Ex: 0,1,2,3,4,5,6">
-                        <div style="display: flex; gap: 10px;">
-                            <div style="flex: 1;">
-                                <label>Abre às</label>
-                                <input type="time" id="admin-hora-abre" style="margin-bottom: 0;">
-                            </div>
-                            <div style="flex: 1;">
-                                <label>Fecha às</label>
-                                <input type="time" id="admin-hora-fecha" style="margin-bottom: 0;">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="card-config" style="--cor-card: var(--rosa);">
-                        <h3><i class="fa-solid fa-motorcycle" style="color: var(--rosa);"></i> Entrega</h3>
-                        <label>Taxa de Entrega Cobrada do Cliente (R$)</label>
-                        <input type="number" id="admin-taxa-entrega" placeholder="0.00" step="0.01">
-                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 12px;">
-                            <input type="checkbox" id="admin-repasse-igual" onchange="alternarCampoRepasse()" style="width: auto; margin: 0;">
-                            O valor repassado ao entregador é o mesmo cobrado do cliente
-                        </label>
-                        <div id="bloco-valor-repasse">
-                            <label>Valor Fixo Pago ao Entregador (R$)</label>
-                            <input type="number" id="admin-valor-repasse" placeholder="0.00" step="0.01" style="margin-bottom: 0;">
-                        </div>
-                    </div>
-
-                    <div class="card-config" style="--cor-card: var(--azul);">
-                        <h3><i class="fa-solid fa-stopwatch" style="color: var(--azul);"></i> Tempos informados ao cliente</h3>
-                        <label>Previsao de entrega</label>
-                        <select id="admin-tempo-entrega-modo">
-                            <option value="fixo">Tempo fixo</option>
-                            <option value="dinamico">Dinamico: media de hoje</option>
-                        </select>
-                        <input type="number" id="admin-tempo-entrega-fixo" min="1" step="1" placeholder="Ex: 50">
-                        <label>Previsao de retirada</label>
-                        <select id="admin-tempo-retirada-modo">
-                            <option value="fixo">Tempo fixo</option>
-                            <option value="dinamico">Dinamico: media de hoje</option>
-                        </select>
-                        <input type="number" id="admin-tempo-retirada-fixo" min="1" step="1" placeholder="Ex: 30">
-                        <p class="dica">No modo dinamico, o sistema usa a media dos pedidos concluidos hoje. Antes da primeira conclusao, usa o tempo fixo.</p>
-                    </div>
-
-                    <div class="card-config" style="--cor-card: var(--rosa);">
-                        <h3><i class="fa-solid fa-sun" style="color: var(--rosa);"></i> Tema do painel do cliente</h3>
-                        <label>Escolha como o cardapio sera exibido</label>
-                        <select id="admin-tema-cliente">
-                            <option value="escuro">Tema escuro</option>
-                            <option value="claro">Tema claro</option>
-                        </select>
-                        <p class="dica">A escolha vale para o cardapio, checkout, perfil, pedidos e demais telas do cliente.</p>
-                    </div>
-
-                    <div class="card-config" style="--cor-card: var(--azul);">
-                        <h3><i class="fa-solid fa-print" style="color: var(--azul);"></i> Impressão de Cupom</h3>
-                        <label class="toggle-linha">
-                            <input type="checkbox" id="admin-impressao-automatica">
-                            Imprimir automaticamente pedidos novos
-                        </label>
-                        <p class="dica">Quando ligado, os pedidos novos entram numa fila e são impressos um por vez. O pedido só muda de "Pendente" para "Em Preparo" depois que a impressão termina. Precisa do navegador configurado em modo kiosk de impressão para funcionar sem diálogo.</p>
-                    </div>
-
-                    <div class="card-config" style="--cor-card: var(--azul);">
-                        <h3><i class="fa-brands fa-whatsapp" style="color: var(--azul);"></i> Contato e Endereço</h3>
-                        <label>Número Oficial (+55 + DDD)</label>
-                        <input type="text" id="admin-whatsapp" placeholder="Ex: 5543996150221">
-                        <label>Endereço</label>
-                        <input type="text" id="admin-endereco" placeholder="Ex: Rua das Flores, 123 - Centro, Arapoti/PR" style="margin-bottom: 0;">
-                    </div>
-
-                    <div class="card-config" style="--cor-card: var(--verde);">
-                        <h3><i class="fa-brands fa-whatsapp" style="color: var(--verde);"></i> Saudação Automática no WhatsApp</h3>
-                        <label class="toggle-linha">
-                            <input type="checkbox" id="admin-whatsapp-saudacao-ativa">
-                            Responder automaticamente a primeira mensagem de cada cliente
-                        </label>
-                        <p class="dica">Precisa do WhatsApp Business da loja conectado (veja "Como conseguir esses dados?" abaixo). Sem os dois campos preenchidos, a saudação fica desligada mesmo marcando aqui.</p>
-
-                        <label>Mensagem de Saudação</label>
-                        <textarea id="admin-whatsapp-mensagem" rows="3" placeholder="Ex: Olá! Bem-vindo(a). Peça pelo nosso site: https://sualoja.mathshub.com.br" style="width:100%; padding:10px 12px; margin-bottom:15px; border:1px solid var(--borda); border-radius:8px; font-family:inherit; font-size:14px; background:#fbfbfd; color:var(--texto); resize:vertical; box-sizing:border-box;"></textarea>
-
-                        <label>Phone Number ID (Meta)</label>
-                        <input type="text" id="admin-whatsapp-phone-id" placeholder="Ex: 123456789012345">
-                        <label>Token de Acesso (Meta)</label>
-                        <input type="password" id="admin-whatsapp-token" placeholder="Cole o token permanente aqui" style="margin-bottom: 0;">
-
-                        <details style="margin-top: 16px;">
-                            <summary style="cursor:pointer; font-size:13px; font-weight:600; color: var(--texto-suave);">Como conseguir esses dados?</summary>
-                            <div style="font-size: 12.5px; color: var(--texto-suave); line-height: 1.65; margin-top: 10px;">
-                                <ol style="padding-left: 18px; margin: 0;">
-                                    <li>Crie uma conta em <a href="https://business.facebook.com" target="_blank" rel="noopener" style="color: var(--laranja-fogo);">business.facebook.com</a> e um app em <a href="https://developers.facebook.com" target="_blank" rel="noopener" style="color: var(--laranja-fogo);">developers.facebook.com</a>, adicionando o produto "WhatsApp".</li>
-                                    <li>No painel do app, em WhatsApp &gt; Introdução, copie o <b>Phone Number ID</b> e gere um <b>Token de acesso</b> permanente (via usuário do sistema).</li>
-                                    <li>Ainda no painel, em WhatsApp &gt; Configuração, cadastre o Webhook com a URL abaixo e combine o token de verificação com quem administra a plataforma.</li>
-                                    <li>Cole o Phone Number ID e o Token aqui, marque a caixa acima e salve.</li>
-                                </ol>
-                                <p style="margin-top: 10px;"><b>URL do Webhook:</b> <code id="whatsapp-webhook-url" style="user-select: all; word-break: break-all;">carregando...</code></p>
-                            </div>
-                        </details>
-                    </div>
-                </div>
-
-                <button id="btn-salvar-config" class="btn-salvar-config" onclick="salvarConfiguracoesLoja()">
-                    <i class="fa-solid fa-floppy-disk"></i> Salvar Todas as Configurações
-                </button>
-
-                <div class="card-config" style="--cor-card: var(--rosa);">
-                    <h3><i class="fa-solid fa-palette" style="color: var(--rosa);"></i> Identidade Visual do Site</h3>
-
-                    <div class="grid-config">
-                        <div>
-                            <label>Nome da Hamburgueria</label>
-                            <input type="text" id="admin-nome-loja" placeholder="Ex: Fire Burger">
-                        </div>
-                        <div>
-                            <label>Título do Banner</label>
-                            <input type="text" id="admin-titulo-banner" placeholder="Ex: Grelhado no fogo.">
-                        </div>
-                        <div>
-                            <label>Subtítulo do Banner</label>
-                            <input type="text" id="admin-subtitulo-banner" placeholder="Ex: O verdadeiro sabor...">
-                        </div>
-                        <div>
-                            <label>Foto de Fundo (Computador/Celular)</label>
-                            <input type="file" id="admin-file-banner" accept="image/*" style="padding: 8px;">
-                            <input type="hidden" id="admin-img-banner">
-                        </div>
-                        <div>
-                            <label>Logo da Loja</label>
-                            <input type="file" id="admin-file-logo" accept="image/*" style="padding: 8px;">
-                            <input type="hidden" id="admin-logo-loja">
-                            <p class="dica">Aparece no cabeçalho do site, no lugar do ícone de fogo padrão.</p>
-                        </div>
-                        <div>
-                            <label>Cor Principal (Botões)</label>
-                            <input type="color" id="admin-cor-principal" value="#ff5e00" style="height: 42px; padding: 3px; cursor: pointer;">
-                        </div>
-                        <div>
-                            <label>Áudio do Fogo (Estalo .mp3)</label>
-                            <input type="hidden" id="admin-audio-fogo-atual" value="">
-                            <input type="file" id="admin-file-audio-fogo" accept="audio/mpeg, audio/mp3" style="padding: 8px; margin-bottom: 4px;">
-                            <p class="dica">Selecione o som do fogo que tocará ao finalizar o pedido no site do cliente.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-        </main>
+        </div>
     </div>
-    </div> <!-- fim de #app-admin-container -->
 
     <!-- ========================================== -->
     <!-- MODAIS DO ESTOQUE                          -->
@@ -1001,27 +278,24 @@
     <div id="modal-novo-produto" class="modal-overlay">
         <div class="modal-conteudo">
             <h2>Cadastrar Lanche</h2>
-            <label>Nome do Lanche</label>
-            <input type="text" id="novo-nome" placeholder="Ex: X-Bacon">
-            <label>Descrição</label>
-            <input type="text" id="novo-descricao" placeholder="Ex: Pão brioche, hambúrguer 180g, bacon...">
-            <label>Preço</label>
-            <input type="number" id="novo-preco" placeholder="0.00" step="0.01">
+            <input type="text" id="novo-nome" placeholder="Nome do Lanche">
+            <input type="text" id="novo-descricao" placeholder="Descrição">
+            <input type="number" id="novo-preco" placeholder="Preço" step="0.01">
 
-            <label>Categoria</label>
-            <select id="novo-categoria" onchange="verificarNovaCategoria()">
+            <label style="font-size: 13px; color: #555; margin-top: 10px; display: block;">Categoria:</label>
+            
+            <!-- Select listando as categorias existentes -->
+            <select id="novo-categoria" onchange="verificarNovaCategoria()" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px; margin-top: 5px;">
                 <!-- O JS preenche aqui -->
             </select>
-            <input type="text" id="nova-categoria-texto" placeholder="Digite o nome da nova categoria (Ex: Porções)" style="display: none;">
-
-            <label>Ordem de Exibição</label>
-            <input type="number" id="novo-ordem" placeholder="0" step="1">
-            <p style="font-size: 11.5px; color: var(--texto-claro); margin: -10px 0 15px;">Quanto menor o número, mais cedo aparece pro cliente. Também define a ordem das categorias (a categoria aparece na posição do seu primeiro produto).</p>
-
-            <label>Foto do Lanche (Opcional)</label>
-            <input type="file" id="novo-file-imagem" accept="image/*" style="padding: 8px;">
+            
+            <!-- Campo de texto invisível que só aparece se ele quiser criar uma nova -->
+            <input type="text" id="nova-categoria-texto" placeholder="Digite o nome da nova categoria (Ex: Porções)" style="display: none; width: 100%; padding: 8px; border: 1px solid var(--laranja-fogo); border-radius: 5px; margin-top: 5px;">
+            
+            <label style="font-size: 13px; color: #555; margin-top: 10px; display: block;">Foto do Lanche (Opcional):</label>
+            <input type="file" id="novo-file-imagem" accept="image/*" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 5px; margin-top: 5px; cursor: pointer;">
             <input type="hidden" id="novo-imagem">
-
+            
             <div class="modal-botoes">
                 <button class="btn-cancelar" onclick="fecharModalAdmin()">Cancelar</button>
                 <button class="btn-novo" onclick="salvarNovoProduto()">Salvar Produto</button>
@@ -1032,15 +306,15 @@
     <div id="modal-receita" class="modal-overlay">
         <div class="modal-conteudo largo">
             <h2 id="titulo-modal-receita">Ficha Técnica</h2>
-
+            
             <div class="box-add-ingrediente">
-                <h4 style="margin-top: 0; margin-bottom: 10px; color: var(--texto-suave); font-size: 13px; font-weight: 600;">➕ Adicionar à Receita</h4>
+                <h4 style="margin-top: 0; margin-bottom: 10px; color: #555;">➕ Adicionar à Receita</h4>
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <select id="select-ingrediente" style="margin-bottom: 0; flex: 2;"></select>
                     <input type="number" id="input-qtd-ingrediente" placeholder="Qtd" step="0.01" style="margin-bottom: 0; flex: 1;">
-                    <span id="label-unidade" style="font-weight: 700; color: var(--laranja-fogo); width: 60px; font-size: 13px;"></span>
+                    <span id="label-unidade" style="font-weight: bold; color: var(--laranja-fogo); width: 60px;"></span>
                 </div>
-                <button class="btn-novo" style="margin-top: 10px; width: 100%; justify-content: center;" onclick="salvarIngredienteNaReceita()">Vincular Ingrediente</button>
+                <button class="btn-novo" style="margin-top: 10px; width: 100%;" onclick="salvarIngredienteNaReceita()">Vincular Ingrediente</button>
             </div>
 
             <table>
@@ -1066,23 +340,20 @@
     <div id="modal-novo-ingrediente" class="modal-overlay">
         <div class="modal-conteudo">
             <h2 id="titulo-modal-ingrediente">Cadastrar Matéria-Prima</h2>
-            <label>Nome</label>
-            <input type="text" id="ingred-nome" placeholder="Ex: Pão Brioche">
-
-            <label>Unidade</label>
-            <select id="ingred-unidade">
+            <input type="text" id="ingred-nome" placeholder="Nome (Ex: Pão Brioche)">
+            
+            <select id="ingred-unidade" style="width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 5px;">
                 <option value="unidade">Unidade (un)</option>
                 <option value="gramas">Gramas (g)</option>
                 <option value="fatia">Fatia</option>
                 <option value="ml">Mililitros (ml)</option>
             </select>
-
-            <label>Estoque Inicial</label>
-            <input type="number" id="ingred-estoque" placeholder="0" step="0.01">
-
-            <label>Preço Adicional (Deixe 0 se não for vendido à parte)</label>
-            <input type="number" id="ingred-preco-add" placeholder="0.00" step="0.01" value="0.00">
-
+            
+            <input type="number" id="ingred-estoque" placeholder="Estoque Inicial" step="0.01">
+            
+            <label style="font-size: 13px; color: #555; font-weight: bold; margin-bottom: 5px; display: block;">Preço Adicional (Deixe 0 se não for vendido à parte):</label>
+            <input type="number" id="ingred-preco-add" placeholder="Preço Extra" step="0.01" value="0.00">
+            
             <div class="modal-botoes">
                 <button class="btn-cancelar" onclick="fecharModalIngrediente()">Cancelar</button>
                 <button class="btn-novo" onclick="salvarNovoIngrediente()">Salvar</button>
@@ -1090,107 +361,20 @@
         </div>
     </div>
 
-    <div id="modal-detalhes-entrega" class="modal-overlay">
-        <div class="modal-conteudo">
-            <h2>Pedido <span id="detalhes-entrega-numero"></span></h2>
-            <ul class="timeline-entrega" id="detalhes-entrega-timeline"></ul>
-            <div class="modal-botoes">
-                <button class="btn-cancelar" onclick="fecharModalDetalhesEntrega()">Fechar</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="modal-cupom" class="modal-overlay">
-        <div class="modal-conteudo">
-            <h2>Novo Cupom de Desconto</h2>
-
-            <div id="cupom-erro" style="display:none; color: var(--vermelho); background: var(--vermelho-suave); padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; text-align: center;"></div>
-
-            <label>Código do Cupom</label>
-            <input type="text" id="cupom-codigo" placeholder="Ex: DESCONTO10" style="text-transform: uppercase;">
-
-            <label>Tipo de Desconto</label>
-            <select id="cupom-tipo" onchange="alternarCampoTetoCupom()">
-                <option value="percentual">Percentual (%)</option>
-                <option value="valor_fixo">Valor fixo (R$)</option>
-            </select>
-
-            <label id="rotulo-cupom-valor">Valor do Desconto (%)</label>
-            <input type="number" id="cupom-valor" placeholder="Ex: 10" step="0.01" min="0">
-
-            <div id="bloco-teto-cupom">
-                <label>Desconto Máximo por Pedido (R$)</label>
-                <input type="number" id="cupom-teto-pedido" placeholder="Ex: 20.00" step="0.01" min="0">
-                <p style="font-size: 11.5px; color: var(--texto-claro); margin: -10px 0 15px;">Evita que o percentual "estoure" em pedidos grandes — ex: 30% num pedido de R$ 200 seria R$ 60 de desconto; com teto de R$ 20, para em R$ 20 mesmo assim.</p>
-            </div>
-
-            <label>Valor Mínimo do Pedido (R$) <span style="font-weight:400; color: var(--texto-claro);">(opcional)</span></label>
-            <input type="number" id="cupom-valor-minimo" placeholder="Ex: 50 — só aplica em pedidos a partir desse valor" step="0.01" min="0">
-
-            <label>Limite de Usos <span style="font-weight:400; color: var(--texto-claro);">(opcional)</span></label>
-            <input type="number" id="cupom-limite-usos" placeholder="Deixe em branco = sem limite" step="1" min="1">
-
-            <label>Valor Máximo de Desconto Total (R$) <span style="font-weight:400; color: var(--texto-claro);">(opcional)</span></label>
-            <input type="number" id="cupom-limite-valor" placeholder="Ex: 300 — expira ao atingir esse total descontado" step="0.01" min="0">
-
-            <label>Máximo de Pedidos Anteriores do Cliente <span style="font-weight:400; color: var(--texto-claro);">(opcional)</span></label>
-            <input type="number" id="cupom-max-pedidos-anteriores" placeholder="Ex: 0 = só cliente que nunca comprou" step="1" min="0">
-            <p style="font-size: 11.5px; color: var(--texto-claro); margin: -10px 0 15px;">Deixe em branco pra valer pra qualquer cliente. Com <strong>0</strong>, só quem nunca fez pedido nessa loja consegue usar — bom pra atrair cliente novo sem descontar de quem já compra sempre.</p>
-
-            <label class="toggle-linha">
-                <input type="checkbox" id="cupom-limite-por-cliente">
-                Limitar a 1 uso por cliente
-            </label>
-            <label class="toggle-linha" style="margin-bottom: 0;">
-                <input type="checkbox" id="cupom-publico">
-                Mostrar na vitrine de promoções do site (senão só funciona pra quem já sabe o código)
-            </label>
-
-            <div class="modal-botoes">
-                <button class="btn-cancelar" onclick="fecharModalCupom()">Cancelar</button>
-                <button class="btn-novo" id="btn-salvar-cupom" onclick="salvarCupom()">Salvar Cupom</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="modal-entregador" class="modal-overlay">
-        <div class="modal-conteudo">
-            <h2 id="titulo-modal-entregador">Cadastrar Entregador</h2>
-
-            <div id="entregador-form">
-                <p style="font-size: 13.5px; color: var(--texto-suave); margin-top: 0;">
-                    Digite o nome — um código de acesso é gerado na hora, sem precisar de e-mail nem senha.
-                </p>
-                <div id="entregador-erro" style="display:none; color: var(--vermelho); background: var(--vermelho-suave); padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; text-align: center;"></div>
-                <label>Nome do Entregador</label>
-                <input type="text" id="entregador-nome" placeholder="Ex: João" style="margin-bottom: 0;">
-                <br><br>
-                <label>WhatsApp do Entregador (+55 + DDD, opcional)</label>
-                <input type="text" id="entregador-telefone" placeholder="Ex: 5543996150221" style="margin-bottom: 0;">
-                <p class="dica" style="margin-top: 6px;">Se preencher, depois de gerar o código dá pra mandar o link de acesso já pronto pelo WhatsApp.</p>
-                <div class="modal-botoes">
-                    <button class="btn-cancelar" onclick="fecharModalEntregador()">Cancelar</button>
-                    <button class="btn-novo" id="btn-salvar-entregador" onclick="salvarEntregador()">Gerar Código</button>
-                </div>
-            </div>
-
-            <div id="entregador-token-gerado" style="display:none; text-align: center;">
-                <p style="font-size: 13.5px; color: var(--texto-suave);">Passa esse código pro entregador — é só o que ele precisa pra entrar em <strong>entregador.html</strong>:</p>
-                <div id="texto-token-gerado" style="font-size: 24px; font-weight: 800; letter-spacing: 2px; background: var(--laranja-suave); color: var(--laranja-fogo); padding: 14px; border-radius: 10px; margin-bottom: 16px;"></div>
-                <button class="btn-novo" id="btn-enviar-token-whatsapp" style="width: 100%; justify-content: center; background: #25D366; display:none; margin-bottom: 10px;" onclick="enviarTokenPorWhatsapp()"><i class="fa-brands fa-whatsapp"></i> Enviar por WhatsApp</button>
-                <button class="btn-cancelar" style="width: 100%; justify-content: center;" onclick="fecharModalEntregador()">Concluído</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Área usada só na hora de imprimir o cupom (escondida na tela normal) -->
-    <div id="area-impressao"></div>
-
-    <!-- Mesmo som que toca no celular do cliente quando o pedido sai para entrega -->
-    <audio id="som-novo-pedido" preload="auto">
-        <source src="https://tjievzloufqptabbvumz.supabase.co/storage/v1/object/public/audios/entrega.mp3.mpeg" type="audio/mpeg">
-    </audio>
-
+    <!-- Script de navegação embutido (responsável pelas abas e animação) -->
+    <script>
+        function mudarAbaAdmin(abaId, elementoBotao) {
+            // Esconde todas as abas
+            document.querySelectorAll('.view-section').forEach(view => view.classList.remove('ativa'));
+            // Tira a cor ativa de todos os botões
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('ativa'));
+            
+            // Mostra a aba selecionada e pinta o botão clicado
+            document.getElementById(abaId).classList.add('ativa');
+            elementoBotao.classList.add('ativa');
+        }
+    </script>
+    
     <script src="admin.js"></script>
 </body>
 </html>

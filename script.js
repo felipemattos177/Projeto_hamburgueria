@@ -13,83 +13,6 @@ let configLoja = {
 };
 let lojaAberta = true;
 let mensagemFechado = "";
-let lojaAtual = null; // { id, subdominio, nome, ativo }
-
-// Guarda o valor que foi copiado no botão "Copiar Código PIX" — só libera
-// enviar o pedido no Pix se isso bater com o total atual do carrinho (se o
-// carrinho mudar depois de copiar, o código copiado ficaria com valor errado).
-let pixValorCopiado = null;
-
-function obterSlugDaLoja() {
-    const params = new URLSearchParams(window.location.search);
-    const slugParam = params.get("loja");
-    if (slugParam) return slugParam.toLowerCase();
-    return window.location.hostname.split(".")[0].toLowerCase();
-}
-
-// Descobre qual loja este site está servindo, pelo subdomínio (ou ?loja=slug
-// pra testar em localhost/preview). Precisa rodar antes de qualquer outra
-// chamada ao banco, já que tudo depois é filtrado por loja_id.
-async function resolverLoja() {
-    const slug = obterSlugDaLoja();
-    try {
-        const resposta = await fetchSupabase(`/rest/v1/lojas?select=*&subdominio=eq.${encodeURIComponent(slug)}&limit=1`);
-        const dados = await resposta.json();
-
-        if (!dados || dados.length === 0) {
-            mostrarTelaLojaIndisponivel("Loja não encontrada", "Não encontramos nenhuma hamburgueria neste endereço.");
-            return false;
-        }
-        if (!dados[0].ativo) {
-            mostrarTelaLojaIndisponivel("Loja indisponível", "Esta loja está temporariamente fora do ar. Entre em contato com o estabelecimento.");
-            return false;
-        }
-
-        lojaAtual = dados[0];
-        return true;
-    } catch (erro) {
-        mostrarTelaLojaIndisponivel("Erro de conexão", "Não foi possível conectar ao servidor. Tente novamente em instantes.");
-        return false;
-    }
-}
-
-function mostrarTelaLojaIndisponivel(titulo, mensagem) {
-    document.body.innerHTML = `
-        <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #121212; color: #fff; padding: 30px; text-align: center; font-family: 'Roboto', sans-serif;">
-            <div>
-                <i class="fa-solid fa-shop-slash" style="font-size: 40px; color: var(--laranja-fogo, #ff5e00); margin-bottom: 15px;"></i>
-                <h2 style="margin-bottom: 10px;">${escaparHtml(titulo)}</h2>
-                <p style="color: #aaa;">${escaparHtml(mensagem)}</p>
-            </div>
-        </div>
-    `;
-}
-
-function chaveLocalStorage(sufixo) {
-    return `loja_${lojaAtual.subdominio}_${sufixo}`;
-}
-
-// Evita XSS: qualquer texto vindo do banco (nome/descrição de produto ou ingrediente)
-// passa por aqui antes de entrar num innerHTML.
-function escaparHtml(texto) {
-    if (texto === null || texto === undefined) return "";
-    return String(texto)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
-}
-
-// O Supabase às vezes devolve o horário sem indicar o fuso (ex: "2026-08-21T09:48:00").
-// Sem isso, o navegador interpreta como horário local e o horário exibido fica errado.
-// Forçamos UTC quando a string não traz fuso, e sempre exibimos convertido pro horário de Brasília.
-function formatarDataHoraBr(valorTimestamp, opcoes) {
-    if (!valorTimestamp) return '-';
-    const temFuso = /[Zz]|[+-]\d{2}:?\d{2}$/.test(valorTimestamp);
-    const data = new Date(temFuso ? valorTimestamp : valorTimestamp + 'Z');
-    return data.toLocaleString('pt-BR', Object.assign({ timeZone: 'America/Sao_Paulo' }, opcoes));
-}
 
 // === FUNÇÃO DE AVISOS PERSONALIZADOS ===
 function mostrarAviso(mensagem, titulo = "Ops!", tipo = "aviso") {
@@ -154,39 +77,8 @@ function fecharAviso() {
     }
 }
 
-// === SEGURANÇA DE TAXA E ANTI-ABUSO ===
-const LIMITADOR_REQUISICOES = new Map();
-
-function limitarRequisicoes(endpoint, limiteMax = 40, janelaMs = 15000) {
-    const chave = endpoint.replace(/\?.*$/, '').replace(/^\//, '');
-    const agora = Date.now();
-    const historico = LIMITADOR_REQUISICOES.get(chave) || [];
-    const recente = historico.filter(ts => agora - ts < janelaMs);
-
-    if (recente.length >= limiteMax) {
-        return false;
-    }
-
-    recente.push(agora);
-    LIMITADOR_REQUISICOES.set(chave, recente);
-    return true;
-}
-
 // === FUNÇÃO MÁGICA ANTI-CACHE ===
 async function fetchSupabase(endpoint, options = {}) {
-    const endpointSeguro = String(endpoint || '').replace(/\?.*$/, '');
-    const limite = endpointSeguro.includes('/rpc/registrar_pedido_completo')
-        ? { max: 8, janelaMs: 6000 }
-        : endpointSeguro.includes('/rpc/validar_cupom')
-            ? { max: 12, janelaMs: 6000 }
-            : endpointSeguro.includes('/auth/')
-                ? { max: 8, janelaMs: 15000 }
-                : { max: 40, janelaMs: 15000 };
-
-    if (!limitarRequisicoes(endpointSeguro, limite.max, limite.janelaMs)) {
-        throw new Error('Muitas requisições em pouco tempo. Aguarde alguns segundos antes de tentar novamente.');
-    }
-
     const configuracao = {
         ...options,
         method: options.method || 'GET',
@@ -203,14 +95,13 @@ async function fetchSupabase(endpoint, options = {}) {
 }
 
 function obterOuCriarClienteId() {
-    const chave = chaveLocalStorage("cliente_id");
-    let id = localStorage.getItem(chave);
+    let id = localStorage.getItem("vilelaburgers_cliente_id");
     if (!id) {
         id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
             var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
             return v.toString(16);
         });
-        localStorage.setItem(chave, id);
+        localStorage.setItem("vilelaburgers_cliente_id", id);
     }
     return id;
 }
@@ -234,29 +125,10 @@ function calcularUsoIngredienteNoCarrinho(ingredienteId) {
     return usoTotal;
 }
 
-// Mostra placeholders "pulsando" no lugar dos cards enquanto o cardápio
-// ainda não chegou do banco — melhor que a tela ficar vazia/parada.
-function mostrarSkeletonCardapio() {
-    const lista = document.getElementById("lista-produtos");
-    if (!lista) return;
-    const cardSkeleton = `
-        <div class="skeleton-card">
-            <div class="skeleton-imagem"></div>
-            <div class="skeleton-info">
-                <div class="skeleton-linha curta"></div>
-                <div class="skeleton-linha"></div>
-                <div class="skeleton-linha curta"></div>
-            </div>
-        </div>
-    `;
-    lista.innerHTML = cardSkeleton.repeat(5);
-}
-
 // === 2. EXTRAÇÃO DE DADOS AO VIVO ===
 async function carregarCardapioDoBanco() {
-    mostrarSkeletonCardapio();
     try {
-        const resposta = await fetchSupabase(`/rest/v1/cardapio_inteligente?select=*&ativo=eq.true&loja_id=eq.${lojaAtual.id}&order=ordem.asc,id.asc`);
+        const resposta = await fetchSupabase(`/rest/v1/cardapio_inteligente?select=*&ativo=eq.true`);
         if (!resposta.ok) throw new Error(`Erro na API: HTTP ${resposta.status}`);
         const dados = await resposta.json();
 
@@ -284,18 +156,16 @@ async function carregarCardapioDoBanco() {
                 
                 // Cria um botão para cada categoria que existir no banco
                 categoriasUnicas.forEach(cat => {
-                    menuCategorias.innerHTML += `<button class="btn-categoria" onclick="filtrarCategoria('${cat}', this)">${escaparHtml(cat)}</button>`;
+                    menuCategorias.innerHTML += `<button class="btn-categoria" onclick="filtrarCategoria('${cat}', this)">${cat}</button>`;
                 });
             }
             // ------------------------------------------
-        const resRec = await fetchSupabase(`/rest/v1/receita_produto?select=*&loja_id=eq.${lojaAtual.id}`);
+        const resRec = await fetchSupabase(`/rest/v1/receita_produto?select=*`);
         receitasGlobais = await resRec.json();
 
         renderizarCardapio();
     } catch (erro) {
         console.error("Falha na extração dos dados:", erro);
-        const lista = document.getElementById("lista-produtos");
-        if (lista) lista.innerHTML = `<p style="color: #aaa; text-align: center; padding: 30px 10px; grid-column: 1 / -1;">Não foi possível carregar o cardápio agora. Tenta recarregar a página.</p>`;
     }
 }
 
@@ -323,8 +193,8 @@ function renderizarCardapio(categoriaFiltro = "Todos") {
                         ${badgeEsgotado}
                     </div>
                     <div class="produto-info">
-                        <h3>${escaparHtml(produto.nome)}</h3>
-                        <p>${escaparHtml(produto.descricao)}</p>
+                        <h3>${produto.nome}</h3>
+                        <p>${produto.descricao}</p>
                         <span class="preco">R$ ${produto.preco.toFixed(2).replace('.', ',')}</span>
                     </div>
                 </div>
@@ -352,13 +222,13 @@ async function abrirModalProduto(id) {
     modal.classList.remove("escondido");
 
     try {
-        const resExtras = await fetchSupabase(`/rest/v1/ingredientes?select=id,nome,preco_adicional,estoque&preco_adicional=gt.0&estoque=gt.0&loja_id=eq.${lojaAtual.id}`);
+        const resExtras = await fetchSupabase(`/rest/v1/ingredientes?select=id,nome,preco_adicional,estoque&preco_adicional=gt.0&estoque=gt.0`);
         const adicionaisDoBanco = await resExtras.json();
 
-        const resRec = await fetchSupabase(`/rest/v1/receita_produto?select=*&loja_id=eq.${lojaAtual.id}`);
+        const resRec = await fetchSupabase(`/rest/v1/receita_produto?select=*`);
         receitasGlobais = await resRec.json();
 
-        const resIngTodos = await fetchSupabase(`/rest/v1/ingredientes?select=id,nome,estoque&loja_id=eq.${lojaAtual.id}`);
+        const resIngTodos = await fetchSupabase(`/rest/v1/ingredientes?select=id,nome,estoque`);
         const todosIngredientes = await resIngTodos.json();
 
         const receitaDesteLanche = receitasGlobais.filter(r => r.produto_id == produtoSendoVisto.id);
@@ -405,10 +275,10 @@ async function abrirModalProduto(id) {
                 if(estoqueRealDisponivel >= consumoBaseDoIngrediente) { 
                     htmlAdicionais += `
                         <div class="adicional-item" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 12px; background: #222; border-radius: 8px; border: 1px solid #333;">
-                            <span style="color: #fff; font-weight: 500;">${escaparHtml(add.nome)} <br><small style="color: #aaa;">+ R$ ${Number(add.preco_adicional).toFixed(2).replace('.', ',')}</small></span>
+                            <span style="color: #fff; font-weight: 500;">${add.nome} <br><small style="color: #aaa;">+ R$ ${Number(add.preco_adicional).toFixed(2).replace('.', ',')}</small></span>
                             <div style="display: flex; align-items: center; gap: 12px;">
                                 <button type="button" onclick="alterarQtdAdicional('${add.id}', -1)" style="width: 32px; height: 32px; border-radius: 6px; background: #444; color: white; border: none; font-weight: bold; cursor: pointer; font-size: 18px;">-</button>
-                                <span class="qtd-adicional-span" id="qtd-add-${add.id}" data-id="${add.id}" data-nome="${escaparHtml(add.nome)}" data-preco="${add.preco_adicional}" style="font-weight: bold; color: #fff; width: 15px; text-align: center; font-size: 16px;">0</span>
+                                <span class="qtd-adicional-span" id="qtd-add-${add.id}" data-id="${add.id}" data-nome="${add.nome}" data-preco="${add.preco_adicional}" style="font-weight: bold; color: #fff; width: 15px; text-align: center; font-size: 16px;">0</span>
                                 <button type="button" onclick="alterarQtdAdicional('${add.id}', 1)" style="width: 32px; height: 32px; border-radius: 6px; background: var(--laranja-fogo, #ff5e00); color: white; border: none; font-weight: bold; cursor: pointer; font-size: 18px;">+</button>
                             </div>
                         </div>
@@ -420,7 +290,6 @@ async function abrirModalProduto(id) {
 
         let controleQtdHtml = "";
         let btnAdicionarHtml = "";
-        let observacaoHtml = "";
 
         if (!lojaAberta) {
             btnAdicionarHtml = `
@@ -433,16 +302,10 @@ async function abrirModalProduto(id) {
             btnAdicionarHtml = `
                 <div style="background: #333; color: #ff4757; text-align: center; padding: 15px; border-radius: 8px; margin-top: 15px; border: 1px solid #444;">
                     <i class="fa-solid fa-triangle-exclamation" style="font-size: 20px; margin-bottom: 5px;"></i><br>
-                    <strong>Estoque Insuficiente</strong><br><span style="font-size: 13px;">Falta ${escaparHtml(ingredienteFaltanteBase)} para finalizar a montagem.</span>
+                    <strong>Estoque Insuficiente</strong><br><span style="font-size: 13px;">Falta ${ingredienteFaltanteBase} para finalizar a montagem.</span>
                 </div>
             `;
         } else {
-            observacaoHtml = `
-                <div style="margin-top: 15px;">
-                    <label style="color: #fff; font-weight: bold; font-size: 14px; display: block; margin-bottom: 8px;">Alguma observação?</label>
-                    <textarea id="observacao-item" placeholder="Ex: sem cebola, sem tomate, caprichar no molho..." maxlength="200" style="width: 100%; min-height: 60px; padding: 12px; background: #222; border: 1px solid #333; border-radius: 8px; color: #fff; font-family: inherit; font-size: 14px; resize: vertical; box-sizing: border-box;"></textarea>
-                </div>
-            `;
             controleQtdHtml = `
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; padding: 15px; background: #222; border-radius: 8px;">
                     <span style="color: #fff; font-weight: bold; font-size: 16px;">Quantidade:</span>
@@ -460,11 +323,10 @@ async function abrirModalProduto(id) {
 
         detalhes.innerHTML = `
             <div class="produto-imagem" style="${imgModalSegura} height: 200px; background-size: cover; background-position: center; border-radius: 10px; margin-bottom: 15px; width: 100%;"></div>
-            <h2 style="color: #fff; font-size: 22px;">${escaparHtml(produtoSendoVisto.nome)}</h2>
-            <p style="color: #aaa; font-size: 14px; margin-bottom: 10px;">${escaparHtml(produtoSendoVisto.descricao)}</p>
+            <h2 style="color: #fff; font-size: 22px;">${produtoSendoVisto.nome}</h2>
+            <p style="color: #aaa; font-size: 14px; margin-bottom: 10px;">${produtoSendoVisto.descricao}</p>
             <h3 style="color: var(--laranja-fogo, #ff5e00); font-size: 22px;">R$ ${produtoSendoVisto.preco.toFixed(2).replace('.', ',')}</h3>
             ${htmlAdicionais}
-            ${observacaoHtml}
             ${controleQtdHtml}
             ${btnAdicionarHtml}
         `;
@@ -491,7 +353,7 @@ async function alterarQtdBase(delta) {
     btn.disabled = true;
 
     try {
-        const resIng = await fetchSupabase(`/rest/v1/ingredientes?select=id,nome,estoque&loja_id=eq.${lojaAtual.id}`);
+        const resIng = await fetchSupabase(`/rest/v1/ingredientes?select=id,nome,estoque`);
         const ingredientesLive = await resIng.json();
         const receitaDesteLanche = receitasGlobais.filter(r => r.produto_id == produtoSendoVisto.id);
 
@@ -586,7 +448,7 @@ async function alterarQtdAdicional(id, delta) {
     btn.disabled = true;
 
     try {
-        const resIng = await fetchSupabase(`/rest/v1/ingredientes?select=nome,estoque&id=eq.${id}&loja_id=eq.${lojaAtual.id}`);
+        const resIng = await fetchSupabase(`/rest/v1/ingredientes?select=nome,estoque&id=eq.${id}`);
         const dadosIng = await resIng.json();
 
         if (dadosIng && dadosIng.length > 0) {
@@ -641,7 +503,7 @@ async function confirmarAdicao() {
     }
 
     try {
-        const resIng = await fetchSupabase(`/rest/v1/ingredientes?select=id,nome,estoque&loja_id=eq.${lojaAtual.id}`);
+        const resIng = await fetchSupabase(`/rest/v1/ingredientes?select=id,nome,estoque`);
         const ingredientesLive = await resIng.json();
 
         const receitaDesteLanche = receitasGlobais.filter(r => r.produto_id == produtoSendoVisto.id);
@@ -702,15 +564,11 @@ async function confirmarAdicao() {
         }
 
         // TUDO CERTO! Envia pro carrinho
-        const campoObservacao = document.getElementById("observacao-item");
-        const observacao = campoObservacao ? campoObservacao.value.trim().substring(0, 200) : "";
-
         for (let i = 0; i < qtdBaseEscolhida; i++) {
             const itemParaCarrinho = {
                 produtoBase: produtoSendoVisto,
-                adicionais: JSON.parse(JSON.stringify(adicionaisEscolhidos)),
-                precoTotalItem: produtoSendoVisto.preco + totalAdicionais,
-                observacao: observacao
+                adicionais: JSON.parse(JSON.stringify(adicionaisEscolhidos)), 
+                precoTotalItem: produtoSendoVisto.preco + totalAdicionais
             };
             carrinho.push(itemParaCarrinho);
         }
@@ -744,87 +602,13 @@ function atualizarContadorCart() {
     }
 }
 
-let tipoEntregaSelecionado = "entrega";
-let cupomAplicado = null; // { codigo, valorDesconto } ou null — validado no servidor, nunca calculado só no cliente
-
-function obterDescontoCupomAtual() {
-    return cupomAplicado ? cupomAplicado.valorDesconto : 0;
-}
-
-// Usado em todo lugar que precisa do total (checkout, PIX, WhatsApp) pra
-// nunca esquecer de somar a taxa de entrega em algum deles.
-function obterTaxaEntregaAtual() {
-    return (tipoEntregaSelecionado === "entrega") ? (Number(configLoja.taxa_entrega) || 0) : 0;
-}
-
-function selecionarTipoEntrega(tipo) {
-    tipoEntregaSelecionado = tipo;
-    const btnEntrega = document.getElementById("btn-tipo-entrega");
-    const btnRetirada = document.getElementById("btn-tipo-retirada");
-    const camposEndereco = document.getElementById("campos-endereco-entrega");
-    if (!btnEntrega || !btnRetirada || !camposEndereco) return;
-
-    if (tipo === "entrega") {
-        btnEntrega.style.background = "var(--laranja-fogo, #ff5e00)";
-        btnEntrega.style.borderColor = "var(--laranja-fogo, #ff5e00)";
-        btnRetirada.style.background = "transparent";
-        btnRetirada.style.borderColor = "#333";
-        camposEndereco.style.display = "block";
-    } else {
-        btnRetirada.style.background = "var(--laranja-fogo, #ff5e00)";
-        btnRetirada.style.borderColor = "var(--laranja-fogo, #ff5e00)";
-        btnEntrega.style.background = "transparent";
-        btnEntrega.style.borderColor = "#333";
-        camposEndereco.style.display = "none";
-    }
-    atualizarPrevisaoCliente();
-    renderizarCheckout();
-}
-
-let previsaoClienteAtualizacao = 0;
-
-async function obterPrevisaoCliente(tipo) {
-    const ehRetirada = tipo === "retirada";
-    const campoModo = ehRetirada ? "tempo_retirada_modo" : "tempo_entrega_modo";
-    const campoFixo = ehRetirada ? "tempo_retirada_fixo" : "tempo_entrega_fixo";
-    const tempoFixo = Number(configLoja[campoFixo]) || (ehRetirada ? 30 : 50);
-
-    if (configLoja[campoModo] !== "dinamico") return `Em ate ${tempoFixo} minutos`;
-
-    try {
-        const resposta = await fetchSupabase(`/rest/v1/rpc/obter_previsao_pedido`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ p_loja_id: lojaAtual.id, p_tipo_entrega: tipo })
-        });
-        if (resposta.ok) {
-            const previsao = await resposta.json();
-            if (typeof previsao === "string" && previsao.trim()) return previsao;
-        }
-    } catch (erro) {
-        console.warn("Previsao dinamica indisponivel; usando tempo fixo.");
-    }
-    return `Em ate ${tempoFixo} minutos`;
-}
-
-async function atualizarPrevisaoCliente() {
-    const elemento = document.getElementById("previsao-cliente");
-    if (!elemento || !lojaAtual) return;
-    const atualizacao = ++previsaoClienteAtualizacao;
-    elemento.style.display = "inline-flex";
-    elemento.innerHTML = '<i class="fa-solid fa-clock"></i><span>Calculando...</span>';
-    const previsao = await obterPrevisaoCliente(tipoEntregaSelecionado);
-    if (atualizacao !== previsaoClienteAtualizacao) return;
-    elemento.innerHTML = `<i class="fa-solid fa-clock"></i><span>Tempo estimado <strong>${escaparHtml(previsao)}</strong></span>`;
-}
-
 function abrirCheckout() {
     if (carrinho.length === 0) { mostrarAviso("Adicione algo delicioso antes de finalizar.", "Carrinho Vazio"); return; }
     navegarPara('checkout');
-    selecionarTipoEntrega('entrega');
-    carregarPerfilNaTela();
+    renderizarCheckout();
+    carregarPerfilNaTela(); 
     preencherCheckoutComPerfil();
-    verificarTroco();
+    verificarTroco(); 
 }
 
 function renderizarCheckout() {
@@ -832,61 +616,29 @@ function renderizarCheckout() {
     divItens.innerHTML = "";
     let somaTotal = 0;
 
-    // Agrupa itens IDÊNTICOS (mesmo produto, mesmos adicionais, mesma
-    // observação) numa linha só com quantidade — "1x Coca" + "1x Coca" vira
-    // "2x Coca". Item com observação diferente (ex: "sem tomate") não se
-    // mistura com um igual sem observação, fica em linhas separadas.
-    const grupos = [];
     carrinho.forEach((item, index) => {
-        const chave = JSON.stringify({
-            id: item.produtoBase.id,
-            adicionais: item.adicionais.map(a => ({ id: a.id, quantidade: a.quantidade })),
-            observacao: item.observacao || ''
-        });
-        const existente = grupos.find(g => g.chave === chave);
-        if (existente) {
-            existente.indices.push(index);
-        } else {
-            grupos.push({ chave, item, indices: [index] });
-        }
-    });
-
-    grupos.forEach(grupo => {
-        const item = grupo.item;
-        const qtd = grupo.indices.length;
-        const primeiroIndice = grupo.indices[0];
-        somaTotal += item.precoTotalItem * qtd;
-
+        somaTotal += item.precoTotalItem;
+        
         let listaAddsHtml = "";
         if (item.adicionais.length > 0) {
             listaAddsHtml = "<ul style='color: #aaa; font-size: 13px; margin-top: 5px; list-style: none;'>";
             item.adicionais.forEach(add => {
                 const subtotalAdd = add.preco * add.quantidade;
-                listaAddsHtml += `<li>+ ${add.quantidade}x ${escaparHtml(add.nome)} (R$ ${subtotalAdd.toFixed(2).replace('.', ',')})</li>`;
+                listaAddsHtml += `<li>+ ${add.quantidade}x ${add.nome} (R$ ${subtotalAdd.toFixed(2).replace('.', ',')})</li>`;
             });
             listaAddsHtml += "</ul>";
-        }
-
-        let obsHtml = "";
-        if (item.observacao) {
-            obsHtml = `<div style="color: #ffa502; font-size: 13px; margin-top: 6px;"><i class="fa-solid fa-pen"></i> Obs: ${escaparHtml(item.observacao)}</div>`;
         }
 
         divItens.innerHTML += `
             <div style="background: #222; border-radius: 8px; padding: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333;">
                 <div>
-                    <strong>${qtd}x ${escaparHtml(item.produtoBase.nome)} <span style="color: #aaa; font-size: 13px;">(R$ ${item.produtoBase.preco.toFixed(2).replace('.', ',')})</span></strong>
+                    <strong>1x ${item.produtoBase.nome} <span style="color: #aaa; font-size: 13px;">(R$ ${item.produtoBase.preco.toFixed(2).replace('.', ',')})</span></strong>
                     ${listaAddsHtml}
-                    ${obsHtml}
                     <div style="color: var(--laranja-fogo, #ff5e00); margin-top: 5px; font-weight: bold; font-size: 15px;">
-                        Subtotal: R$ ${(item.precoTotalItem * qtd).toFixed(2).replace('.', ',')}
+                        Subtotal: R$ ${item.precoTotalItem.toFixed(2).replace('.', ',')}
                     </div>
                 </div>
-                <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
-                    <button onclick="removerDoCarrinho(${primeiroIndice})" style="background: transparent; color: #ff4757; border: none; font-size: 16px; cursor: pointer; padding: 4px;"><i class="fa-solid fa-minus"></i></button>
-                    <span style="color:#fff; font-weight:bold; min-width:14px; text-align:center;">${qtd}</span>
-                    <button onclick="duplicarItemCarrinho(${primeiroIndice})" style="background: transparent; color: #2ed573; border: none; font-size: 16px; cursor: pointer; padding: 4px;"><i class="fa-solid fa-plus"></i></button>
-                </div>
+                <button onclick="removerDoCarrinho(${index})" style="background: transparent; color: #ff4757; border: none; font-size: 18px; cursor: pointer;"><i class="fa-solid fa-trash"></i></button>
             </div>
         `;
     });
@@ -897,389 +649,17 @@ function renderizarCheckout() {
         </button>
     `;
 
-    atualizarAvisoProgressoCupom(somaTotal);
-
-    const descontoAtual = obterDescontoCupomAtual();
-    if (descontoAtual > 0) {
-        somaTotal -= descontoAtual;
-        divItens.innerHTML += `
-            <div style="display: flex; justify-content: space-between; color: #2ed573; font-size: 14px; margin-top: 12px; padding-top: 10px; border-top: 1px dashed #333;">
-                <span><i class="fa-solid fa-tag"></i> Cupom ${escaparHtml(cupomAplicado.codigo)}</span>
-                <span>-R$ ${descontoAtual.toFixed(2).replace('.', ',')}</span>
-            </div>
-        `;
-    }
-
-    const taxaEntregaCheckout = obterTaxaEntregaAtual();
-    if (taxaEntregaCheckout > 0) {
-        somaTotal += taxaEntregaCheckout;
-        divItens.innerHTML += `
-            <div style="display: flex; justify-content: space-between; color: #aaa; font-size: 14px; margin-top: 12px; padding-top: 10px; border-top: 1px dashed #333;">
-                <span><i class="fa-solid fa-motorcycle"></i> Taxa de entrega</span>
-                <span>R$ ${taxaEntregaCheckout.toFixed(2).replace('.', ',')}</span>
-            </div>
-        `;
-    }
-
     document.getElementById("valor-total").innerText = `R$ ${somaTotal.toFixed(2).replace('.', ',')}`;
-
-    // "De R$X por R$Y" — deixa visível o quanto o cupom realmente economizou.
-    const elOriginal = document.getElementById("total-original-riscado");
-    const elEconomia = document.getElementById("linha-economia");
-    if (descontoAtual > 0) {
-        elOriginal.innerText = `R$ ${(somaTotal + descontoAtual).toFixed(2).replace('.', ',')}`;
-        elOriginal.style.display = "block";
-        elEconomia.innerHTML = `<i class="fa-solid fa-circle-check"></i> Você economizou R$ ${descontoAtual.toFixed(2).replace('.', ',')}`;
-        elEconomia.style.display = "block";
-    } else {
-        elOriginal.style.display = "none";
-        elEconomia.style.display = "none";
-    }
-
-    verificarTroco();
+    verificarTroco(); 
 }
 
 function removerDoCarrinho(index) {
     carrinho.splice(index, 1);
     atualizarContadorCart();
     renderizarCardapio();
-
-    // O carrinho mudou, então o desconto calculado antes pode não valer mais
-    // (um cupom de % muda de valor com o subtotal) — pede pra reaplicar.
-    removerCupom();
-
+    
     if (carrinho.length === 0) navegarPara('inicio');
     else renderizarCheckout();
-}
-
-// Adiciona mais uma unidade idêntica a um item já no carrinho (mesmos
-// adicionais e observação) — usado pelo "+" da linha agrupada no checkout.
-function duplicarItemCarrinho(index) {
-    const original = carrinho[index];
-    if (!original) return;
-
-    carrinho.push(JSON.parse(JSON.stringify(original)));
-    atualizarContadorCart();
-    renderizarCardapio();
-    removerCupom();
-    renderizarCheckout();
-}
-
-async function aplicarCupom() {
-    const inputEl = document.getElementById("cupom-codigo-cliente");
-    const erroEl = document.getElementById("cupom-feedback-erro");
-    const codigo = inputEl ? inputEl.value.trim().toUpperCase() : "";
-
-    if (erroEl) erroEl.style.display = "none";
-
-    if (!codigo) {
-        if (erroEl) { erroEl.innerText = "Digite um código de cupom."; erroEl.style.display = "block"; }
-        return;
-    }
-
-    const subtotalAtual = carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0);
-
-    try {
-        const resposta = await fetchSupabase(`/rest/v1/rpc/validar_cupom`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                p_loja_id: lojaAtual.id,
-                p_codigo: codigo,
-                p_subtotal: subtotalAtual,
-                p_cliente_id: obterOuCriarClienteId()
-            })
-        });
-
-        const dados = resposta.ok ? await resposta.json() : null;
-
-        if (!dados || !dados.valido) {
-            cupomAplicado = null;
-            const motivoBruto = dados && dados.motivo ? dados.motivo : "";
-            const motivo = motivoBruto.includes(':') ? motivoBruto.split(':').slice(1).join(':').trim() : (motivoBruto || "Cupom inválido.");
-            if (erroEl) { erroEl.innerText = motivo; erroEl.style.display = "block"; }
-            renderizarCheckout();
-            return;
-        }
-
-        cupomAplicado = { codigo, valorDesconto: Number(dados.valor_desconto) };
-        if (inputEl) inputEl.value = "";
-
-        const elAplicado = document.getElementById("linha-cupom-aplicado");
-        const elInputLinha = document.getElementById("linha-cupom-input");
-        const elCodigoAplicado = document.getElementById("texto-codigo-cupom-aplicado");
-        const elDescontoAplicado = document.getElementById("texto-desconto-cupom-aplicado");
-        if (elCodigoAplicado) elCodigoAplicado.innerText = codigo;
-        if (elDescontoAplicado) elDescontoAplicado.innerText = `-R$ ${cupomAplicado.valorDesconto.toFixed(2).replace('.', ',')}`;
-        if (elAplicado) elAplicado.style.display = "flex";
-        if (elInputLinha) elInputLinha.style.display = "none";
-
-        renderizarCheckout();
-    } catch (erro) {
-        if (erroEl) { erroEl.innerText = "Erro ao validar cupom. Tente novamente."; erroEl.style.display = "block"; }
-    }
-}
-
-function removerCupom() {
-    cupomAplicado = null;
-    const elAplicado = document.getElementById("linha-cupom-aplicado");
-    const elInput = document.getElementById("linha-cupom-input");
-    const elErro = document.getElementById("cupom-feedback-erro");
-    if (elAplicado) elAplicado.style.display = "none";
-    if (elInput) elInput.style.display = "flex";
-    if (elErro) elErro.style.display = "none";
-
-    // Sem isso, o total (e o Pix já copiado) continuava mostrando o valor
-    // com desconto mesmo depois de remover o cupom.
-    if (document.getElementById("valor-total")) renderizarCheckout();
-}
-
-// ==========================================
-// VITRINE DE PROMOÇÕES (cupons marcados como públicos pela loja)
-// ==========================================
-let cuponsPublicosCache = [];
-
-async function carregarCuponsPublicos() {
-    try {
-        const resposta = await fetchSupabase(`/rest/v1/rpc/listar_cupons_publicos`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ p_loja_id: lojaAtual.id, p_cliente_id: obterOuCriarClienteId() })
-        });
-        cuponsPublicosCache = resposta.ok ? await resposta.json() : [];
-    } catch (erro) {
-        cuponsPublicosCache = [];
-    }
-
-    const link = document.getElementById("link-ver-promocoes");
-    if (link) link.style.display = cuponsPublicosCache.length > 0 ? "block" : "none";
-
-    // Badge no menu inferior — chama atenção pra quantos cupons dá pra usar agora.
-    const badge = document.getElementById("badge-cupons-disponiveis");
-    if (badge) {
-        if (cuponsPublicosCache.length > 0) {
-            badge.innerText = cuponsPublicosCache.length;
-            badge.style.display = "flex";
-        } else {
-            badge.style.display = "none";
-        }
-    }
-}
-
-// Tela "Meus Cupons" (aba do menu inferior) — mostra os cupons que esse
-// cliente pode usar agora, e embaixo o histórico dos que ele já usou.
-async function carregarTelaCupons() {
-    document.getElementById("cupons-total-disponiveis").innerText = cuponsPublicosCache.length;
-
-    const listaDisponiveis = document.getElementById("lista-cupons-disponiveis");
-    if (cuponsPublicosCache.length === 0) {
-        listaDisponiveis.innerHTML = `<p style="color:#aaa; text-align:center; padding:16px;">Nenhum cupom disponível pra você no momento.</p>`;
-    } else {
-        listaDisponiveis.innerHTML = cuponsPublicosCache.map(c => {
-            let descricao = c.tipo_desconto === 'percentual'
-                ? `${Number(c.valor_desconto)}% de desconto${c.desconto_maximo_por_pedido ? ` (até R$ ${Number(c.desconto_maximo_por_pedido).toFixed(2).replace('.', ',')})` : ''}`
-                : `R$ ${Number(c.valor_desconto).toFixed(2).replace('.', ',')} de desconto`;
-            if (c.valor_minimo_pedido) {
-                descricao += ` · a partir de R$ ${Number(c.valor_minimo_pedido).toFixed(2).replace('.', ',')}`;
-            }
-            return `
-                <div style="display:flex; justify-content:space-between; align-items:center; background:#1e1e1e; border:1px solid #333; border-radius:10px; padding:14px; margin-bottom:10px;">
-                    <div>
-                        <strong style="font-family: monospace; color: #fff; font-size:15px;">${escaparHtml(c.codigo)}</strong>
-                        <div style="color:#aaa; font-size:12.5px; margin-top:2px;">${descricao}</div>
-                    </div>
-                    <button type="button" onclick="usarCupomDaTelaCupons('${escaparHtml(c.codigo)}')" style="background: var(--laranja-fogo, #ff5e00); color:#fff; border:none; padding:8px 16px; border-radius:8px; font-size:13px; font-weight:bold; cursor:pointer; flex-shrink:0;">Usar</button>
-                </div>
-            `;
-        }).join('');
-    }
-
-    const listaUsados = document.getElementById("lista-cupons-usados");
-    listaUsados.innerHTML = `<p style="color:#666; text-align:center; padding:10px; font-size:13px;">Carregando...</p>`;
-    try {
-        const resposta = await fetchSupabase(`/rest/v1/rpc/listar_meus_cupons_usados`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ p_loja_id: lojaAtual.id, p_cliente_id: obterOuCriarClienteId() })
-        });
-        const usados = resposta.ok ? await resposta.json() : [];
-
-        if (usados.length === 0) {
-            listaUsados.innerHTML = `<p style="color:#666; text-align:center; padding:10px; font-size:13px;">Você ainda não usou nenhum cupom.</p>`;
-        } else {
-            listaUsados.innerHTML = usados.map(c => {
-                const descricao = c.tipo_desconto === 'percentual'
-                    ? `${Number(c.valor_desconto)}% de desconto`
-                    : `R$ ${Number(c.valor_desconto).toFixed(2).replace('.', ',')} de desconto`;
-                return `
-                    <div style="display:flex; justify-content:space-between; align-items:center; background:#1a1a1a; border:1px solid #2a2a2a; border-radius:10px; padding:12px 14px; margin-bottom:8px; opacity:.65;">
-                        <div>
-                            <strong style="font-family: monospace; color: #ccc; font-size:14px;">${escaparHtml(c.codigo)}</strong>
-                            <div style="color:#777; font-size:12px; margin-top:2px;">${descricao}</div>
-                        </div>
-                        <div style="color:#666; font-size:11.5px;">${formatarDataHoraBr(c.usado_em, { day: '2-digit', month: '2-digit' })}</div>
-                    </div>
-                `;
-            }).join('');
-        }
-    } catch (erro) {
-        listaUsados.innerHTML = `<p style="color:#ff4757; text-align:center; padding:10px; font-size:13px;">Erro ao carregar cupons usados.</p>`;
-    }
-}
-
-function usarCupomDaTelaCupons(codigo) {
-    if (carrinho.length === 0) {
-        mostrarAviso("Adiciona alguns itens ao carrinho primeiro pra usar esse cupom.", "Carrinho Vazio");
-        navegarPara('inicio');
-        return;
-    }
-    navegarPara('checkout');
-    setTimeout(() => {
-        const input = document.getElementById("cupom-codigo-cliente");
-        if (input) input.value = codigo;
-        aplicarCupom();
-    }, 50);
-}
-
-function abrirVitrinePromocoes() {
-    const container = document.getElementById("vitrine-promocoes");
-    if (!container) return;
-
-    if (container.style.display === "block") {
-        container.style.display = "none";
-        return;
-    }
-
-    if (cuponsPublicosCache.length === 0) {
-        container.innerHTML = `<p style="color:#aaa; font-size:13px; margin:0;">Nenhuma promoção disponível no momento.</p>`;
-    } else {
-        container.innerHTML = cuponsPublicosCache.map(c => {
-            let descricao = c.tipo_desconto === 'percentual'
-                ? `${Number(c.valor_desconto)}% de desconto${c.desconto_maximo_por_pedido ? ` (até R$ ${Number(c.desconto_maximo_por_pedido).toFixed(2).replace('.', ',')})` : ''}`
-                : `R$ ${Number(c.valor_desconto).toFixed(2).replace('.', ',')} de desconto`;
-            if (c.valor_minimo_pedido) {
-                descricao += ` · a partir de R$ ${Number(c.valor_minimo_pedido).toFixed(2).replace('.', ',')}`;
-            }
-            return `
-                <div style="display:flex; justify-content:space-between; align-items:center; padding: 8px 0; border-bottom: 1px solid #2a2a2a;">
-                    <div>
-                        <strong style="font-family: monospace; color: #fff;">${escaparHtml(c.codigo)}</strong>
-                        <div style="color:#aaa; font-size:12.5px;">${descricao}</div>
-                    </div>
-                    <button type="button" onclick="usarCupomDaVitrine('${escaparHtml(c.codigo)}')" style="background: var(--laranja-fogo, #ff5e00); color:#fff; border:none; padding:6px 12px; border-radius:6px; font-size:12.5px; font-weight:bold; cursor:pointer;">Usar</button>
-                </div>
-            `;
-        }).join('');
-    }
-    container.style.display = "block";
-}
-
-// Mostra "falta R$X pra desbloquear o cupom Y" olhando sempre pro PRÓXIMO
-// patamar ainda não alcançado — se o cliente já bateu o mínimo de um cupom
-// menor, pula automaticamente pra sugerir o de cima (se houver).
-function atualizarAvisoProgressoCupom(subtotalAtual) {
-    const container = document.getElementById("aviso-progresso-cupom");
-    const textoEl = document.getElementById("texto-aviso-progresso-cupom");
-    if (!container || !textoEl) return;
-
-    const candidatos = cuponsPublicosCache.filter(c =>
-        c.valor_minimo_pedido && (!cupomAplicado || c.codigo !== cupomAplicado.codigo)
-    );
-
-    if (candidatos.length === 0) {
-        container.style.display = "none";
-        return;
-    }
-
-    const descricaoDesconto = (c) => c.tipo_desconto === 'percentual'
-        ? `${Number(c.valor_desconto)}% de desconto`
-        : `R$ ${Number(c.valor_desconto).toFixed(2).replace('.', ',')} de desconto`;
-
-    const proximo = candidatos
-        .filter(c => Number(c.valor_minimo_pedido) > subtotalAtual)
-        .sort((a, b) => Number(a.valor_minimo_pedido) - Number(b.valor_minimo_pedido))[0];
-
-    if (proximo) {
-        const faltante = Number(proximo.valor_minimo_pedido) - subtotalAtual;
-        textoEl.innerHTML = `<i class="fa-solid fa-gift"></i> Falta <strong>R$ ${faltante.toFixed(2).replace('.', ',')}</strong> pra desbloquear o cupom <strong>${escaparHtml(proximo.codigo)}</strong> (${descricaoDesconto(proximo)})!`;
-        container.style.display = "block";
-        return;
-    }
-
-    const melhorDisponivel = candidatos
-        .filter(c => Number(c.valor_minimo_pedido) <= subtotalAtual)
-        .sort((a, b) => Number(b.valor_minimo_pedido) - Number(a.valor_minimo_pedido))[0];
-
-    if (melhorDisponivel) {
-        textoEl.innerHTML = `<i class="fa-solid fa-circle-check"></i> Você já pode usar o cupom <strong>${escaparHtml(melhorDisponivel.codigo)}</strong> (${descricaoDesconto(melhorDisponivel)})!`;
-        container.style.display = "block";
-        return;
-    }
-
-    container.style.display = "none";
-}
-
-// ==========================================
-// "TURBINAR PEDIDO" — carrossel horizontal de adição rápida, aberto pelo
-// "+" no aviso de progresso do cupom.
-// ==========================================
-function alternarCarrosselTurbinar() {
-    const carrossel = document.getElementById("carrossel-turbinar");
-    if (!carrossel) return;
-
-    if (carrossel.style.display === "block") {
-        fecharCarrosselTurbinar();
-        return;
-    }
-    renderizarCarrosselTurbinar();
-    carrossel.style.display = "block";
-}
-
-function fecharCarrosselTurbinar() {
-    const carrossel = document.getElementById("carrossel-turbinar");
-    if (carrossel) carrossel.style.display = "none";
-}
-
-function renderizarCarrosselTurbinar() {
-    const lista = document.getElementById("carrossel-turbinar-itens");
-    if (!lista) return;
-
-    const disponiveis = cardapio.filter(p => p.tem_estoque !== false).sort((a, b) => a.preco - b.preco);
-
-    if (disponiveis.length === 0) {
-        lista.innerHTML = `<p style="color:#aaa; font-size:13px; margin:0;">Nenhum item disponível agora.</p>`;
-        return;
-    }
-
-    lista.innerHTML = disponiveis.map(p => `
-        <div style="flex: 0 0 auto; width: 108px; background:#1a1a1a; border:1px solid #333; border-radius:10px; padding:8px; text-align:center;">
-            <div style="width:100%; height:58px; border-radius:6px; background-size:cover; background-position:center; background-color:#222; ${p.imagem ? `background-image:url('${p.imagem}');` : ''} margin-bottom:6px;"></div>
-            <div style="font-size:11.5px; color:#fff; font-weight:600; line-height:1.25; height:28px; overflow:hidden;">${escaparHtml(p.nome)}</div>
-            <div style="font-size:12px; color:#2ed573; font-weight:700; margin:4px 0;">R$ ${p.preco.toFixed(2).replace('.', ',')}</div>
-            <button type="button" onclick="adicionarProdutoRapido(${p.id})" style="width:100%; background: var(--laranja-fogo, #ff5e00); color:#fff; border:none; border-radius:6px; padding:6px; font-size:12px; font-weight:bold; cursor:pointer;">+ Add</button>
-        </div>
-    `).join('');
-}
-
-function adicionarProdutoRapido(produtoId) {
-    const produto = cardapio.find(p => p.id === produtoId);
-    if (!produto) return;
-
-    carrinho.push({
-        produtoBase: produto,
-        adicionais: [],
-        precoTotalItem: produto.preco,
-        observacao: ""
-    });
-
-    atualizarContadorCart();
-    renderizarCheckout();
-}
-
-function usarCupomDaVitrine(codigo) {
-    document.getElementById("cupom-codigo-cliente").value = codigo;
-    document.getElementById("vitrine-promocoes").style.display = "none";
-    aplicarCupom();
 }
 
 function verificarTroco() {
@@ -1307,8 +687,8 @@ function verificarTroco() {
             return; 
         }
 
-        const totalCalculado = Math.max(0, carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0) - obterDescontoCupomAtual()) + obterTaxaEntregaAtual();
-
+        const totalCalculado = carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0);
+        
         if (!areaPix) {
             areaPix = document.createElement("div");
             areaPix.id = "area-pix-dinamica";
@@ -1338,11 +718,10 @@ function gerarPixCopiaECola(valorPix) {
 }
 
 function copiarPixParaAreaDeTransferencia() {
-    const totalCalculado = Math.max(0, carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0) - obterDescontoCupomAtual()) + obterTaxaEntregaAtual();
+    const totalCalculado = carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0);
     const codigoPix = gerarPixCopiaECola(totalCalculado);
 
     navigator.clipboard.writeText(codigoPix).then(() => {
-        pixValorCopiado = totalCalculado;
         const btn = document.getElementById("btn-copiar-pix");
         btn.innerHTML = `<i class="fa-solid fa-check"></i> Copiado! Abra seu app do banco`;
         btn.style.background = "#ffa502"; btn.style.color = "#fff";
@@ -1379,29 +758,15 @@ async function enviarParaWhatsApp() {
     const bairro = document.getElementById("bairro-cliente").value;
     const complemento = document.getElementById("complemento-cliente").value;
     const pagamento = document.getElementById("forma-pagamento").value;
-    const ehEntrega = tipoEntregaSelecionado === "entrega";
 
-    if (nome === "") {
-        mostrarAviso("Por favor, preencha seu nome.", "Dados Incompletos");
-        return;
-    }
-    if (ehEntrega && (rua === "" || numero === "" || bairro === "")) {
-        mostrarAviso("Por favor, preencha Rua, Número e Bairro para a entrega!", "Dados Incompletos");
+    if (nome === "" || rua === "" || numero === "" || bairro === "") {
+        mostrarAviso("Por favor, preencha seu Nome, Rua, Número e Bairro para a entrega!", "Dados Incompletos");
         return;
     }
 
-    const enderecoFormatado = ehEntrega ? `${rua}, ${numero} - ${bairro} ${complemento ? '(' + complemento + ')' : ''}` : "";
-    const taxaEntrega = obterTaxaEntregaAtual();
-    const totalCalculado = Math.max(0, carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0) - obterDescontoCupomAtual()) + taxaEntrega;
-
-    if (pagamento.toUpperCase() === "PIX" && configLoja.chave_pix && configLoja.chave_pix.trim() !== "") {
-        const pixAindaValido = pixValorCopiado !== null && Math.abs(pixValorCopiado - totalCalculado) < 0.01;
-        if (!pixAindaValido) {
-            mostrarAviso("Copia o código PIX antes de enviar — é só clicar em \"Copiar Código PIX\" logo acima do botão de enviar.", "Falta copiar o PIX");
-            return;
-        }
-    }
-
+    const enderecoFormatado = `${rua}, ${numero} - ${bairro} ${complemento ? '(' + complemento + ')' : ''}`;
+    const totalCalculado = carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0);
+    
     const btnFinalizar = document.querySelector(".btn-whatsapp");
     let textoOriginalBotao = "Enviar Pedido";
 
@@ -1412,7 +777,7 @@ async function enviarParaWhatsApp() {
     }
 
     try {
-        const perfilSalvo = JSON.parse(localStorage.getItem(chaveLocalStorage("perfil")) || "{}");
+        const perfilSalvo = JSON.parse(localStorage.getItem("vilelaburgers_perfil") || "{}");
         const telefoneCliente = perfilSalvo.telefone ? String(perfilSalvo.telefone).replace(/\D/g, '') : "";
         const clienteId = obterOuCriarClienteId();
 
@@ -1423,12 +788,8 @@ async function enviarParaWhatsApp() {
             p_cliente_id: clienteId,
             p_telefone_cliente: telefoneCliente,
             p_status: "Pendente",
-            p_previsao_entrega: await obterPrevisaoCliente(tipoEntregaSelecionado),
-            p_carrinho: carrinho,
-            p_loja_id: lojaAtual.id,
-            p_tipo_entrega: tipoEntregaSelecionado,
-            p_endereco_entrega: ehEntrega ? enderecoFormatado : null,
-            p_codigo_cupom: cupomAplicado ? cupomAplicado.codigo : null
+            p_previsao_entrega: "Em até 50 minutos",
+            p_carrinho: carrinho 
         };
 
         const resSupabase = await fetchSupabase(`/rest/v1/rpc/registrar_pedido_completo`, {
@@ -1437,37 +798,17 @@ async function enviarParaWhatsApp() {
             body: JSON.stringify(dadosPedidoCompleto)
         });
 
-        const corpoResposta = await resSupabase.json().catch(() => null);
-
-        if (!resSupabase.ok || !corpoResposta || corpoResposta.sucesso !== true) {
-            const erroTexto = (corpoResposta && corpoResposta.erro) || "";
-            const codigoErro = corpoResposta && corpoResposta.codigo_erro;
-
-            if (codigoErro === "trava_estoque_positivo") {
-                mostrarAviso("O estoque de algum ingrediente esgotou agora mesmo! Volte e ajuste a quantidade no carrinho.", "Estoque Esgotado");
-            } else if (erroTexto.includes("CUPOM_JA_USADO")) {
-                removerCupom();
-                renderizarCheckout();
-                mostrarAviso("Esse cupom já foi usado por você antes e só vale uma vez. Remove pra continuar sem ele.", "Cupom Já Usado");
-            } else if (erroTexto.includes("CUPOM_VALOR_MINIMO_NAO_ATINGIDO")) {
-                removerCupom();
-                renderizarCheckout();
-                mostrarAviso("O carrinho ficou abaixo do valor mínimo exigido por esse cupom. Remove ou adiciona mais itens pra continuar.", "Valor Mínimo Não Atingido");
-            } else if (erroTexto.includes("CUPOM_RESTRITO_A_NOVOS_CLIENTES")) {
-                removerCupom();
-                renderizarCheckout();
-                mostrarAviso("Esse cupom é exclusivo pra quem está começando a pedir aqui. Remove pra continuar sem ele.", "Cupom Restrito");
-            } else if (erroTexto.includes("CUPOM_INVALIDO") || erroTexto.includes("CUPOM_ESGOTADO")) {
-                removerCupom();
-                renderizarCheckout();
-                mostrarAviso("Esse cupom não é mais válido (pode ter esgotado agora mesmo). Remove ou tenta outro pra continuar.", "Cupom Inválido");
-            } else if (codigoErro === "TOTAL_INVALIDO") {
-                mostrarAviso("O total do pedido mudou (talvez um preço tenha sido atualizado). Recarregue a página e tente novamente.", "Total Desatualizado");
+        if (!resSupabase.ok) {
+            const erroDB = await resSupabase.json();
+            if (erroDB.code === "23514" || (erroDB.message && erroDB.message.includes("trava_estoque_positivo"))) {
+                let itemFalho = "algum ingrediente";
+                if (erroDB.details) { const partes = erroDB.details.split(','); if (partes.length > 1) itemFalho = partes[1].trim(); }
+                mostrarAviso(`O estoque de "${itemFalho}" esgotou agora mesmo! Volte e ajuste a quantidade no carrinho.`, "Estoque Esgotado");
             } else {
-                mostrarAviso("Ocorreu um erro ao registrar seu pedido no nosso sistema.", "Erro na Finalização");
+                mostrarAviso("Ocorreu um erro ao registrar seu pedido no nosso system.", "Erro na Finalização");
             }
             if (btnFinalizar) { btnFinalizar.innerText = textoOriginalBotao; btnFinalizar.disabled = false; }
-            return;
+            return; 
         }
 
         // =========================================================
@@ -1478,7 +819,7 @@ async function enviarParaWhatsApp() {
         if (fogoOverlay) {
             fogoOverlay.style.display = "flex";
         }
-
+        
         if (somFogo) {
             somFogo.currentTime = 0;
             somFogo.play().catch(erroAudio => console.log("Navegador aguardando interação ou bloqueou áudio:", erroAudio));
@@ -1486,48 +827,25 @@ async function enviarParaWhatsApp() {
 
         // Aguarda 2,5 segundos com o fogo estralando antes de ir para o WhatsApp
         setTimeout(() => {
-            const nomeLojaTexto = (configLoja.nome_loja || lojaAtual.nome || "").toUpperCase();
-            let textoPedido = `🔥 *NOVO PEDIDO - ${nomeLojaTexto}* 🔥\n\n`;
-            textoPedido += `👤 *Cliente:* ${nome}\n`;
-            textoPedido += ehEntrega ? `📍 *Endereço:* ${enderecoFormatado}\n` : `🏪 *Retirada na loja*\n`;
-
-
+            let textoPedido = `🔥 *NOVO PEDIDO - VILELA BURGERS* 🔥\n\n`;
+            textoPedido += `👤 *Cliente:* ${nome}\n📍 *Endereço:* ${enderecoFormatado}\n`;
+            
             if (pagamento === "Dinheiro") {
                 const troco = document.getElementById("troco-dinheiro").value;
                 textoPedido += `💳 *Pagamento:* Dinheiro (Troco para R$ ${troco})\n\n`;
-            } else if (pagamento.toUpperCase() === "PIX" && configLoja.chave_pix && configLoja.chave_pix.trim() !== "") {
-                const codigoPixPedido = gerarPixCopiaECola(totalCalculado);
-                textoPedido += `💳 *Pagamento:* Pix\n🔑 *Pix Copia e Cola:*\n${codigoPixPedido}\n\n`;
             } else {
                 textoPedido += `💳 *Pagamento:* ${pagamento}\n\n`;
             }
 
             textoPedido += "🛒 *ITENS DO PEDIDO:*\n";
-            let subtotalItens = 0;
             carrinho.forEach(item => {
-                subtotalItens += item.precoTotalItem;
                 textoPedido += `\n*1x ${item.produtoBase.nome}* (R$ ${item.produtoBase.preco.toFixed(2).replace('.', ',')})\n`;
                 item.adicionais.forEach(add => {
                     const subtotalExtra = add.preco * add.quantidade;
                     textoPedido += `   + ${add.quantidade}x ${add.nome} (R$ ${subtotalExtra.toFixed(2).replace('.', ',')})\n`;
                 });
-                if (item.observacao) {
-                    textoPedido += `   📝 Obs: ${item.observacao}\n`;
-                }
                 textoPedido += `   *Subtotal do item: R$ ${item.precoTotalItem.toFixed(2).replace('.', ',')}*\n`;
             });
-
-            // Ordem proposital: subtotal -> desconto -> taxa de entrega -> total.
-            // O cupom desconta só em cima do subtotal dos itens, nunca da taxa.
-            textoPedido += `\n💵 *Subtotal: R$ ${subtotalItens.toFixed(2).replace('.', ',')}*\n`;
-
-            if (cupomAplicado) {
-                textoPedido += `🏷️ *Cupom ${cupomAplicado.codigo}: -R$ ${cupomAplicado.valorDesconto.toFixed(2).replace('.', ',')}*\n`;
-            }
-
-            if (taxaEntrega > 0) {
-                textoPedido += `🛵 *Taxa de entrega: R$ ${taxaEntrega.toFixed(2).replace('.', ',')}*\n`;
-            }
 
             textoPedido += `\n💰 *TOTAL DO PEDIDO: R$ ${totalCalculado.toFixed(2).replace('.', ',')}*`;
 
@@ -1535,7 +853,6 @@ async function enviarParaWhatsApp() {
             
             // Limpa os dados do carrinho local e atualiza as telas de fundo
             carrinho = [];
-            cupomAplicado = null;
             atualizarContadorCart();
             renderizarCardapio(); 
             navegarPara('inicio');
@@ -1547,13 +864,10 @@ async function enviarParaWhatsApp() {
             if (somFogo) {
                 somFogo.pause();
             }
-
-            const numeroLimpo = configLoja.numero_whatsapp ? String(configLoja.numero_whatsapp).replace(/\D/g, '') : "";
-            if (numeroLimpo === "") {
-                mostrarAviso("Pedido registrado, mas esta loja ainda não configurou um número de WhatsApp. Entre em contato diretamente com o estabelecimento.", "WhatsApp não configurado");
-                return;
-            }
-
+            
+            let numeroLimpo = configLoja.numero_whatsapp ? String(configLoja.numero_whatsapp).replace(/\D/g, '') : "5543996150221";
+            if(numeroLimpo === "") numeroLimpo = "5543996150221";
+            
             // =========================================================
             // LÓGICA INTELIGENTE PARA FORÇAR O APLICATIVO DO WHATSAPP
             // =========================================================
@@ -1587,21 +901,17 @@ async function carregarHistoricoPedidos() {
     if (!container) return;
 
     const clienteId = obterOuCriarClienteId();
-    const perfilSalvo = JSON.parse(localStorage.getItem(chaveLocalStorage("perfil")) || "{}");
+    const perfilSalvo = JSON.parse(localStorage.getItem("vilelaburgers_perfil") || "{}");
     const telefoneCliente = perfilSalvo.telefone ? String(perfilSalvo.telefone).replace(/\D/g, '') : "";
 
     container.innerHTML = `<p style="color: #aaa; text-align: center; padding: 20px;">Carregando seus pedidos...</p>`;
 
     try {
-        const resposta = await fetchSupabase(`/rest/v1/rpc/buscar_meus_pedidos`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                p_loja_id: lojaAtual.id,
-                p_cliente_id: clienteId,
-                p_telefone: telefoneCliente || null
-            })
-        });
+        let queryUrl = `/rest/v1/pedidos?select=*&or=(cliente_id.eq.${clienteId}`;
+        if (telefoneCliente) queryUrl += `,telefone_cliente.eq.${telefoneCliente}`;
+        queryUrl += `)&order=data_pedido.desc`;
+
+        const resposta = await fetchSupabase(queryUrl);
         if (!resposta.ok) throw new Error("Erro histórico");
         const pedidos = await resposta.json();
 
@@ -1612,16 +922,15 @@ async function carregarHistoricoPedidos() {
 
         let html = "";
         pedidos.forEach(p => {
-            const dataFormatada = formatarDataHoraBr(p.data_pedido);
+            const dataFormatada = new Date(p.data_pedido).toLocaleString('pt-BR');
             html += `
                 <div style="background: #222; border-radius: 8px; padding: 15px; margin-bottom: 12px; border: 1px solid #333;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                        <strong style="color: var(--laranja-fogo, #ff5e00);">Pedido #${p.numero_pedido || p.id}</strong>
+                        <strong style="color: var(--laranja-fogo, #ff5e00);">Pedido #${p.id}</strong>
                         <span style="color: #aaa; font-size: 12px;">${dataFormatada}</span>
                     </div>
-                    <div style="color: #fff; font-size: 14px; margin-bottom: 5px;">Status: <strong>${escaparHtml(p.status) || 'Pendente'}</strong></div>
-                    <div style="color: #aaa; font-size: 13px; margin-bottom: 5px;"><i class="fa-solid fa-clock"></i> Previsao: ${escaparHtml(p.previsao_entrega || 'Nao informada')}</div>
-                    <div style="color: #fff; font-size: 14px; margin-bottom: 5px;">Pagamento: ${escaparHtml(p.forma_pagamento)}</div>
+                    <div style="color: #fff; font-size: 14px; margin-bottom: 5px;">Status: <strong>${p.status || 'Pendente'}</strong></div>
+                    <div style="color: #fff; font-size: 14px; margin-bottom: 5px;">Pagamento: ${p.forma_pagamento}</div>
                     <div style="color: #2ed573; font-weight: bold; font-size: 15px;">Total: R$ ${Number(p.total).toFixed(2).replace('.', ',')}</div>
                 </div>
             `;
@@ -1634,176 +943,47 @@ async function carregarHistoricoPedidos() {
 }
 
 function fecharModal() { document.getElementById("modal-produto").classList.add("escondido"); document.body.classList.remove("modal-aberto"); }
-window.addEventListener('click', function(event) {
-    const modal = document.getElementById("modal-produto");
-    if (event.target === modal) { fecharModal(); }
-    const modalLoja = document.getElementById("modal-loja-info");
-    if (event.target === modalLoja) { fecharModalLojaInfo(); }
-});
-
-// ==========================================
-// MODAL "SOBRE A LOJA" (endereço, telefone, horário)
-// ==========================================
-function formatarDiasTrabalho(diasTrabalhoStr) {
-    const nomesAbrev = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-    const dias = (diasTrabalhoStr || "0,1,2,3,4,5,6")
-        .split(',')
-        .map(d => parseInt(d.trim()))
-        .filter(d => !isNaN(d) && d >= 0 && d <= 6)
-        .sort((a, b) => a - b);
-
-    if (dias.length === 0) return "Dias não informados";
-    if (dias.length === 7) return "Todos os dias";
-
-    const grupos = [];
-    let inicio = dias[0];
-    let anterior = dias[0];
-
-    for (let i = 1; i <= dias.length; i++) {
-        const atual = dias[i];
-        if (atual !== anterior + 1) {
-            grupos.push(inicio === anterior ? nomesAbrev[inicio] : `${nomesAbrev[inicio]} a ${nomesAbrev[anterior]}`);
-            inicio = atual;
-        }
-        anterior = atual;
-    }
-    return grupos.join(', ');
-}
-
-function formatarTelefoneExibicao(numero) {
-    const digitos = String(numero || "").replace(/\D/g, '');
-    if (digitos.length === 13 && digitos.startsWith('55')) {
-        return `(${digitos.substring(2, 4)}) ${digitos.substring(4, 9)}-${digitos.substring(9)}`;
-    }
-    if (digitos.length === 11) {
-        return `(${digitos.substring(0, 2)}) ${digitos.substring(2, 7)}-${digitos.substring(7)}`;
-    }
-    return numero || "";
-}
-
-function abrirModalLojaInfo() {
-    const modal = document.getElementById("modal-loja-info");
-    const conteudo = document.getElementById("conteudo-loja-info");
-    if (!modal || !conteudo) return;
-
-    const nome = configLoja.nome_loja || (lojaAtual ? lojaAtual.nome : "");
-    const logoHtml = (configLoja.logo_url && configLoja.logo_url.trim() !== "")
-        ? `<img src="${configLoja.logo_url}" alt="" style="width: 84px; height: 84px; object-fit: contain; border-radius: 16px; background: #222; flex-shrink: 0;">`
-        : `<div style="width: 84px; height: 84px; border-radius: 16px; background: #222; display: flex; align-items: center; justify-content: center; flex-shrink: 0;"><i class="fa-solid fa-fire-flame-curved" style="font-size: 34px; color: var(--laranja-fogo, #ff5e00);"></i></div>`;
-
-    const horarioTexto = `${formatarDiasTrabalho(configLoja.dias_trabalho)} • ${configLoja.horario_abertura || '--:--'} às ${configLoja.horario_fechar || '--:--'}`;
-    const telefoneTexto = formatarTelefoneExibicao(configLoja.numero_whatsapp);
-
-    conteudo.innerHTML = `
-        <div style="display: flex; gap: 16px; align-items: center; margin-bottom: 22px;">
-            ${logoHtml}
-            <div>
-                <h2 style="margin: 0 0 6px; color: #fff; font-size: 20px;">${escaparHtml(nome)}</h2>
-                <span style="color: ${lojaAberta ? '#2ed573' : '#ff4757'}; font-size: 13px; font-weight: bold;">${lojaAberta ? '● Aberto agora' : '● Fechado no momento'}</span>
-            </div>
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 16px;">
-            ${configLoja.endereco ? `
-            <div style="display: flex; gap: 12px; align-items: flex-start;">
-                <i class="fa-solid fa-location-dot" style="color: var(--laranja-fogo, #ff5e00); width: 18px; margin-top: 3px;"></i>
-                <span style="color: #ddd; font-size: 14px; line-height: 1.4;">${escaparHtml(configLoja.endereco)}</span>
-            </div>` : ''}
-            ${telefoneTexto ? `
-            <div style="display: flex; gap: 12px; align-items: center;">
-                <i class="fa-solid fa-phone" style="color: var(--laranja-fogo, #ff5e00); width: 18px;"></i>
-                <span style="color: #ddd; font-size: 14px;">${escaparHtml(telefoneTexto)}</span>
-            </div>` : ''}
-            <div style="display: flex; gap: 12px; align-items: center;">
-                <i class="fa-solid fa-clock" style="color: var(--laranja-fogo, #ff5e00); width: 18px;"></i>
-                <span style="color: #ddd; font-size: 14px;">${escaparHtml(horarioTexto)}</span>
-            </div>
-            <div style="display: flex; gap: 12px; align-items: center;">
-                <i class="fa-solid fa-stopwatch" style="color: var(--laranja-fogo, #ff5e00); width: 18px;"></i>
-                <span style="color: #ddd; font-size: 14px;">Entrega: ${escaparHtml(`Em ate ${Number(configLoja.tempo_entrega_fixo) || 50} minutos`)} · Retirada: ${escaparHtml(`Em ate ${Number(configLoja.tempo_retirada_fixo) || 30} minutos`)}</span>
-            </div>
-        </div>
-    `;
-
-    modal.classList.remove("escondido");
-}
-
-function fecharModalLojaInfo() {
-    const modal = document.getElementById("modal-loja-info");
-    if (modal) modal.classList.add("escondido");
-}
+window.addEventListener('click', function(event) { const modal = document.getElementById("modal-produto"); if (event.target === modal) { fecharModal(); }});
 
 function navegarPara(aba) {
-    const telas = ["tela-catalogo", "tela-checkout", "tela-perfil", "tela-pedidos", "tela-cupons"];
+    const telas = ["tela-catalogo", "tela-checkout", "tela-perfil", "tela-pedidos"];
     telas.forEach(id => { const elemento = document.getElementById(id); if (elemento) elemento.classList.add("escondido"); });
     document.querySelectorAll(".nav-item").forEach(btn => btn.classList.remove("ativo"));
-
-    if (aba === 'inicio') {
-        document.getElementById("tela-catalogo").classList.remove("escondido");
-        const b = document.getElementById("btn-nav-inicio"); if(b) b.classList.add("ativo");
-        window.scrollTo(0, 0);
-    } else if (aba === 'checkout') {
-        document.getElementById("tela-checkout").classList.remove("escondido");
-        window.scrollTo(0, 0);
-    } else if (aba === 'perfil') {
-        document.getElementById("tela-perfil").classList.remove("escondido");
-        const b = document.getElementById("btn-nav-perfil"); if(b) b.classList.add("ativo");
-        carregarPerfilNaTela(); window.scrollTo(0, 0);
-    } else if (aba === 'pedidos') {
-        document.getElementById("tela-pedidos").classList.remove("escondido");
-        const b = document.getElementById("btn-nav-pedidos"); if(b) b.classList.add("ativo");
-        carregarHistoricoPedidos();
-        window.scrollTo(0, 0);
-    } else if (aba === 'cupons') {
-        document.getElementById("tela-cupons").classList.remove("escondido");
-        const b = document.getElementById("btn-nav-cupons"); if(b) b.classList.add("ativo");
-        carregarTelaCupons();
-        window.scrollTo(0, 0);
+    
+    if (aba === 'inicio') { 
+        document.getElementById("tela-catalogo").classList.remove("escondido"); 
+        const b = document.getElementById("btn-nav-inicio"); if(b) b.classList.add("ativo"); 
+        window.scrollTo(0, 0); 
+    } else if (aba === 'checkout') { 
+        document.getElementById("tela-checkout").classList.remove("escondido"); 
+        window.scrollTo(0, 0); 
+    } else if (aba === 'perfil') { 
+        document.getElementById("tela-perfil").classList.remove("escondido"); 
+        const b = document.getElementById("btn-nav-perfil"); if(b) b.classList.add("ativo"); 
+        carregarPerfilNaTela(); window.scrollTo(0, 0); 
+    } else if (aba === 'pedidos') { 
+        document.getElementById("tela-pedidos").classList.remove("escondido"); 
+        const b = document.getElementById("btn-nav-pedidos"); if(b) b.classList.add("ativo"); 
+        carregarHistoricoPedidos(); 
+        window.scrollTo(0, 0); 
     }
     atualizarContadorCart();
 }
 
 function salvarPerfil() {
     const perfil = { nome: document.getElementById("perfil-nome").value, telefone: document.getElementById("perfil-telefone").value, rua: document.getElementById("perfil-rua").value, numero: document.getElementById("perfil-numero").value, bairro: document.getElementById("perfil-bairro").value, complemento: document.getElementById("perfil-complemento").value };
-    localStorage.setItem(chaveLocalStorage("perfil"), JSON.stringify(perfil));
-    mostrarAviso("Seus dados de entrega foram salvos com sucesso!", "Tudo Certo!", "sucesso");
-    navegarPara('inicio');
-
-    // Manda pro banco da loja também — assim quem só cadastra o perfil e
-    // nunca chega a pedir também aparece pro admin, como "possível cliente".
-    salvarClienteNoBanco(perfil);
-}
-
-async function salvarClienteNoBanco(perfil, email) {
-    if (!perfil.nome && !perfil.telefone && !email) return; // nada de útil pra guardar
-    try {
-        const endereco = [perfil.rua, perfil.numero].filter(Boolean).join(', ')
-            + (perfil.bairro ? ' - ' + perfil.bairro : '')
-            + (perfil.complemento ? ' (' + perfil.complemento + ')' : '');
-
-        await fetchSupabase(`/rest/v1/rpc/salvar_perfil_cliente`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                p_loja_id: lojaAtual.id,
-                p_cliente_id: obterOuCriarClienteId(),
-                p_nome: perfil.nome || null,
-                p_telefone: perfil.telefone || null,
-                p_endereco: endereco.trim() || null,
-                p_email: email || null
-            })
-        });
-    } catch (erro) {
-        console.error("Erro ao salvar cliente no banco:", erro);
-    }
+    localStorage.setItem("vilelaburgers_perfil", JSON.stringify(perfil)); 
+    mostrarAviso("Seus dados de entrega foram salvos com sucesso!", "Tudo Certo!", "sucesso"); 
+    navegarPara('inicio'); 
 }
 
 function carregarPerfilNaTela() {
-    const salvo = localStorage.getItem(chaveLocalStorage("perfil"));
+    const salvo = localStorage.getItem("vilelaburgers_perfil");
     if (salvo) { const perfil = JSON.parse(salvo); document.getElementById("perfil-nome").value = perfil.nome || ""; document.getElementById("perfil-telefone").value = perfil.telefone || ""; document.getElementById("perfil-rua").value = perfil.rua || ""; document.getElementById("perfil-numero").value = perfil.numero || ""; document.getElementById("perfil-bairro").value = perfil.bairro || ""; document.getElementById("perfil-complemento").value = perfil.complemento || ""; }
 }
 
 function preencherCheckoutComPerfil() {
-    const salvo = localStorage.getItem(chaveLocalStorage("perfil"));
+    const salvo = localStorage.getItem("vilelaburgers_perfil");
     if (salvo) { const perfil = JSON.parse(salvo); document.getElementById("nome-cliente").value = perfil.nome || ""; document.getElementById("rua-cliente").value = perfil.rua || ""; document.getElementById("numero-cliente").value = perfil.numero || ""; document.getElementById("bairro-cliente").value = perfil.bairro || ""; document.getElementById("complemento-cliente").value = perfil.complemento || ""; }
 }
 
@@ -1812,15 +992,8 @@ async function renderizarRodape() {
     const footer = document.createElement("footer"); 
     footer.style.cssText = "text-align: center; padding: 30px 15px; background: transparent; color: #777; font-size: 13px; margin-top: 40px; width: 100%; padding-bottom: 100px;"; 
     footer.innerHTML = `
-        <div style="margin-bottom: 8px;">&copy; ${ano} ${escaparHtml(configLoja.nome_loja || lojaAtual.nome)}. Identidade e conteúdo reservados.</div>
+        <div style="margin-bottom: 8px;">&copy; ${ano} Vilela Burgers. Identidade e conteúdo reservados.</div>
         <div style="margin-bottom: 8px;">Tecnologia por <a href="https://mathshub.com.br" target="_blank" style="color: var(--laranja-fogo, #ff5e00); text-decoration: none; font-weight: bold;">Maths Labs</a> 🚀</div>
-        <div style="margin-bottom: 8px; font-size: 12px;">
-            <a href="politica-de-privacidade.html" style="color: #888; text-decoration: none;">Política de Privacidade</a>
-            &nbsp;·&nbsp;
-            <a href="termos-de-uso.html" style="color: #888; text-decoration: none;">Termos de Uso</a>
-            &nbsp;·&nbsp;
-            <a href="politica-de-cookies.html" style="color: #888; text-decoration: none;">Cookies</a>
-        </div>
         <div id="versao-app" style="font-size: 11px; color: #555; margin-top: 10px;">Sincronizando versão...</div>
     `;
     document.body.appendChild(footer);
@@ -1841,34 +1014,15 @@ async function renderizarRodape() {
 
 async function carregarConfiguracoes() {
     try {
-        const res = await fetchSupabase(`/rest/v1/configuracoes?select=*&loja_id=eq.${lojaAtual.id}&limit=1`);
+        const res = await fetchSupabase(`/rest/v1/configuracoes?select=*&limit=1`);
         const dados = await res.json();
-        if (dados && dados.length > 0) {
-            configLoja = dados[0];
-            aplicarTemaCliente(configLoja.tema_cliente);
-        }
+        if (dados && dados.length > 0) configLoja = dados[0];
     } catch (erro) {
         console.error("Erro ao puxar configurações da loja.", erro);
     } finally {
-        renderizarResumoLoja();
-        atualizarPrevisaoCliente();
         verificarHorarioLoja();
         setInterval(verificarHorarioLoja, 60000); 
     }
-}
-
-function aplicarTemaCliente(tema) {
-    const temaAplicado = tema === "claro" ? "claro" : "escuro";
-    document.documentElement.dataset.tema = temaAplicado;
-    try { localStorage.setItem(chaveLocalStorage("tema_cliente"), temaAplicado); } catch (e) {}
-}
-
-async function renderizarResumoLoja() {
-    const texto = document.getElementById("resumo-loja-texto");
-    if (!texto) return;
-
-    const previsaoEntrega = await obterPrevisaoCliente("entrega");
-    texto.innerText = `Entrega: ${previsaoEntrega.replace(/^Em ate /, "")}`;
 }
 
 function verificarHorarioLoja() {
@@ -1920,16 +1074,10 @@ function verificarHorarioLoja() {
         mensagemFechado = `Voltamos ${txtDia} às ${configLoja.horario_abertura}.`;
         
         if (bannerHtml) { bannerHtml.innerHTML = `⚠️ Loja Fechada no momento. ${mensagemFechado}`; bannerHtml.style.display = "block"; }
-        // O aviso já empurra o cabeçalho pra baixo (margin-top próprio), então o
-        // banner principal não precisa mais da margem que usa pra limpar o header sozinho.
-        const heroEl = document.getElementById("banner-fundo");
-        if (heroEl) heroEl.style.marginTop = "0";
         const detalhes = document.getElementById("detalhes-produto-modal");
         if (detalhes && !detalhes.innerHTML.includes("Loja Fechada no Momento") && produtoSendoVisto) { abrirModalProduto(produtoSendoVisto.id); }
     } else {
         if (bannerHtml) bannerHtml.style.display = "none";
-        const heroEl = document.getElementById("banner-fundo");
-        if (heroEl) heroEl.style.marginTop = "";
     }
 }
 
@@ -1939,19 +1087,16 @@ function verificarHorarioLoja() {
 let memoriaStatusPedidos = {}; 
 
 async function rastrearPedidosEmAndamento() {
-    if (!lojaAtual) return;
     const clienteId = obterOuCriarClienteId();
     if (!clienteId) return;
 
     try {
-        const res = await fetchSupabase(`/rest/v1/rpc/buscar_meus_pedidos`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ p_loja_id: lojaAtual.id, p_cliente_id: clienteId, p_telefone: null })
-        });
-
+        // Puxamos os pedidos recentes do cliente. Removemos o filtro de status da URL 
+        // para garantir que o Supabase não barre a resposta por erro de sintaxe.
+        const res = await fetchSupabase(`/rest/v1/pedidos?select=id,status&cliente_id=eq.${clienteId}&order=data_pedido.desc&limit=5`);
+        
         if (!res.ok) return;
-        const pedidosAoVivo = (await res.json()).slice(0, 5);
+        const pedidosAoVivo = await res.json();
 
         pedidosAoVivo.forEach(pedidoDb => {
             // Se o pedido não tem status ou já foi finalizado/entregue antes, pula
@@ -1965,10 +1110,18 @@ async function rastrearPedidosEmAndamento() {
             // CHECAGEM BLINDADA: Se o status antigo existia, mudou, e o novo contém a palavra "entrega"
             if (statusAntigo && statusAntigo !== pedidoDb.status && statusNovoLimpo.includes("entrega")) {
                 
-                // Dispara o Alerta Visual na Tela do Cliente (sem som)
-                mostrarAviso(`Seu pedido #${pedidoDb.numero_pedido || pedidoDb.id} acabou de sair para entrega! 🛵 Prepare-se para receber.`, "Saiu para Entrega!", "sucesso");
+                // 1. Toca o som da entrega
+                const somEntrega = document.getElementById("som-entrega");
+                if (somEntrega) {
+                    somEntrega.volume = 1;
+                    somEntrega.currentTime = 0;
+                    somEntrega.play().catch(e => console.log("Navegador barrou o som automático:", e));
+                }
 
-                // Atualiza o histórico do cliente na tela
+                // 2. Dispara o Alerta Visual na Tela do Cliente
+                mostrarAviso(`Seu pedido #${pedidoDb.id} acabou de sair para entrega! 🛵 Prepare-se para receber.`, "Saiu para Entrega!", "sucesso");
+                
+                // 3. Atualiza o histórico do cliente na tela
                 carregarHistoricoPedidos();
             }
 
@@ -1989,7 +1142,7 @@ setInterval(rastrearPedidosEmAndamento, 10000);
 // ==========================================
 async function carregarIdentidadeVisual() {
     try {
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracoes?loja_id=eq.${lojaAtual.id}&select=*`, {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/configuracoes?id=eq.1&select=*`, {
             method: 'GET',
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
         });
@@ -2006,15 +1159,6 @@ async function carregarIdentidadeVisual() {
             if(elNomeLoja && config.nome_loja) elNomeLoja.innerText = config.nome_loja;
             if(elTituloBanner && config.titulo_banner) elTituloBanner.innerText = config.titulo_banner;
             if(elSubtituloBanner && config.subtitulo_banner) elSubtituloBanner.innerText = config.subtitulo_banner;
-
-            // Logo da loja (substitui o ícone de fogo padrão, se configurada)
-            const elLogoImg = document.getElementById("loja-logo-img");
-            const elLogoIcone = document.getElementById("loja-logo-icone");
-            if (elLogoImg && elLogoIcone && config.logo_url && config.logo_url.trim() !== "") {
-                elLogoImg.src = config.logo_url;
-                elLogoImg.style.display = "inline-block";
-                elLogoIcone.style.display = "none";
-            }
             
 
            // 2. Trocando a Imagem de Fundo
@@ -2031,9 +1175,6 @@ async function carregarIdentidadeVisual() {
             // 3. Trocando a Cor Principal (A Mágica!)
             if(config.cor_principal) {
                 document.documentElement.style.setProperty('--laranja-fogo', config.cor_principal);
-                try { localStorage.setItem(chaveLocalStorage('cor_principal'), config.cor_principal); } catch (e) {}
-            } else {
-                try { localStorage.removeItem(chaveLocalStorage('cor_principal')); } catch (e) {}
             }
 
             // ==========================================================
@@ -2049,7 +1190,7 @@ async function carregarIdentidadeVisual() {
                 // Se não tiver áudio no banco, tenta tocar um local de garantia
                 const somFogo = document.getElementById("som-fogo");
                 if (somFogo) {
-                    somFogo.src = "fogo.mp3";
+                    somFogo.src = "fogo.mp3"; 
                     somFogo.load();
                 }
             }
@@ -2060,120 +1201,10 @@ async function carregarIdentidadeVisual() {
     }
 }
 
-// ==========================================
-// AUTENTICAÇÃO COM GOOGLE (SUPABASE OAUTH)
-// ==========================================
+// Roda a função assim que o cliente abre o site
+carregarIdentidadeVisual();
 
-// 1. Redireciona o cliente para a tela de login do Google
-async function loginComGoogle() {
-    try {
-        const redirecionarPara = window.location.origin;
-        window.location.href = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirecionarPara)}`;
-    } catch (erro) {
-        console.error("Erro ao iniciar login com Google:", erro);
-        mostrarAviso("Não foi possível conectar com o Google no momento.", "Erro de Login");
-    }
-}
-
-// 2. Checa se o cliente acabou de voltar do login do Google e captura os dados dele
-function checarRetornoLoginGoogle() {
-    // Pegamos exatamente o Hash (tudo que vem depois do # na URL)
-    const hashAtual = window.location.hash;
-    
-    if (hashAtual && hashAtual.includes("access_token=")) {
-        try {
-            // 1. Extrai o token de forma perfeita e limpa usando a ferramenta nativa do navegador
-            const parametros = new URLSearchParams(hashAtual.substring(1));
-            const tokenCompleto = parametros.get("access_token");
-
-            if (!tokenCompleto) return; // Se não achar o token, aborta a missão
-
-            // 2. Faz o fetch na mesma hora usando o token, SEM limpar a URL da tela ainda
-            fetch(`${SUPABASE_URL}/auth/v1/user`, {
-                method: 'GET',
-                headers: {
-                    'apikey': SUPABASE_KEY,
-                    'Authorization': `Bearer ${tokenCompleto}`
-                }
-            })
-            .then(res => {
-                if (res.ok) return res.json();
-                throw new Error("Token rejeitado pelo Supabase");
-            })
-            .then(usuarioGoogle => {
-                // Captura o nome retornado pelas credenciais do Google
-                const nomeGoogle = usuarioGoogle.user_metadata.full_name || usuarioGoogle.user_metadata.name || "Cliente Google";
-
-                // Sincroniza o nome no LocalStorage do navegador
-                let perfilExistente = JSON.parse(localStorage.getItem(chaveLocalStorage("perfil")) || "{}");
-                perfilExistente.nome = nomeGoogle;
-                localStorage.setItem(chaveLocalStorage("perfil"), JSON.stringify(perfilExistente));
-
-                // Já registra a pessoa pro admin nesse instante — sem isso, quem faz
-                // login com Google e não chega a clicar "Salvar" no perfil depois
-                // ficava de fora do "Meus Clientes" (mesmo já tendo um e-mail real).
-                salvarClienteNoBanco(perfilExistente, usuarioGoogle.email);
-
-                // Atualiza as caixas de texto na tela do cliente
-                carregarPerfilNaTela();
-                preencherCheckoutComPerfil();
-
-                // 3. SÓ AGORA (quando tudo deu certo) APAGAMOS A URL GIGANTE PARA LIMPAR A TELA!
-                window.location.hash = "";
-                window.history.replaceState({}, document.title, window.location.pathname);
-
-                // Dispara o popup de sucesso verde e manda pra tela de perfil
-                mostrarAviso(`Olá, ${nomeGoogle}! Seu perfil foi conectado com o Google com sucesso.`, "Login Concluído!", "sucesso");
-                navegarPara('perfil');
-            })
-            .catch(err => {
-                console.error("Erro na validação do login Google:", err);
-                // Mesmo se der erro, limpamos a tela para o cliente não ficar travado
-                window.location.hash = "";
-                window.history.replaceState({}, document.title, window.location.pathname);
-            });
-
-        } catch (e) {
-            console.error("Erro no processamento dos parâmetros OAuth:", e);
-        }
-    }
-}
-
-// ==========================================================
-// GATILHOS DE INICIALIZAÇÃO AUTOMÁTICA DO SISTEMA
-// ==========================================================
-// Tudo abaixo só roda depois de descobrir qual loja este subdomínio é —
-// sem isso não tem como filtrar cardápio, pedidos, nem configurações.
-async function iniciarApp() {
-    const lojaOk = await resolverLoja();
-
-    if (!lojaOk) {
-        // "loja não encontrada/inativa" já tomou conta da página nesse caso.
-        const telaCarregando = document.getElementById("tela-carregando-inicial");
-        if (telaCarregando) telaCarregando.style.display = "none";
-        return;
-    }
-
-    // 1. Roda o verificador do Google imediatamente ao abrir o site
-    checarRetornoLoginGoogle();
-
-    // 2. Carrega a Identidade Visual Dinâmica — só tira o spinner depois
-    // dela terminar, pra ninguém ver o nome/cor genéricos por um instante.
-    await carregarIdentidadeVisual();
-    const telaCarregando = document.getElementById("tela-carregando-inicial");
-    if (telaCarregando) telaCarregando.style.display = "none";
-
-    // 3. Inicializa as configurações e horários da hamburgueria
-    carregarConfiguracoes();
-
-    // 4. Puxa os produtos do cardápio do banco de dados
-    carregarCardapioDoBanco();
-
-    // 4.5. Verifica se a loja tem alguma promoção pública pra mostrar no checkout
-    carregarCuponsPublicos();
-
-    // 5. Insere e atualiza a versão no rodapé
-    renderizarRodape();
-}
-
-iniciarApp();
+// === INICIALIZAÇÃO DO SISTEMA ===
+carregarConfiguracoes(); 
+carregarCardapioDoBanco(); 
+renderizarRodape();

@@ -54,9 +54,6 @@ h1, h2, h3, .logo {
 }
 
 .logo {
-    display: flex;
-    align-items: center;
-    min-width: 0;
     font-size: 20px;
     font-weight: 800;
     color: var(--laranja-fogo);
@@ -89,8 +86,7 @@ h1, h2, h3, .logo {
 
 /* Hero Section (Banner de Fogo) */
 .hero {
-    position: relative;
-    margin-top: 68px;
+    margin-top: 60px;
     height: 200px;
     background-image: linear-gradient(to top, var(--fundo-principal), rgba(0,0,0,0.4)), url('https://images.unsplash.com/photo-1555939594-58d7cb561ad1?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80');
     background-size: cover;
@@ -111,34 +107,6 @@ h1, h2, h3, .logo {
     font-size: 14px;
     color: #eee;
     text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
-}
-
-.acoes-cabecalho-loja {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-left: auto;
-}
-.btn-icone-informacoes {
-    flex-shrink: 0;
-    width: 32px;
-    height: 32px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--laranja-fogo);
-    background: transparent;
-    border: 1px solid rgba(255,94,0,.45);
-    border-radius: 50%;
-    font-size: 14px;
-    cursor: pointer;
-}
-.btn-icone-informacoes:hover { background: rgba(255,94,0,.1); }
-
-@media (max-width: 420px) {
-    .acoes-cabecalho-loja { gap: 8px; }
-    .logo { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; letter-spacing: .5px; }
-    .acoes-cabecalho-loja { gap: 6px; }
 }
 
 /* Menu de Categorias Deslizante */
@@ -199,29 +167,6 @@ h1, h2, h3, .logo {
     width: 120px;
     background-size: cover;
     background-position: center;
-}
-
-/* Skeleton de carregamento do cardápio (enquanto busca no banco) */
-.skeleton-card {
-    background-color: var(--fundo-secundario);
-    border-radius: 12px;
-    overflow: hidden;
-    display: flex;
-    height: 104px;
-}
-.skeleton-imagem, .skeleton-linha {
-    background: linear-gradient(90deg, #2a2a2a 25%, #3a3a3a 37%, #2a2a2a 63%);
-    background-size: 400% 100%;
-    animation: skeleton-pulse 1.4s ease infinite;
-    border-radius: 4px;
-}
-.skeleton-imagem { width: 120px; border-radius: 0; flex-shrink: 0; }
-.skeleton-info { flex: 1; padding: 15px; display: flex; flex-direction: column; justify-content: center; gap: 10px; }
-.skeleton-linha { height: 12px; }
-.skeleton-linha.curta { width: 45%; }
-@keyframes skeleton-pulse {
-    0% { background-position: 100% 50%; }
-    100% { background-position: 0 50%; }
 }
 
 .produto-info {
@@ -397,87 +342,13 @@ h1, h2, h3, .logo {
 
 .total-checkout {
     display: flex;
-    flex-direction: column;
-    gap: 4px;
+    justify-content: space-between;
+    font-size: 20px;
+    font-weight: bold;
     margin-top: 15px;
     padding-top: 15px;
     border-top: 1px dashed var(--borda);
 }
-.total-checkout .linha-total-principal {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    font-size: 20px;
-    font-weight: bold;
-}
-.total-original-riscado {
-    text-align: right;
-    color: #888;
-    font-size: 14px;
-    font-weight: 500;
-    text-decoration: line-through;
-}
-.linha-economia {
-    text-align: right;
-    color: #2ed573;
-    font-size: 13px;
-    font-weight: 600;
-}
-
-/* Cupom de desconto — campo unificado (pill) */
-.cupom-pill-input {
-    display: flex;
-    border: 1px solid var(--borda);
-    border-radius: 10px;
-    overflow: hidden;
-    background: var(--fundo-principal);
-}
-.cupom-pill-input input {
-    flex: 1;
-    border: none;
-    background: transparent;
-    margin: 0;
-    padding: 13px 14px;
-    text-transform: uppercase;
-    letter-spacing: .5px;
-}
-.cupom-pill-input input:focus { outline: none; }
-.cupom-pill-input button {
-    border: none;
-    background: var(--laranja-fogo);
-    color: #fff;
-    font-weight: 700;
-    padding: 0 22px;
-    cursor: pointer;
-    font-size: 13.5px;
-    transition: filter .15s;
-}
-.cupom-pill-input button:hover { filter: brightness(1.08); }
-
-/* Cupom de desconto — chip de "aplicado" */
-.cupom-chip-aplicado {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: rgba(46, 213, 115, .08);
-    border: 1px solid rgba(46, 213, 115, .35);
-    border-radius: 10px;
-    padding: 12px 14px;
-}
-.cupom-chip-info { display: flex; align-items: center; gap: 10px; }
-.cupom-chip-icone {
-    width: 34px; height: 34px; border-radius: 9px; background: rgba(46, 213, 115, .15);
-    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
-.cupom-chip-icone i { color: #2ed573; font-size: 14px; }
-.cupom-chip-codigo { color: #fff; font-weight: 700; font-size: 14px; font-family: monospace; letter-spacing: .5px; }
-.cupom-chip-desconto { color: #2ed573; font-size: 12px; font-weight: 600; margin-top: 1px; }
-.btn-remover-cupom {
-    width: 28px; height: 28px; border-radius: 50%; background: rgba(255,255,255,.06);
-    color: #888; border: none; cursor: pointer; display: flex; align-items: center;
-    justify-content: center; font-size: 13px; transition: .15s; flex-shrink: 0;
-}
-.btn-remover-cupom:hover { background: rgba(255,71,87,.15); color: #ff4757; }
 
 /* Formulários Dark */
 input, select {
@@ -716,47 +587,6 @@ body.modo-checkout .bottom-nav {
 #barra-sacola {
     bottom: 85px; 
 }
-
-/* Tema claro escolhido pela loja no painel administrativo. */
-html[data-tema="claro"] {
-    --fundo-principal: #f4f6f8;
-    --fundo-secundario: #ffffff;
-    --texto-claro: #17202a;
-    --texto-cinza: #5f6b76;
-    --borda: #d9dee5;
-}
-
-html[data-tema="claro"] .header {
-    background-color: rgba(255,255,255,.96);
-}
-html[data-tema="claro"] .produto-card,
-html[data-tema="claro"] .checkout-secao,
-html[data-tema="claro"] .modal-conteudo,
-html[data-tema="claro"] .skeleton-card {
-    box-shadow: 0 4px 15px rgba(23,32,42,.08);
-}
-html[data-tema="claro"] .produto-info h3,
-html[data-tema="claro"] .checkout-secao h3,
-html[data-tema="claro"] .item-checkout-info,
-html[data-tema="claro"] .modal-conteudo {
-    color: var(--texto-claro);
-}
-html[data-tema="claro"] input,
-html[data-tema="claro"] select {
-    background-color: #fff;
-    color: var(--texto-claro);
-}
-html[data-tema="claro"] .bottom-nav {
-    background-color: #fff;
-    border-top-color: var(--borda);
-}
-html[data-tema="claro"] .nav-item.ativo { color: var(--laranja-fogo); }
-html[data-tema="claro"] #barra-sacola {
-    background-color: #17202a;
-    color: #fff;
-}
-html[data-tema="claro"] .selo-esgotado { background-color: rgba(220,38,38,.88); }
-
 /* --- EFEITO DE FOGO NO CHECKOUT --- */
 #fogo-overlay {
     position: fixed;

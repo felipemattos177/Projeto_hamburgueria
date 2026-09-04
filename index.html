@@ -14,21 +14,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Maths_hub Delivery</title>
-    <script>
-        // Aplica a última cor conhecida da loja ANTES da página desenhar o
-        // primeiro quadro (sem esperar a consulta na rede) — evita o laranja
-        // padrão aparecer por uma fração de segundo em quem já visitou antes.
-        // Chave com o mesmo prefixo por loja que chaveLocalStorage() usa no
-        // resto do site, senão duas lojas testadas em ?loja= colidem.
-        try {
-            var _params = new URLSearchParams(window.location.search);
-            var _slug = (_params.get("loja") || window.location.hostname.split(".")[0]).toLowerCase();
-            var corSalvaAntes = localStorage.getItem('loja_' + _slug + '_cor_principal');
-            if (corSalvaAntes) document.documentElement.style.setProperty('--laranja-fogo', corSalvaAntes);
-            var temaSalvoAntes = localStorage.getItem('loja_' + _slug + '_tema_cliente');
-            if (temaSalvoAntes === 'claro') document.documentElement.dataset.tema = 'claro';
-        } catch (e) {}
-    </script>
     
     <!-- Fontes e Ícones -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -42,51 +27,22 @@
     <style>
         /* === ESTILO DA TARJA INTELIGENTE DE LOJA FECHADA === */
         #aviso-loja-fechada {
-            display: none;
+            display: none; 
             background: #ff4757;
             color: white;
             text-align: center;
             padding: 12px;
             font-weight: bold;
-            margin-top: 60px; /* limpa o cabeçalho fixo, fica abaixo da logo */
-            position: relative;
-            z-index: 90;
+            position: sticky;
+            top: 0;
+            z-index: 9999;
             box-shadow: 0 4px 10px rgba(0,0,0,0.5);
             font-size: 14px;
             font-family: 'Roboto', sans-serif;
         }
-
-        /* Cobre a tela até sabermos o nome/logo/cor certos da loja — sem
-           isso, com internet lenta dá pra ver "Maths_hub" e o ícone/cor
-           genéricos por um instante antes de trocar pelos da loja. */
-        #tela-carregando-inicial {
-            position: fixed; inset: 0; z-index: 9000; display: flex; align-items: center; justify-content: center;
-            background: #121212;
-        }
-        #tela-carregando-inicial .marca {
-            font-size: 22px; font-weight: 800; color: #fff; letter-spacing: .3px; margin-bottom: 22px;
-        }
-        #tela-carregando-inicial .marca span { color: #ff5e00; }
-        #tela-carregando-inicial .spinner {
-            width: 34px; height: 34px; border-radius: 50%; margin: 0 auto;
-            border: 3px solid rgba(255,255,255,.15); border-top-color: #fff;
-            animation: girar-spinner .8s linear infinite;
-        }
-        #tela-carregando-inicial .legenda {
-            color: rgba(255,255,255,.5); font-size: 12px; margin-top: 14px; letter-spacing: .08em; text-transform: uppercase;
-        }
-        @keyframes girar-spinner { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
-
-    <div id="tela-carregando-inicial">
-        <div style="text-align: center;">
-            <div class="marca">Maths Hub <span>Delivery</span></div>
-            <div class="spinner"></div>
-            <div class="legenda">Carregando...</div>
-        </div>
-    </div>
 
     <!-- === AVISO INTELIGENTE DE LOJA FECHADA === -->
     <div id="aviso-loja-fechada">
@@ -95,24 +51,10 @@
 
     <!-- Header Fixo -->
     <header class="header">
-        <div class="logo" onclick="abrirModalLojaInfo()" style="cursor: pointer;">
-            <img id="loja-logo-img" src="" alt="" style="display: none; height: 28px; width: 28px; object-fit: contain; border-radius: 6px; vertical-align: middle; margin-right: 8px;">
-            <i id="loja-logo-icone" class="fa-solid fa-fire-flame-curved"></i> <span id="loja-nome">Maths_hub</span>
-        </div>
-        <div class="acoes-cabecalho-loja" aria-label="Informacoes da loja">
-            <button type="button" class="btn-icone-informacoes" onclick="abrirModalLojaInfo()" title="Ver informações da loja" aria-label="Ver informações da loja">
-                <i class="fa-solid fa-clock"></i>
-            </button>
+        <div class="logo">
+            <i class="fa-solid fa-fire-flame-curved"></i> <span id="loja-nome">Maths_hub</span>
         </div>
     </header>
-
-    <!-- === MODAL "SOBRE A LOJA" === -->
-    <div id="modal-loja-info" class="modal-overlay escondido">
-        <div class="modal-conteudo">
-            <button class="btn-fechar-modal" onclick="fecharModalLojaInfo()"><i class="fa-solid fa-xmark"></i></button>
-            <div id="conteudo-loja-info"></div>
-        </div>
-    </div>
 
     <!-- ========================================== -->
     <!-- TELA 1: CATÁLOGO E CARDÁPIO                -->
@@ -148,68 +90,22 @@
                 <div id="itens-checkout" class="lista-checkout">
                     <!-- Itens do carrinho aparecem aqui -->
                 </div>
-
-                <button type="button" onclick="alternarCarrosselTurbinar()" style="width: 100%; display:flex; align-items:center; justify-content:center; gap:8px; background: rgba(255,94,0,0.1); color: var(--laranja-fogo, #ff5e00); border: none; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 13.5px; cursor: pointer; margin-top: 8px;">
-                    <i class="fa-solid fa-bolt"></i> Turbinar pedido (adicionar rápido)
-                </button>
-                <div id="carrossel-turbinar" style="display:none; margin-top: 10px;">
-                    <div id="carrossel-turbinar-itens" style="display:flex; gap:10px; overflow-x:auto; padding-bottom:6px; -webkit-overflow-scrolling:touch;"></div>
-                </div>
-
                 <div class="total-checkout">
-                    <div id="total-original-riscado" class="total-original-riscado" style="display: none;"></div>
-                    <div class="linha-total-principal">
-                        <span>Total:</span>
-                        <span id="valor-total">R$ 0,00</span>
-                    </div>
-                    <div id="linha-economia" class="linha-economia" style="display: none;"></div>
+                    <span>Total:</span>
+                    <span id="valor-total">R$ 0,00</span>
                 </div>
-            </section>
-
-            <section id="secao-cupons" class="checkout-secao">
-                <h3><i class="fa-solid fa-tags"></i> Cupom de Desconto</h3>
-                <div id="aviso-progresso-cupom" style="display:none; background: rgba(255,94,0,0.08); border: 1px solid rgba(255,94,0,0.3); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; font-size: 13px; color: #ffb37a;">
-                    <span id="texto-aviso-progresso-cupom"></span>
-                </div>
-                <div id="linha-cupom-aplicado" class="cupom-chip-aplicado" style="display: none; margin-bottom: 12px;">
-                    <div class="cupom-chip-info">
-                        <div class="cupom-chip-icone"><i class="fa-solid fa-tag"></i></div>
-                        <div>
-                            <div class="cupom-chip-codigo" id="texto-codigo-cupom-aplicado"></div>
-                            <div class="cupom-chip-desconto" id="texto-desconto-cupom-aplicado"></div>
-                        </div>
-                    </div>
-                    <button type="button" class="btn-remover-cupom" onclick="removerCupom()" title="Remover cupom"><i class="fa-solid fa-xmark"></i></button>
-                </div>
-                <div id="linha-cupom-input" class="cupom-pill-input">
-                    <input type="text" id="cupom-codigo-cliente" placeholder="Código do cupom">
-                    <button type="button" id="btn-aplicar-cupom" onclick="aplicarCupom()">Aplicar</button>
-                </div>
-                <div id="cupom-feedback-erro" style="display: none; color: #ff4757; font-size: 13px; margin-top: 8px;"></div>
-                <div id="link-ver-promocoes" style="display:none; margin-top: 10px;">
-                    <span onclick="abrirVitrinePromocoes()" style="color: var(--laranja-fogo, #ff5e00); font-size: 13px; cursor: pointer; text-decoration: underline;"><i class="fa-solid fa-gift"></i> Ver promoções disponíveis</span>
-                </div>
-                <div id="vitrine-promocoes" style="display:none; margin-top: 12px; background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 12px;"></div>
             </section>
 
             <section class="checkout-secao">
-                <h3 style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;"><span><i class="fa-solid fa-location-dot"></i> Entrega</span><span id="previsao-cliente" style="display: none; align-items: center; gap: 6px; color: #ffd2b8; background: rgba(255,94,0,.12); border: 1px solid rgba(255,94,0,.28); border-radius: 999px; padding: 6px 10px; font-size: 11px; font-weight: 500; white-space: nowrap;"></span></h3>
-
-                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                    <button type="button" id="btn-tipo-entrega" onclick="selecionarTipoEntrega('entrega')" style="flex: 1; padding: 12px; border-radius: 8px; border: 2px solid var(--laranja-fogo, #ff5e00); background: var(--laranja-fogo, #ff5e00); color: #fff; font-weight: bold; cursor: pointer; font-size: 14px;"><i class="fa-solid fa-motorcycle"></i> Entrega</button>
-                    <button type="button" id="btn-tipo-retirada" onclick="selecionarTipoEntrega('retirada')" style="flex: 1; padding: 12px; border-radius: 8px; border: 2px solid #333; background: transparent; color: #fff; font-weight: bold; cursor: pointer; font-size: 14px;"><i class="fa-solid fa-store"></i> Retirar na loja</button>
-                </div>
-
+                <h3><i class="fa-solid fa-location-dot"></i> Entrega</h3>
                 <input type="text" id="nome-cliente" placeholder="Seu Nome Completo">
-
-                <div id="campos-endereco-entrega">
-                    <input type="text" id="rua-cliente" placeholder="Rua / Avenida">
-                    <div style="display: flex; gap: 10px;">
-                        <input type="text" id="numero-cliente" placeholder="Número" style="width: 40%;">
-                        <input type="text" id="bairro-cliente" placeholder="Bairro" style="width: 60%;">
-                    </div>
-                    <input type="text" id="complemento-cliente" placeholder="Complemento / Ponto de Referência">
+                
+                <input type="text" id="rua-cliente" placeholder="Rua / Avenida">
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="numero-cliente" placeholder="Número" style="width: 40%;">
+                    <input type="text" id="bairro-cliente" placeholder="Bairro" style="width: 60%;">
                 </div>
+                <input type="text" id="complemento-cliente" placeholder="Complemento / Ponto de Referência">
             </section>
 
             <section class="checkout-secao">
@@ -253,13 +149,6 @@
             <button onclick="salvarPerfil()" style="width: 100%; background: var(--laranja-fogo); color: white; border: none; padding: 15px; border-radius: 8px; font-weight: bold; font-size: 16px; margin-top: 15px; cursor: pointer;">
                 Salvar Meus Dados
             </button>
-
-            <div style="padding: 10px 0; text-align: center; border-bottom: 1px solid #333; margin-bottom: 20px;">
-                <p style="color: #aaa; font-size: 14px; margin-bottom: 10px;">Facilite seu cadastro:</p>
-                 <button onclick="loginComGoogle()" style="display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 12px; background: #fff; color: #000; border: none; border-radius: 8px; font-weight: bold; font-size: 15px; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
-                <img src="https://fonts.gstatic.com/s/i/productlogos/googleg/v6/24px.svg" alt="Google" style="width: 20px;">
-            </button>
-            </div>
         </div>
     </div>
 
@@ -268,27 +157,10 @@
     <!-- ========================================== -->
     <div id="tela-pedidos" class="container escondido" style="margin-top: 80px; margin-bottom: 100px;">
         <h2 style="color: var(--laranja-fogo); margin-bottom: 20px;"><i class="fa-regular fa-clipboard"></i> Meus Pedidos</h2>
-
+        
         <div id="lista-historico-pedidos">
             <!-- Os pedidos vão aparecer aqui magicamente -->
         </div>
-    </div>
-
-    <!-- ========================================== -->
-    <!-- TELA: MEUS CUPONS                          -->
-    <!-- ========================================== -->
-    <div id="tela-cupons" class="container escondido" style="margin-top: 80px; margin-bottom: 100px;">
-        <h2 style="color: var(--laranja-fogo); margin-bottom: 20px;"><i class="fa-solid fa-tags"></i> Meus Cupons</h2>
-
-        <div style="background: linear-gradient(135deg, #2a1608, #1a1a1a); border: 1px solid rgba(255,94,0,0.3); border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 24px;">
-            <div id="cupons-total-disponiveis" style="font-size: 38px; font-weight: 800; color: var(--laranja-fogo, #ff5e00); line-height: 1;">0</div>
-            <div style="color: #ddd; font-size: 13.5px; font-weight: 600; margin-top: 4px;">cupom(ns) disponível(is) pra você</div>
-        </div>
-
-        <div id="lista-cupons-disponiveis"></div>
-
-        <h3 style="color: #888; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin: 28px 0 12px;">Já usados</h3>
-        <div id="lista-cupons-usados"></div>
     </div>
 
     <!-- ========================================== -->
@@ -317,10 +189,9 @@
             <i class="fa-solid fa-house"></i>
             <span>Início</span>
         </a>
-        <a href="#" class="nav-item" onclick="navegarPara('cupons')" id="btn-nav-cupons" style="position: relative;">
-            <i class="fa-solid fa-tags"></i>
-            <span id="badge-cupons-disponiveis" style="display:none; position:absolute; top:-2px; right:calc(50% - 22px); background: var(--laranja-fogo, #ff5e00); color:#fff; font-size:10px; font-weight:800; min-width:16px; height:16px; border-radius:8px; align-items:center; justify-content:center; padding:0 3px; line-height:1;">0</span>
-            <span>Cupons</span>
+        <a href="#" class="nav-item">
+            <i class="fa-solid fa-percent"></i>
+            <span>Promoções</span>
         </a>
         <a href="#" class="nav-item" onclick="navegarPara('pedidos')" id="btn-nav-pedidos">
             <i class="fa-regular fa-clipboard"></i>
@@ -339,8 +210,12 @@
         </div>
         <div id="fogo-particulas"></div>
     </div>
-    <audio id="som-fogo" preload="auto"></audio>
-
+   <audio id="som-fogo" preload="auto"></audio>
+    
+    <audio id="som-entrega" preload="auto">
+        <source src="https://tjievzloufqptabbvumz.supabase.co/storage/v1/object/public/audios/entrega.mp3.mpeg" type="audio/mpeg">
+    </audio>
+    
     <script src="script.js"></script>
 </body>
 </html>

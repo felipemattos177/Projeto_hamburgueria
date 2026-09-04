@@ -163,8 +163,33 @@ function headersAutenticados(contentType) {
     return headers;
 }
 
+const LIMITE_LOGIN_ADMIN = new Map();
+function limitarLoginAdmin() {
+    const agora = Date.now();
+    const historico = LIMITE_LOGIN_ADMIN.get('admin-login') || [];
+    const recente = historico.filter(ts => agora - ts < 60000);
+
+    if (recente.length >= 5) {
+        return false;
+    }
+
+    recente.push(agora);
+    LIMITE_LOGIN_ADMIN.set('admin-login', recente);
+    return true;
+}
+
 async function fazerLoginAdmin(event) {
     if (event) event.preventDefault();
+
+    if (!limitarLoginAdmin()) {
+        const erroEl = document.getElementById("login-erro");
+        if (erroEl) {
+            erroEl.innerText = "Muitas tentativas em pouco tempo. Aguarde 1 minuto antes de tentar novamente.";
+            erroEl.style.display = "block";
+        }
+        return;
+    }
+
     const email = document.getElementById("login-email").value.trim();
     const senha = document.getElementById("login-senha").value;
     const erroEl = document.getElementById("login-erro");

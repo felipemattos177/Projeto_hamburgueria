@@ -966,12 +966,57 @@ function duplicarItemCarrinho(index) {
 }
 
 async function aplicarCupom() {
+    const inputEl = document.getElementById("cupom-codigo-cliente");
     const erroEl = document.getElementById("cupom-feedback-erro");
-    // Temporariamente desativado enquanto a validação de cupons é ajustada.
-    cupomAplicado = null;
-    if (erroEl) {
-        erroEl.innerText = "Cupons temporariamente indisponíveis.";
-        erroEl.style.display = "block";
+    const codigo = inputEl ? inputEl.value.trim().toUpperCase() : "";
+
+    if (erroEl) erroEl.style.display = "none";
+
+    if (!codigo) {
+        if (erroEl) { erroEl.innerText = "Digite um código de cupom."; erroEl.style.display = "block"; }
+        return;
+    }
+
+    const subtotalAtual = carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0);
+
+    try {
+        const resposta = await fetchSupabase(`/rest/v1/rpc/validar_cupom`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                p_loja_id: lojaAtual.id,
+                p_codigo: codigo,
+                p_subtotal: subtotalAtual,
+                p_cliente_id: obterOuCriarClienteId()
+            })
+        });
+
+        const dados = resposta.ok ? await resposta.json() : null;
+
+        if (!dados || !dados.valido) {
+            cupomAplicado = null;
+            const motivoBruto = dados && dados.motivo ? dados.motivo : "";
+            const motivo = motivoBruto.includes(':') ? motivoBruto.split(':').slice(1).join(':').trim() : (motivoBruto || "Cupom inválido.");
+            if (erroEl) { erroEl.innerText = motivo; erroEl.style.display = "block"; }
+            renderizarCheckout();
+            return;
+        }
+
+        cupomAplicado = { codigo, valorDesconto: Number(dados.valor_desconto) };
+        if (inputEl) inputEl.value = "";
+
+        const elAplicado = document.getElementById("linha-cupom-aplicado");
+        const elInputLinha = document.getElementById("linha-cupom-input");
+        const elCodigoAplicado = document.getElementById("texto-codigo-cupom-aplicado");
+        const elDescontoAplicado = document.getElementById("texto-desconto-cupom-aplicado");
+        if (elCodigoAplicado) elCodigoAplicado.innerText = codigo;
+        if (elDescontoAplicado) elDescontoAplicado.innerText = `-R$ ${cupomAplicado.valorDesconto.toFixed(2).replace('.', ',')}`;
+        if (elAplicado) elAplicado.style.display = "flex";
+        if (elInputLinha) elInputLinha.style.display = "none";
+
+        renderizarCheckout();
+    } catch (erro) {
+        if (erroEl) { erroEl.innerText = "Erro ao validar cupom. Tente novamente."; erroEl.style.display = "block"; }
     }
 }
 
@@ -1345,9 +1390,6 @@ async function enviarParaWhatsApp() {
         return;
     }
 
-    // Validação de cupom temporariamente desativada.
-    cupomAplicado = null;
-
     const enderecoFormatado = ehEntrega ? `${rua}, ${numero} - ${bairro} ${complemento ? '(' + complemento + ')' : ''}` : "";
     const taxaEntrega = obterTaxaEntregaAtual();
     const totalCalculado = Math.max(0, carrinho.reduce((acc, item) => acc + item.precoTotalItem, 0) - obterDescontoCupomAtual()) + taxaEntrega;
@@ -1386,8 +1428,7 @@ async function enviarParaWhatsApp() {
             p_loja_id: lojaAtual.id,
             p_tipo_entrega: tipoEntregaSelecionado,
             p_endereco_entrega: ehEntrega ? enderecoFormatado : null,
-            // Cupom temporariamente desativado; não enviar código nem desconto.
-            p_codigo_cupom: null
+            p_codigo_cupom: cupomAplicado ? cupomAplicado.codigo : null
         };
 
         const resSupabase = await fetchSupabase(`/rest/v1/rpc/registrar_pedido_completo`, {
@@ -1396,33 +1437,37 @@ async function enviarParaWhatsApp() {
             body: JSON.stringify(dadosPedidoCompleto)
         });
 
-        if (!resSupabase.ok) {
-            const erroDB = await resSupabase.json();
-            if (erroDB.code === "23514" || (erroDB.message && erroDB.message.includes("trava_estoque_positivo"))) {
-                let itemFalho = "algum ingrediente";
-                if (erroDB.details) { const partes = erroDB.details.split(','); if (partes.length > 1) itemFalho = partes[1].trim(); }
-                mostrarAviso(`O estoque de "${itemFalho}" esgotou agora mesmo! Volte e ajuste a quantidade no carrinho.`, "Estoque Esgotado");
-            } else if (erroDB.message && erroDB.message.includes("CUPOM_JA_USADO")) {
+        const corpoResposta = await resSupabase.json().catch(() => null);
+
+        if (!resSupabase.ok || !corpoResposta || corpoResposta.sucesso !== true) {
+            const erroTexto = (corpoResposta && corpoResposta.erro) || "";
+            const codigoErro = corpoResposta && corpoResposta.codigo_erro;
+
+            if (codigoErro === "trava_estoque_positivo") {
+                mostrarAviso("O estoque de algum ingrediente esgotou agora mesmo! Volte e ajuste a quantidade no carrinho.", "Estoque Esgotado");
+            } else if (erroTexto.includes("CUPOM_JA_USADO")) {
                 removerCupom();
                 renderizarCheckout();
                 mostrarAviso("Esse cupom já foi usado por você antes e só vale uma vez. Remove pra continuar sem ele.", "Cupom Já Usado");
-            } else if (erroDB.message && erroDB.message.includes("CUPOM_VALOR_MINIMO_NAO_ATINGIDO")) {
+            } else if (erroTexto.includes("CUPOM_VALOR_MINIMO_NAO_ATINGIDO")) {
                 removerCupom();
                 renderizarCheckout();
                 mostrarAviso("O carrinho ficou abaixo do valor mínimo exigido por esse cupom. Remove ou adiciona mais itens pra continuar.", "Valor Mínimo Não Atingido");
-            } else if (erroDB.message && erroDB.message.includes("CUPOM_RESTRITO_A_NOVOS_CLIENTES")) {
+            } else if (erroTexto.includes("CUPOM_RESTRITO_A_NOVOS_CLIENTES")) {
                 removerCupom();
                 renderizarCheckout();
                 mostrarAviso("Esse cupom é exclusivo pra quem está começando a pedir aqui. Remove pra continuar sem ele.", "Cupom Restrito");
-            } else if (erroDB.message && (erroDB.message.includes("CUPOM_INVALIDO") || erroDB.message.includes("CUPOM_ESGOTADO"))) {
+            } else if (erroTexto.includes("CUPOM_INVALIDO") || erroTexto.includes("CUPOM_ESGOTADO")) {
                 removerCupom();
                 renderizarCheckout();
                 mostrarAviso("Esse cupom não é mais válido (pode ter esgotado agora mesmo). Remove ou tenta outro pra continuar.", "Cupom Inválido");
+            } else if (codigoErro === "TOTAL_INVALIDO") {
+                mostrarAviso("O total do pedido mudou (talvez um preço tenha sido atualizado). Recarregue a página e tente novamente.", "Total Desatualizado");
             } else {
-                mostrarAviso("Ocorreu um erro ao registrar seu pedido no nosso system.", "Erro na Finalização");
+                mostrarAviso("Ocorreu um erro ao registrar seu pedido no nosso sistema.", "Erro na Finalização");
             }
             if (btnFinalizar) { btnFinalizar.innerText = textoOriginalBotao; btnFinalizar.disabled = false; }
-            return; 
+            return;
         }
 
         // =========================================================

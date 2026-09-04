@@ -24,13 +24,7 @@ function escaparHtml(texto) {
 // texto na tela isso ajuda o entregador, mas mandar pro Maps faz a busca dar
 // errado — então pra montar o link tiramos só essa parte entre parênteses.
 function enderecoParaMaps(endereco) {
-    // Formato salvo: "Rua, Número - Bairro (complemento)". O bairro às vezes
-    // confunde o geocoding do Maps (nome ambíguo, bairro repetido em cidade
-    // vizinha etc.) — pra busca, fica só "Rua, Número".
-    let limpo = String(endereco || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
-    const idx = limpo.lastIndexOf(' - ');
-    if (idx !== -1) limpo = limpo.substring(0, idx).trim();
-    return limpo;
+    return String(endereco || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
 }
 
 function formatarMoeda(v) {
@@ -222,6 +216,9 @@ function iniciarPainelEntregador() {
 // ==========================================
 async function carregarDadosEntregador() {
     try {
+        const hojeInicio = new Date();
+        hojeInicio.setHours(0, 0, 0, 0);
+
         const [resPreparo, resMinhas, resEntreguesHoje] = await Promise.all([
             chamarRpcEntregador('entregador_pedidos_em_preparo'),
             chamarRpcEntregador('entregador_minhas_entregas'),
@@ -252,7 +249,6 @@ async function carregarDadosEntregador() {
 
         renderizarEmPreparo(pedidosPreparo);
         renderizarMinhasEntregas(minhasEntregas);
-        reaplicarItensAbertos();
     } catch (erro) {
         console.error("Erro ao carregar dados do entregador:", erro);
     }
@@ -279,8 +275,6 @@ function renderizarEmPreparo(pedidos) {
                     ${ped.endereco_entrega ? escaparHtml(ped.endereco_entrega) + '<br>' : ''}
                     <span class="total">${formatarMoeda(totalNum)}</span>
                 </div>
-                <button type="button" class="btn-ver-itens" onclick="alternarItensPedido(${ped.id}, this)"><i class="fa-solid fa-list"></i> Ver itens do pedido</button>
-                <div id="itens-pedido-${ped.id}" class="itens-pedido-expandido" style="display:none;"></div>
                 ${ped.tipo_entrega !== 'retirada' ? `<button class="btn-acao-entregador btn-pegar" onclick="pegarPedido(${ped.id})"><i class="fa-solid fa-motorcycle"></i> Peguei! Saiu pra entrega</button>` : ''}
             </div>
         `;
@@ -311,93 +305,11 @@ function renderizarMinhasEntregas(pedidos) {
                     ${ped.endereco_entrega ? escaparHtml(ped.endereco_entrega) + '<br>' : ''}
                     <span class="total">${formatarMoeda(totalNum)}</span>
                 </div>
-                <button type="button" class="btn-ver-itens" onclick="alternarItensPedido(${ped.id}, this)"><i class="fa-solid fa-list"></i> Ver itens do pedido</button>
-                <div id="itens-pedido-${ped.id}" class="itens-pedido-expandido" style="display:none;"></div>
                 ${linkMaps}
                 <button class="btn-acao-entregador btn-entregue" onclick="marcarComoEntregue(${ped.id})"><i class="fa-solid fa-check-double"></i> Marcar como entregue</button>
             </div>
         `;
     }).join('');
-}
-
-// Guarda o HTML já montado por pedido, pra não rebuscar toda vez que
-// abre/fecha o mesmo card. E lembra quais estão abertos, porque a lista
-// inteira é redesenhada a cada 4s (senão o card fechava sozinho no meio
-// do entregador lendo).
-const cacheItensPedido = {};
-const pedidosComItensAbertos = new Set();
-
-// Chamada depois de todo redesenho da lista — reabre quem estava aberto.
-function reaplicarItensAbertos() {
-    pedidosComItensAbertos.forEach(pedidoId => {
-        const container = document.getElementById(`itens-pedido-${pedidoId}`);
-        if (!container || !cacheItensPedido[pedidoId]) {
-            pedidosComItensAbertos.delete(pedidoId); // pedido saiu da lista (ex: já foi entregue)
-            return;
-        }
-        container.innerHTML = cacheItensPedido[pedidoId];
-        container.style.display = "block";
-        const botao = container.previousElementSibling;
-        if (botao && botao.classList.contains('btn-ver-itens')) {
-            botao.innerHTML = `<i class="fa-solid fa-chevron-up"></i> Ocultar itens`;
-        }
-    });
-}
-
-async function alternarItensPedido(pedidoId, botao) {
-    const container = document.getElementById(`itens-pedido-${pedidoId}`);
-    if (!container) return;
-
-    const estaAberto = container.style.display === "block";
-    if (estaAberto) {
-        container.style.display = "none";
-        pedidosComItensAbertos.delete(pedidoId);
-        botao.innerHTML = `<i class="fa-solid fa-list"></i> Ver itens do pedido`;
-        return;
-    }
-
-    pedidosComItensAbertos.add(pedidoId);
-
-    if (cacheItensPedido[pedidoId]) {
-        container.innerHTML = cacheItensPedido[pedidoId];
-        container.style.display = "block";
-        botao.innerHTML = `<i class="fa-solid fa-chevron-up"></i> Ocultar itens`;
-        return;
-    }
-
-    const textoOriginal = botao.innerHTML;
-    botao.innerHTML = "Carregando...";
-    botao.disabled = true;
-
-    try {
-        const res = await chamarRpcEntregador('entregador_itens_pedido', { p_pedido_id: pedidoId });
-        const itens = await res.json();
-
-        let html;
-        if (!res.ok || !Array.isArray(itens) || itens.length === 0) {
-            console.error("entregador_itens_pedido falhou:", itens);
-            html = `<div class="vazio" style="margin:0; padding:12px;">Não foi possível carregar os itens.</div>`;
-        } else {
-            html = itens.map(item => `
-                <div class="item-detalhe-pedido">
-                    <strong>${item.quantidade}x ${escaparHtml(item.produto_nome)}</strong>
-                    ${item.adicionais ? `<div class="item-adicionais">+ ${escaparHtml(item.adicionais)}</div>` : ''}
-                    ${item.observacao ? `<div class="item-obs"><i class="fa-solid fa-pen"></i> ${escaparHtml(item.observacao)}</div>` : ''}
-                </div>
-            `).join('');
-            cacheItensPedido[pedidoId] = html;
-        }
-
-        container.innerHTML = html;
-        container.style.display = "block";
-        botao.innerHTML = `<i class="fa-solid fa-chevron-up"></i> Ocultar itens`;
-    } catch (erro) {
-        container.innerHTML = `<div class="vazio" style="margin:0; padding:12px;">Erro ao carregar os itens.</div>`;
-        container.style.display = "block";
-        botao.innerHTML = `<i class="fa-solid fa-chevron-up"></i> Ocultar itens`;
-    } finally {
-        botao.disabled = false;
-    }
 }
 
 async function pegarPedido(pedidoId) {

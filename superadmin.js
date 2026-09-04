@@ -57,21 +57,6 @@ function headersAutenticados(contentType) {
     return headers;
 }
 
-const LIMITE_LOGIN_SUPER = new Map();
-function limitarLoginSuper() {
-    const agora = Date.now();
-    const historico = LIMITE_LOGIN_SUPER.get('super-login') || [];
-    const recente = historico.filter(ts => agora - ts < 60000);
-
-    if (recente.length >= 5) {
-        return false;
-    }
-
-    recente.push(agora);
-    LIMITE_LOGIN_SUPER.set('super-login', recente);
-    return true;
-}
-
 async function verificarEhSuperAdmin(userId) {
     try {
         const res = await fetch(`${SUPABASE_URL}/rest/v1/super_admins?select=user_id&user_id=eq.${userId}`, {
@@ -86,16 +71,6 @@ async function verificarEhSuperAdmin(userId) {
 
 async function fazerLoginSuper(event) {
     if (event) event.preventDefault();
-
-    if (!limitarLoginSuper()) {
-        const erroEl = document.getElementById("login-erro-super");
-        if (erroEl) {
-            erroEl.innerText = "Muitas tentativas em pouco tempo. Aguarde 1 minuto antes de tentar novamente.";
-            erroEl.style.display = "block";
-        }
-        return;
-    }
-
     const email = document.getElementById("login-email-super").value.trim();
     const senha = document.getElementById("login-senha-super").value;
     const erroEl = document.getElementById("login-erro-super");
